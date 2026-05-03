@@ -110,8 +110,10 @@ with timer("Summary"):
     print(f"Output zarr: {output_path}")
     print()
     print("Elements:")
-    for name, element in sdata.items():
-        print(f"  {name}: {type(element).__name__}")
+    for group_name in ("images", "labels", "points", "shapes", "tables"):
+        group = getattr(sdata, group_name, {})
+        for name, element in group.items():
+            print(f"  {name}: {type(element).__name__} [{group_name}]")
 ```
 
 ## Timings
