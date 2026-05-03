@@ -16,7 +16,7 @@ process SUBSET_FOLLICLE {
 
     output:
     tuple val(sample),
-          path("output/*.zarr", hidden: true, optional: true)
+          path("output", hidden: true)
 
     script:
     def stagedRowJson = groovy.json.JsonOutput.toJson(new LinkedHashMap(row_params) + [path: sample_zarr.getName()])
