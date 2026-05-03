@@ -9,6 +9,7 @@ process SUBSET_FOLLICLE {
     tuple val(sample),
           path(sample_zarr),
           val(row_params),
+          path(cell_ids_file),
           path(notebook),
           path('timer.py'),
           val(publish_dir),
@@ -22,7 +23,7 @@ process SUBSET_FOLLICLE {
     script:
     def stagedRowJson = groovy.json.JsonOutput.toJson(new LinkedHashMap(row_params) + [path: sample_zarr.getName()])
     def pipeline_params_json = groovy.json.JsonOutput.toJson([
-        cell_ids_file: params.cell_ids_file,
+        cell_ids_file: cell_ids_file.getName(),
         radius       : params.radius,
         n_jobs       : task.cpus,
     ])

@@ -12,6 +12,9 @@ include { WRITE_SAMPLESHEET as WRITE_FOLLICLE_ANALYSIS_INPUTS } from './modules/
 workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"
     def expectedColumns = ['sample', 'path'] as Set
+    def cellIdsRegistry = params.cell_ids_registry ?: [:]
+    def cellIdsFileValue = params.cell_ids_file?.toString()
+    def cellIdsFilePath = file(cellIdsRegistry.get(cellIdsFileValue, cellIdsFileValue))
 
     def sampleRows = Channel
         .fromPath(params.samplesheet)
@@ -56,7 +59,7 @@ workflow {
         def subsetInputs = sampleArtifacts.map { sample, sampleZarr, rowParams ->
             def publishDir = "${params.outdir}/${sample}/${subsetNotebook.baseName}"
             def outputName = "${sample}_${subsetNotebook.baseName}.html"
-            tuple(sample, sampleZarr, rowParams, subsetNotebook, timerScript, publishDir, outputName)
+            tuple(sample, sampleZarr, rowParams, cellIdsFilePath, subsetNotebook, timerScript, publishDir, outputName)
         }
 
         def subsetFollicle = SUBSET_FOLLICLE(subsetInputs)

@@ -87,6 +87,11 @@ ROI1_aaaalpdj-1,results/ROI1/subset_follicle/output/aaaalpdj-1.zarr
 
 `assets/stage_quality_area_all_rois.csv` is used by the build workflow to decide which follicles to subset. It must contain `Donor.ROI` and `cell_id`. An optional `radius` column sets a per-cell bounding box radius (µm); missing values fall back to `params.radius`.
 
+`build.nf` can select this file by key. The built-in choices are:
+
+- `--cell_ids_file full`
+- `--cell_ids_file small`
+
 ---
 
 ## Usage
@@ -120,6 +125,14 @@ nextflow run build.nf \
 
 This runs only `create_spatialdata.qmd` and writes `results/pipeline_info/sample_analysis_inputs.csv`.
 
+### Build with the small test follicle file
+
+```bash
+nextflow run build.nf \
+    --samplesheet assets/samplesheet.csv \
+    --cell_ids_file small
+```
+
 ### Analyze follicle artifacts
 
 ```bash
@@ -148,7 +161,8 @@ Key parameters (set in `nextflow.config` or passed via `--param value`):
 |-----------|---------|-------------|
 | `samplesheet` | `null` | Path to samplesheet CSV |
 | `outdir` | `results` | Output directory |
-| `cell_ids_file` | `assets/stage_quality_area_all_rois.csv` | Cell ID reference file |
+| `cell_ids_file` | `full` | Cell ID reference file key or direct path |
+| `cell_ids_registry` | built-in map | Named cell ID files available to `build.nf` |
 | `radius` | `250` | Default bounding box radius (µm) |
 | `run_subset_follicle` | `true` | Whether `build.nf` should run `subset_follicle.qmd` after building sample-level zarrs |
 | `producer_registry` | built-in map | The two producer notebooks used by `build.nf` |
