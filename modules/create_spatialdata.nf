@@ -17,7 +17,8 @@ process CREATE_SPATIALDATA {
     output:
     tuple val(sample),
           path("output/${sample}.zarr", hidden: true),
-          val(row_params)
+          val(row_params), emit: artifacts
+    path "*.html", emit: reports
 
     script:
     def stagedRowJson = groovy.json.JsonOutput.toJson(new LinkedHashMap(row_params) + [path: input_path.getName()])

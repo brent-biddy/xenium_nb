@@ -21,6 +21,10 @@ import spatialdata
 # import session_info  # not in current container
 from timer import timer, timing_summary
 
+
+def normalize_sample_id(value: str) -> str:
+    return "".join(ch for ch in str(value).upper() if ch.isalnum())
+
 with timer("Setup"):
     with open("params.json") as f:
         params = json.load(f)
@@ -50,7 +54,21 @@ Each cell may have an optional per-cell radius; missing values fall back to the 
 
 ```{python}
 with timer("Load cell IDs"):
-    _df = pd.read_csv(cell_ids_file).query("`Donor.ROI` == @sample")
+    _df = pd.read_csv(cell_ids_file)
+    normalized_sample = normalize_sample_id(sample)
+    _df["_normalized_roi"] = _df["Donor.ROI"].map(normalize_sample_id)
+    matching_rois = _df.loc[_df["_normalized_roi"] == normalized_sample, "Donor.ROI"].drop_duplicates().tolist()
+    if not matching_rois:
+        raise ValueError(
+            f"No follicle cells found for sample '{sample}'. "
+            "Check naming in the samplesheet and cell_ids_file Donor.ROI column."
+        )
+    if len(matching_rois) > 1:
+        raise ValueError(
+            f"Sample '{sample}' matched multiple Donor.ROI values after normalization: {matching_rois}"
+        )
+    matched_roi = matching_rois[0]
+    _df = _df.loc[_df["Donor.ROI"] == matched_roi].copy()
     if "radius" not in _df.columns:
         # no per-cell radius column — apply default to all cells
         _df["radius"] = default_radius
@@ -58,8 +76,8 @@ with timer("Load cell IDs"):
         # fill only missing values; explicit per-cell values are kept
         _df["radius"] = _df["radius"].fillna(default_radius)
     # keep all metadata columns so they can be embedded in each follicle zarr
-    cells = _df.drop(columns=["Donor.ROI"]).reset_index(drop=True)
-print(f"{len(cells)} cell(s) found for sample '{sample}':")
+    cells = _df.drop(columns=["Donor.ROI", "_normalized_roi"]).reset_index(drop=True)
+print(f"{len(cells)} cell(s) found for sample '{sample}' (matched Donor.ROI='{matched_roi}'):")
 print(cells[["cell_id", "radius"]].to_string(index=False))
 ```
 

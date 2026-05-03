@@ -16,7 +16,8 @@ process SUBSET_FOLLICLE {
 
     output:
     tuple val(sample),
-          path("output", hidden: true)
+          path("output", hidden: true), emit: artifacts
+    path "*.html", emit: reports
 
     script:
     def stagedRowJson = groovy.json.JsonOutput.toJson(new LinkedHashMap(row_params) + [path: sample_zarr.getName()])

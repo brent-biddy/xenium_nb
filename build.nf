@@ -39,7 +39,8 @@ workflow {
         tuple(createNotebook, timerScript, inputPath, sample, publishDir, outputName, rowParams)
     }
 
-    def sampleArtifacts = CREATE_SPATIALDATA(createInputs)
+    def createSpatialdata = CREATE_SPATIALDATA(createInputs)
+    def sampleArtifacts = createSpatialdata.out.artifacts
 
     def sampleArtifactRows = sampleArtifacts
         .map { sample, sampleZarr, rowParams ->
@@ -58,7 +59,8 @@ workflow {
             tuple(sample, sampleZarr, rowParams, subsetNotebook, timerScript, publishDir, outputName)
         }
 
-        def follicleArtifactGroups = SUBSET_FOLLICLE(subsetInputs)
+        def subsetFollicle = SUBSET_FOLLICLE(subsetInputs)
+        def follicleArtifactGroups = subsetFollicle.out.artifacts
 
         def follicleArtifactRows = follicleArtifactGroups
             .flatMap { sample, outputDir ->
