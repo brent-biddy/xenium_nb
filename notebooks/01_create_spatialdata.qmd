@@ -20,9 +20,7 @@ import spatialdata
 from timer import timer, timing_summary
 
 with timer("Setup"):
-    sample      = params["sample"]
-    path        = params["path"]
-    n_jobs      = int(params["n_jobs"])
+    # sample, path, n_jobs are injected by Quarto from --execute-params
     output_path = os.path.join("output", f"{sample}.zarr")
 ```
 
