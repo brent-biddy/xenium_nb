@@ -26,11 +26,14 @@ with timer("Setup"):
         params = json.load(f)
 
     sample = params["sample"]
-    # 'path' is the upstream zarr, staged into the work dir by Nextflow.
-    zarr_path = params["path"]
+    # 'path' is the top-level results directory, staged into the work dir by
+    # Nextflow. Notebook 01 publishes its zarr under
+    # <results>/<sample>/01_create_spatialdata/output/<sample>.zarr.
+    results_dir = params["path"]
     cell_ids_file = params["cell_ids_file"]
     radius = float(params["radius"])
     default_radius = float(radius)
+    zarr_path = os.path.join(results_dir, sample, "01_create_spatialdata", "output", f"{sample}.zarr")
 ```
 
 ## Load SpatialData
