@@ -1,20 +1,17 @@
 # xenium_nb
 
-A Nextflow pipeline for analysing 10x Xenium spatial transcriptomics data using Quarto notebooks. Each notebook runs as an independent Nextflow process, producing a rendered HTML report alongside any output files.
+A Nextflow pipeline for Xenium spatial transcriptomics data with two separate entry points:
+
+- `build.nf` builds reusable data artifacts
+- `analyze.nf` runs analysis notebooks against artifact samplesheets
+
+Both workflows use the same two-column samplesheet contract:
+
+```csv
+sample,path
+```
 
 Notebook parameters are staged into each task work directory as `params.json` and loaded explicitly by the notebook code.
-
----
-
-## Overview
-
-The pipeline runs in three passes, each driven by its own samplesheet:
-
-| Pass | Notebook | Input | Output |
-|------|----------|-------|--------|
-| 1 | `01_create_spatialdata` | Raw Xenium output directory | SpatialData zarr store |
-| 2 | `02_subset_follicle` | Base results directory | Per-cell follicle zarr stores |
-| 3 | `03_plot_follicle` | Base results directory | Rendered tissue image plots |
 
 ---
 
@@ -30,22 +27,25 @@ The pipeline runs in three passes, each driven by its own samplesheet:
 
 ```
 xenium_nb/
-├── main.nf                    # Pipeline entry point
+├── build.nf                   # Build workflow: raw Xenium -> sample and follicle artifacts
+├── analyze.nf                 # Analysis workflow: artifact samplesheet -> notebook reports
 ├── nextflow.config            # Parameters and profiles
 ├── conf/
 │   └── base.config            # Resource defaults
 ├── modules/
-│   └── run_notebook.nf        # RUN_NOTEBOOK process
+│   ├── create_spatialdata.nf  # Sample-level artifact producer
+│   ├── subset_follicle.nf     # Follicle-level artifact producer
+│   ├── run_notebook.nf        # Generic analysis notebook runner
+│   └── write_samplesheet.nf   # Writes two-column artifact samplesheets
 ├── notebooks/
-│   ├── 01_create_spatialdata.qmd
-│   ├── 02_subset_follicle.qmd
-│   └── 03_plot_follicle.qmd
+│   ├── create_spatialdata.qmd
+│   ├── subset_follicle.qmd
+│   └── plot_follicle.qmd
 ├── bin/
 │   ├── timer.py               # Timing utilities for notebooks
-│   └── make_follicle_samplesheet.py
+│   └── make_follicle_samplesheet.py  # Legacy helper for manual/export workflows
 └── assets/
-    ├── samplesheet.csv        # Sample-level samplesheet (pass 1 & 2)
-    ├── follicle_samplesheet.csv  # Cell-level samplesheet (pass 3, generated)
+    ├── samplesheet.csv        # Sample-level samplesheet
     └── stage_quality_area_all_rois.csv  # Cell ID reference file
 ```
 
@@ -53,9 +53,9 @@ xenium_nb/
 
 ## Samplesheets
 
-### Sample-level (`assets/samplesheet.csv`)
+### Build workflow input
 
-Used for passes 1 and 2. `path` points to the raw Xenium output directory for pass 1, and to the base results directory for pass 2. Relative paths are resolved against the directory where you launch `nextflow run`.
+Used by `build.nf`. `path` points to a raw Xenium output directory.
 
 ```csv
 sample,path
@@ -63,58 +63,79 @@ ROI1,/path/to/ROI1/xenium_output
 ROI2,/path/to/ROI2/xenium_output
 ```
 
-### Follicle-level (`assets/follicle_samplesheet.csv`)
+### Analysis workflow input
 
-Used for pass 3. Generated automatically by `bin/make_follicle_samplesheet.py`. Each row is one annotated follicle cell; `sample` is `<ROI>_<cell_id>`, `roi_id` and `cell_id` are emitted explicitly, and `path` is the base results directory. Relative paths are resolved against the directory where you launch `nextflow run`.
+Used by `analyze.nf`. `path` points to an already-built artifact, either sample-level or follicle-level depending on the notebook scope.
+
+Sample artifact sheet:
 
 ```csv
-sample,roi_id,cell_id,path
-ROI1_aaaaimck-1,ROI1,aaaaimck-1,results
-ROI1_aaaalpdj-1,ROI1,aaaalpdj-1,results
-ROI2_aaabfpcg-1,ROI2,aaabfpcg-1,results
+sample,path
+ROI1,results/ROI1/create_spatialdata/output/ROI1.zarr
+ROI2,results/ROI2/create_spatialdata/output/ROI2.zarr
 ```
 
-### Cell ID reference file (`assets/stage_quality_area_all_rois.csv`)
+Follicle artifact sheet:
 
-Maps cell IDs to samples. Must contain `Donor.ROI` and `cell_id` columns. An optional `radius` column sets a per-cell bounding box radius (µm); missing values fall back to `params.radius`.
+```csv
+sample,path
+ROI1_aaaaimck-1,results/ROI1/subset_follicle/output/aaaaimck-1.zarr
+ROI1_aaaalpdj-1,results/ROI1/subset_follicle/output/aaaalpdj-1.zarr
+```
+
+### Cell ID reference file
+
+`assets/stage_quality_area_all_rois.csv` is used by the build workflow to decide which follicles to subset. It must contain `Donor.ROI` and `cell_id`. An optional `radius` column sets a per-cell bounding box radius (µm); missing values fall back to `params.radius`.
 
 ---
 
 ## Usage
 
-### Pass 1 — Create SpatialData zarr stores
+### Build artifacts
 
 ```bash
-nextflow run main.nf \
+nextflow run build.nf \
+    --samplesheet assets/samplesheet.csv
+```
+
+By default this runs both producer notebooks:
+
+- `create_spatialdata.qmd`
+- `subset_follicle.qmd`
+
+and writes:
+
+- sample zarrs under `results/<sample>/create_spatialdata/output/`
+- follicle zarrs under `results/<sample>/subset_follicle/output/`
+- `results/pipeline_info/sample_artifacts.csv`
+- `results/pipeline_info/follicle_artifacts.csv`
+
+### Build sample artifacts only
+
+```bash
+nextflow run build.nf \
     --samplesheet assets/samplesheet.csv \
-    --notebooks "[${PWD}/notebooks/01_create_spatialdata.qmd]"
+    --run_subset_follicle false
 ```
 
-### Pass 2 — Subset follicles
+This runs only `create_spatialdata.qmd` and writes `results/pipeline_info/sample_artifacts.csv`.
 
-Update `assets/samplesheet.csv` so `path` points to the base results directory (e.g. `results/`), then run:
+### Analyze follicle artifacts
 
 ```bash
-nextflow run main.nf \
-    --samplesheet assets/samplesheet.csv \
-    --notebooks "[${PWD}/notebooks/02_subset_follicle.qmd]"
+nextflow run analyze.nf \
+    --samplesheet results/pipeline_info/follicle_artifacts.csv \
+    --notebooks plot_follicle
 ```
 
-### Generate follicle samplesheet
+### Analyze sample artifacts
+
+When you add sample-scoped analysis notebooks to the registry, point `analyze.nf` at the sample artifact sheet:
 
 ```bash
-python bin/make_follicle_samplesheet.py \
-    --cell-ids assets/stage_quality_area_all_rois.csv \
-    --outdir   results \
-    --output   assets/follicle_samplesheet.csv
-```
-
-### Pass 3 — Plot follicles
-
-```bash
-nextflow run main.nf \
-    --samplesheet assets/follicle_samplesheet.csv \
-    --notebooks "[${PWD}/notebooks/03_plot_follicle.qmd]"
+nextflow run analyze.nf \
+    --samplesheet results/pipeline_info/sample_artifacts.csv \
+    --notebooks your_sample_notebook_id
 ```
 
 ---
@@ -129,7 +150,18 @@ Key parameters (set in `nextflow.config` or passed via `--param value`):
 | `outdir` | `results` | Output directory |
 | `cell_ids_file` | `assets/stage_quality_area_all_rois.csv` | Cell ID reference file |
 | `radius` | `250` | Default bounding box radius (µm) |
-| `notebooks` | `[01_create_spatialdata.qmd]` | Notebooks to run. Override per pass via `--notebooks` (see Usage). |
+| `run_subset_follicle` | `true` | Whether `build.nf` should run `subset_follicle.qmd` after building sample-level zarrs |
+| `producer_registry` | built-in map | The two producer notebooks used by `build.nf` |
+| `analysis_notebook_registry` | built-in map | Notebook IDs, paths, and scopes used by `analyze.nf` |
+| `notebooks` | `[]` | Analysis notebook IDs to run in `analyze.nf` |
+
+### Analysis notebook IDs
+
+The built-in analysis registry currently defines:
+
+| ID | Scope | Notebook |
+|----|-------|----------|
+| `plot_follicle` | `follicle` | `notebooks/plot_follicle.qmd` |
 
 ### Profiles
 
@@ -141,9 +173,8 @@ Key parameters (set in `nextflow.config` or passed via `--param value`):
 Activate with `-profile oscer`:
 
 ```bash
-nextflow run main.nf \
+nextflow run build.nf \
     --samplesheet assets/samplesheet.csv \
-    --notebooks "[${PWD}/notebooks/01_create_spatialdata.qmd]" \
     -profile oscer
 ```
 
@@ -155,28 +186,36 @@ nextflow run main.nf \
 results/
 ├── pipeline_info/
 │   ├── timeline.html
-│   └── report.html
+│   ├── report.html
+│   ├── sample_artifacts.csv
+│   └── follicle_artifacts.csv
 ├── ROI1/
-│   ├── 01_create_spatialdata/
-│   │   ├── ROI1_01_create_spatialdata.html
+│   ├── create_spatialdata/
+│   │   ├── ROI1_create_spatialdata.html
 │   │   └── output/
 │   │       └── ROI1.zarr/
-│   ├── 02_subset_follicle/
-│   │   ├── ROI1_02_subset_follicle.html
+│   ├── subset_follicle/
+│   │   ├── ROI1_subset_follicle.html
 │   │   └── output/
 │   │       ├── aaaaimck-1.zarr/
 │   │       └── aaaalpdj-1.zarr/
-│   └── 03_plot_follicle/
-│       ├── ROI1_aaaaimck-1_03_plot_follicle.html
-│       └── ROI1_aaaalpdj-1_03_plot_follicle.html
+│   └── plot_follicle/
+│       ├── ROI1_aaaaimck-1_plot_follicle.html
+│       └── ROI1_aaaalpdj-1_plot_follicle.html
 └── ROI2/
     └── ...
 ```
+
+Analysis outputs also publish under the parent sample directory, so follicle reports from `ROI1_aaaaimck-1`, `ROI1_aaaalpdj-1`, and similar artifacts all land under `results/ROI1/plot_follicle/`.
+
+If `--run_subset_follicle false` is used, `subset_follicle/` outputs and `follicle_artifacts.csv` are not created.
 
 ---
 
 ## Adding notebooks
 
-1. Create a new `.qmd` file in `notebooks/` with a YAML params block declaring `sample`, `path`, and any additional params needed.
-2. Add the notebook path to `params.notebooks` in `nextflow.config` or pass it via `--notebooks` on the CLI.
-3. Any params not declared in the notebook's front matter are automatically filtered out before rendering.
+1. Create a new `.qmd` file in `notebooks/` with a YAML params block declaring at least `sample` and `path`.
+2. If it is a build-stage producer, register it in `params.producer_registry` and wire it into `build.nf`.
+3. If it is an analysis notebook, register it in `params.analysis_notebook_registry` with a unique ID and a scope of `sample` or `follicle`.
+4. Run analysis notebooks with `nextflow run analyze.nf --samplesheet <artifact_sheet.csv> --notebooks <id1,id2>`.
+5. Any params not declared in the notebook's front matter are automatically filtered out before rendering.

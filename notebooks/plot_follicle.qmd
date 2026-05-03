@@ -1,9 +1,7 @@
 ---
-title: "03 — Plot Follicle"
+title: "Plot Follicle"
 params:
   sample: "default"
-  roi_id: "default"
-  cell_id: "default"
   path: "."
 format:
   html:
@@ -15,7 +13,7 @@ execute:
 
 ```{python}
 import json
-import os
+from pathlib import Path
 import spatialdata
 import spatialdata_plot
 # import session_info  # not in current container
@@ -26,11 +24,9 @@ with timer("Setup"):
         params = json.load(f)
 
     sample = params["sample"]
-    roi_id = params["roi_id"]
-    cell_id = params["cell_id"]
-    path = params["path"]
-    # follicle zarr written by 02_subset_follicle for this cell
-    zarr_path = os.path.join(path, roi_id, "02_subset_follicle", "output", f"{cell_id}.zarr")
+    cell_id = Path(params["path"]).stem
+    # 'path' is the staged follicle-level zarr produced by subset_follicle.
+    zarr_path = params["path"]
 ```
 
 ## Load follicle SpatialData

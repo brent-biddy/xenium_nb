@@ -1,40 +1,31 @@
-process RUN_NOTEBOOK {
+process SUBSET_FOLLICLE {
     tag "${sample}:${notebook.baseName}"
 
-    // Publish HTML under the sample-scoped analysis directory.
-    // Other outputs (zarr stores etc.) are published under output/ as written.
     publishDir "${publish_dir}", mode: 'copy', saveAs: { fn ->
         fn.endsWith('.html') ? output_name : fn
     }
 
     input:
-    tuple path(notebook),
-          path('timer.py'),       // staged into work dir so notebooks can `from timer import timer`
-          path(artifact_path),    // upstream artifact staged so notebooks read it from CWD
-          val(sample),
-          val(publish_dir),       // resolved by the caller: <outdir>/<sample>/<notebook_basename>
-          val(output_name),       // resolved by the caller: <sample>_<notebook_basename>.html
-          val(row_params)         // row params map; path is rewritten to the staged artifact basename
+    tuple val(sample),
+          path(sample_zarr),
+          val(row_params),
+          path(notebook),
+          path('timer.py'),
+          val(publish_dir),
+          val(output_name)
 
     output:
-    path "*.html"
-    // hidden: true is required so dotfiles inside zarr stores (.zgroup,
-    // .zattrs, .zmetadata) are collected — without it the published zarr
-    // is missing root metadata and downstream readers fail.
-    path "output/**", optional: true, hidden: true
+    tuple val(sample),
+          path("output/*.zarr", hidden: true, optional: true)
 
     script:
-    // Pipeline-level params are written only if the notebook declares them.
-    // n_jobs comes from task.cpus so it tracks whatever the executor allocated.
-    def stagedRowJson = groovy.json.JsonOutput.toJson(new LinkedHashMap(row_params) + [path: artifact_path.getName()])
+    def stagedRowJson = groovy.json.JsonOutput.toJson(new LinkedHashMap(row_params) + [path: sample_zarr.getName()])
     def pipeline_params_json = groovy.json.JsonOutput.toJson([
         cell_ids_file: params.cell_ids_file,
         radius       : params.radius,
         n_jobs       : task.cpus,
     ])
     """
-    # Redirect cache and temp dirs into the writable work dir so quarto/deno
-    # don't try to write to a read-only /tmp on HPC compute nodes.
     export XDG_CACHE_HOME="\$PWD/.cache"
     export TMPDIR="\$PWD/tmp"
     mkdir -p "\$XDG_CACHE_HOME" "\$TMPDIR"
@@ -53,7 +44,6 @@ import json, re, yaml
 with open('${notebook}') as f:
     content = f.read()
 
-# Match YAML front matter, tolerating both Unix and Windows line endings.
 match = re.match(r'^---\\r?\\n(.*?)\\r?\\n---', content, re.DOTALL)
 if not match:
     raise ValueError("Notebook ${notebook} has no YAML front matter")
@@ -62,8 +52,6 @@ declared = set((yaml.safe_load(match.group(1)) or {}).get('params', {}).keys())
 with open('row_params.json') as f:
     full = json.load(f)
 
-# Merge in pipeline-level params only when the notebook declares them.
-# Row params win over pipeline defaults if both are present.
 with open('pipeline_params.json') as f:
     for k, v in json.load(f).items():
         if k in declared and k not in full:

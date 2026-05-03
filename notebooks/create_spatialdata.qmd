@@ -1,5 +1,5 @@
 ---
-title: "01 — Load Xenium → SpatialData"
+title: "Load Xenium → SpatialData"
 params:
   sample: "default"
   path: "."
