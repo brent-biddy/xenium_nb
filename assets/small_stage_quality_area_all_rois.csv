@@ -1,0 +1,13 @@
+Donor.ROI,Image,User,Stage.Labels,Quality,Notes,Time,cell_id,cell_area
+ROI1,ROI1_aaaaimck-1.png,Taylor,early transitioning,good,,22:31.9,aaaaimck-1,669.2156493
+ROI1,ROI1_aaaalpdj-1.png,Taylor,late transitioning,good,,23:55.1,aaaalpdj-1,790.2795599
+ROI2,ROI2_aaaacpld-1.png,Taylor,transitioning,poor,GCs,05:51.6,aaaacpld-1,499.7893931
+ROI2,ROI2_aaaadmip-1.png,Taylor,transitioning,good,,06:02.3,aaaadmip-1,423.6559529
+ROI3,ROI3_aaaagmki-1.png,Taylor,primordial,good,,52:05.1,aaaagmki-1,184.4181317
+ROI3,ROI3_aaaamabg-1.png,Taylor,early transitioning,good,,52:49.1,aaaamabg-1,583.3284587
+ROI4,ROI4_aaaaemgi-1.png,Taylor,primordial,good,,24:29.9,aaaaemgi-1,234.3157898
+ROI4,ROI4_aaaaeokl-1.png,Taylor,late transitioning,poor,"not sure about staging, end of follicle",24:57.2,aaaaeokl-1,282.813604
+ROI5,ROI5_aaaagckl-1.png,Taylor,primary;secondary,good,,54:43.1,aaaagckl-1,336.6850122
+ROI5,ROI5_aaaaplbh-1.png,Taylor,primordial,good,,54:50.9,aaaaplbh-1,1114.907853
+ROI6,ROI6_aaaabpba-1.png,Taylor,early transitioning,good,,00:49.3,aaaabpba-1,280.4654789
+ROI6,ROI6_aaaaeaam-1.png,Taylor,primordial,good,,03:03.8,aaaaeaam-1,209.7507889
