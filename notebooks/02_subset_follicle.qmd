@@ -17,7 +17,7 @@ execute:
 import os
 import pandas as pd
 import spatialdata
-import session_info
+# import session_info  # not in current container
 from timer import timer, timing_summary
 
 with timer("Setup"):
@@ -125,5 +125,5 @@ timing_summary()
 ## Session Info
 
 ```{python}
-session_info.show()
+# session_info.show()  # not in current container
 ```
