@@ -18,7 +18,10 @@ process RUN_NOTEBOOK {
 
     output:
     path "*.html"
-    path "output/**", optional: true
+    // hidden: true is required so dotfiles inside zarr stores (.zgroup,
+    // .zattrs, .zmetadata) are collected — without it the published zarr
+    // is missing root metadata and downstream readers fail.
+    path "output/**", optional: true, hidden: true
 
     script:
     // Pipeline-level params are written only if the notebook declares them.
