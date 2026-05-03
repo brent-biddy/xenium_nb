@@ -40,7 +40,7 @@ workflow {
     }
 
     def createSpatialdata = CREATE_SPATIALDATA(createInputs)
-    def sampleArtifacts = createSpatialdata.out.artifacts
+    def sampleArtifacts = createSpatialdata.artifacts
 
     def sampleArtifactRows = sampleArtifacts
         .map { sample, sampleZarr, rowParams ->
@@ -60,7 +60,7 @@ workflow {
         }
 
         def subsetFollicle = SUBSET_FOLLICLE(subsetInputs)
-        def follicleArtifactGroups = subsetFollicle.out.artifacts
+        def follicleArtifactGroups = subsetFollicle.artifacts
 
         def follicleArtifactRows = follicleArtifactGroups
             .flatMap { sample, outputDir ->
