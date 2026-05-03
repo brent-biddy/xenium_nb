@@ -30,8 +30,9 @@ workflow {
             tuple(row.sample, roi_id, JsonOutput.toJson(row))
         }
 
-    // Resolve notebook paths from config
-    def notebooks = Channel.fromList(params.notebooks).map { file(it) }
+    // Resolve notebook paths from config. Accept either a single string or a list.
+    def notebook_list = params.notebooks instanceof List ? params.notebooks : [params.notebooks]
+    def notebooks = Channel.of(*notebook_list).map { file(it) }
 
     // Stage timer.py into each process work directory so notebooks can
     // import it without any path manipulation
