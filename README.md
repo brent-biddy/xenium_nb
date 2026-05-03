@@ -107,8 +107,8 @@ and writes:
 
 - sample zarrs under `results/<sample>/create_spatialdata/output/`
 - follicle zarrs under `results/<sample>/subset_follicle/output/`
-- `results/pipeline_info/sample_artifacts.csv`
-- `results/pipeline_info/follicle_artifacts.csv`
+- `results/pipeline_info/sample_analysis_inputs.csv`
+- `results/pipeline_info/follicle_analysis_inputs.csv`
 
 ### Build sample artifacts only
 
@@ -118,13 +118,13 @@ nextflow run build.nf \
     --run_subset_follicle false
 ```
 
-This runs only `create_spatialdata.qmd` and writes `results/pipeline_info/sample_artifacts.csv`.
+This runs only `create_spatialdata.qmd` and writes `results/pipeline_info/sample_analysis_inputs.csv`.
 
 ### Analyze follicle artifacts
 
 ```bash
 nextflow run analyze.nf \
-    --samplesheet results/pipeline_info/follicle_artifacts.csv \
+    --samplesheet results/pipeline_info/follicle_analysis_inputs.csv \
     --notebooks plot_follicle
 ```
 
@@ -134,7 +134,7 @@ When you add sample-scoped analysis notebooks to the registry, point `analyze.nf
 
 ```bash
 nextflow run analyze.nf \
-    --samplesheet results/pipeline_info/sample_artifacts.csv \
+    --samplesheet results/pipeline_info/sample_analysis_inputs.csv \
     --notebooks your_sample_notebook_id
 ```
 
@@ -187,8 +187,8 @@ results/
 ├── pipeline_info/
 │   ├── timeline.html
 │   ├── report.html
-│   ├── sample_artifacts.csv
-│   └── follicle_artifacts.csv
+│   ├── sample_analysis_inputs.csv
+│   └── follicle_analysis_inputs.csv
 ├── ROI1/
 │   ├── create_spatialdata/
 │   │   ├── ROI1_create_spatialdata.html
@@ -208,7 +208,7 @@ results/
 
 Analysis outputs also publish under the parent sample directory, so follicle reports from `ROI1_aaaaimck-1`, `ROI1_aaaalpdj-1`, and similar artifacts all land under `results/ROI1/plot_follicle/`.
 
-If `--run_subset_follicle false` is used, `subset_follicle/` outputs and `follicle_artifacts.csv` are not created.
+If `--run_subset_follicle false` is used, `subset_follicle/` outputs and `follicle_analysis_inputs.csv` are not created.
 
 ---
 

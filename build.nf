@@ -6,7 +6,8 @@ nextflow.enable.dsl = 2
 
 include { CREATE_SPATIALDATA } from './modules/create_spatialdata'
 include { SUBSET_FOLLICLE } from './modules/subset_follicle'
-include { WRITE_SAMPLESHEET } from './modules/write_samplesheet'
+include { WRITE_SAMPLESHEET as WRITE_SAMPLE_ANALYSIS_INPUTS } from './modules/write_samplesheet'
+include { WRITE_SAMPLESHEET as WRITE_FOLLICLE_ANALYSIS_INPUTS } from './modules/write_samplesheet'
 
 workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"
@@ -46,9 +47,9 @@ workflow {
         }
         .collect()
         .map { rows -> JsonOutput.toJson(rows) }
-        .map { rowsJson -> tuple('sample_artifacts.csv', rowsJson) }
+        .map { rowsJson -> tuple('sample_analysis_inputs.csv', rowsJson) }
 
-    WRITE_SAMPLESHEET(sampleArtifactRows)
+    WRITE_SAMPLE_ANALYSIS_INPUTS(sampleArtifactRows)
 
     if (runSubsetFollicle) {
         def subsetInputs = sampleArtifacts.map { sample, sampleZarr, rowParams ->
@@ -68,8 +69,8 @@ workflow {
             }
             .collect()
             .map { rows -> JsonOutput.toJson(rows) }
-            .map { rowsJson -> tuple('follicle_artifacts.csv', rowsJson) }
+            .map { rowsJson -> tuple('follicle_analysis_inputs.csv', rowsJson) }
 
-        WRITE_SAMPLESHEET(follicleArtifactRows)
+        WRITE_FOLLICLE_ANALYSIS_INPUTS(follicleArtifactRows)
     }
 }
