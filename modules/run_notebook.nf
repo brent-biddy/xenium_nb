@@ -8,12 +8,12 @@ process RUN_NOTEBOOK {
     }
 
     input:
-    path  notebook
-    path  'timer.py'     // staged into work dir so notebooks can `from timer import timer`
-    val   sample_id
-    val   publish_dir    // resolved in main.nf: <outdir>/<roi_id>/<notebook_basename>
-    val   output_name    // resolved in main.nf: <sample_id>_<notebook_basename>.html
-    val   params_json    // params JSON built from the samplesheet row
+    tuple path(notebook),
+          path('timer.py'),       // staged into work dir so notebooks can `from timer import timer`
+          val(sample_id),
+          val(publish_dir),       // resolved in main.nf: <outdir>/<roi_id>/<notebook_basename>
+          val(output_name),       // resolved in main.nf: <sample_id>_<notebook_basename>.html
+          val(params_json)        // params JSON built from the samplesheet row
 
     output:
     path "*.html"
