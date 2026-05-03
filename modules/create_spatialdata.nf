@@ -16,7 +16,7 @@ process CREATE_SPATIALDATA {
 
     output:
     tuple val(sample),
-          path("output/${sample}.zarr", hidden: true),
+          path("output/${sample}.zarr"),
           val(row_params), emit: artifacts
     path "*.html", emit: reports
 
