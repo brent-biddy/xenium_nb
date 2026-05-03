@@ -28,6 +28,12 @@ process RUN_NOTEBOOK {
         n_jobs       : task.cpus,
     ])
     """
+    # Redirect cache and temp dirs into the writable work dir so quarto/deno
+    # don't try to write to a read-only /tmp on HPC compute nodes.
+    export XDG_CACHE_HOME="\$PWD/.cache"
+    export TMPDIR="\$PWD/tmp"
+    mkdir -p "\$XDG_CACHE_HOME" "\$TMPDIR"
+
     cat > row_params.json << 'ROW_EOF'
 ${params_json}
 ROW_EOF
