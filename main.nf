@@ -23,11 +23,13 @@ workflow {
         .map { row ->
             if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
-            // Resolve sample input paths relative to the launch directory so
-            // notebooks see stable absolute paths from their isolated work dirs.
-            row.path = file(row.path).toAbsolutePath().toString()
+            // The 'path' column is staged into each work dir. The notebook
+            // sees the staged basename in its CWD, so rewrite the row before
+            // serializing it to params.json.
+            def input_path = file(row.path)
+            row.path = input_path.getName()
             def roi_id = row.roi_id ?: row.sample
-            tuple(row.sample, roi_id, JsonOutput.toJson(row))
+            tuple(row.sample, roi_id, input_path, JsonOutput.toJson(row))
         }
 
     // Resolve notebook paths from config. Accept either a single string or a list.
@@ -43,10 +45,10 @@ workflow {
     // under their parent ROI directory.
     samples
         .combine(notebooks)
-        .map { sample, roi_id, json, nb ->
+        .map { sample, roi_id, input_path, json, nb ->
             def publish_dir = "${params.outdir}/${roi_id}/${nb.baseName}"
             def output_name = "${sample}_${nb.baseName}.html"
-            tuple(nb, timer_script, sample, publish_dir, output_name, json)
+            tuple(nb, timer_script, input_path, sample, publish_dir, output_name, json)
         }
         | RUN_NOTEBOOK
 }

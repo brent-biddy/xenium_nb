@@ -10,10 +10,11 @@ process RUN_NOTEBOOK {
     input:
     tuple path(notebook),
           path('timer.py'),       // staged into work dir so notebooks can `from timer import timer`
+          path(input_path),       // samplesheet 'path' column, staged so notebooks read it from CWD
           val(sample),
           val(publish_dir),       // resolved in main.nf: <outdir>/<roi_id>/<notebook_basename>
           val(output_name),       // resolved in main.nf: <sample>_<notebook_basename>.html
-          val(params_json)        // params JSON built from the samplesheet row
+          val(params_json)        // params JSON built from the samplesheet row (path = staged basename)
 
     output:
     path "*.html"

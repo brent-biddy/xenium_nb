@@ -2,6 +2,7 @@
 title: "02 — Subset Follicle"
 params:
   sample: "default"
+  roi_id: "default"
   path: "."
   cell_ids_file: "assets/stage_quality_area_all_rois.csv"
   radius: 250
@@ -26,12 +27,14 @@ with timer("Setup"):
         params = json.load(f)
 
     sample = params["sample"]
-    path = params["path"]
+    roi_id = params["roi_id"]
+    # 'path' is the results dir, staged into the work dir by Nextflow.
+    # Notebook 01 publishes its zarr under <results>/<roi_id>/01_create_spatialdata/output/<roi_id>.zarr
+    results_dir = params["path"]
     cell_ids_file = params["cell_ids_file"]
     radius = float(params["radius"])
     default_radius = float(radius)
-    # zarr store written by 01_create_spatialdata for this sample
-    zarr_path = os.path.join(path, sample, "01_create_spatialdata", "output", f"{sample}.zarr")
+    zarr_path = os.path.join(results_dir, roi_id, "01_create_spatialdata", "output", f"{roi_id}.zarr")
 ```
 
 ## Load SpatialData
