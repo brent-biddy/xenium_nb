@@ -1,0 +1,81 @@
+---
+title: "01 — Load Xenium → SpatialData"
+params:
+  sample_id: "default"
+  data_path: "."
+  n_jobs: 1
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  warning: false
+---
+
+```{python}
+import os
+import spatialdata_io
+import spatialdata
+import session_info
+from timer import timer, timing_summary
+
+with timer("Setup"):
+    sample_id   = params["sample_id"]
+    data_path   = params["data_path"]
+    n_jobs      = int(params["n_jobs"])
+    output_path = os.path.join("output", f"{sample_id}.zarr")
+```
+
+## Load
+
+Reads the raw Xenium output directory using `spatialdata_io.xenium()`, which parses
+the transcript detections, cell boundaries, nucleus boundaries, and morphology images
+into a single `SpatialData` object.
+
+```{python}
+with timer("Read Xenium"):
+    sdata = spatialdata_io.xenium(
+        path=data_path,
+        n_jobs=n_jobs,
+    )
+sdata
+```
+
+## Write zarr store
+
+Persists the `SpatialData` object to disk as a zarr store. This on-disk format is used
+by all downstream notebooks.
+
+```{python}
+with timer("Write zarr"):
+    os.makedirs("output", exist_ok=True)
+    sdata.write(output_path, overwrite=True)
+print(f"Written to {output_path}")
+```
+
+## Summary
+
+Lists all elements contained in the zarr store, including images, shapes, points, and tables.
+
+```{python}
+with timer("Summary"):
+    print(f"Sample:      {sample_id}")
+    print(f"Input path:  {data_path}")
+    print(f"Output zarr: {output_path}")
+    print()
+    print("Elements:")
+    for name, element in sdata.items():
+        print(f"  {name}: {type(element).__name__}")
+```
+
+## Timings
+
+```{python}
+timing_summary()
+```
+
+## Session Info
+
+```{python}
+session_info.show()
+```

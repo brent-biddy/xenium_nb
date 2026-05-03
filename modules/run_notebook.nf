@@ -1,0 +1,67 @@
+process RUN_NOTEBOOK {
+    tag "${sample_id}:${notebook.baseName}"
+
+    // Publish HTML under <roi_id>/<notebook>/ with the sample-scoped filename.
+    // Other outputs (zarr stores etc.) are published under output/ as written.
+    publishDir "${publish_dir}", mode: 'copy', saveAs: { fn ->
+        fn.endsWith('.html') ? output_name : fn
+    }
+
+    input:
+    path  notebook
+    path  'timer.py'     // staged into work dir so notebooks can `from timer import timer`
+    val   sample_id
+    val   publish_dir    // resolved in main.nf: <outdir>/<roi_id>/<notebook_basename>
+    val   output_name    // resolved in main.nf: <sample_id>_<notebook_basename>.html
+    val   params_json    // params JSON built from the samplesheet row
+
+    output:
+    path "*.html"
+    path "output/**", optional: true
+
+    script:
+    // Pipeline-level params injected only if the notebook declares them.
+    // n_jobs comes from task.cpus so it tracks whatever the executor allocated.
+    def pipeline_params_json = groovy.json.JsonOutput.toJson([
+        cell_ids_file: params.cell_ids_file,
+        radius       : params.radius,
+        n_jobs       : task.cpus,
+    ])
+    """
+    cat > row_params.json << 'ROW_EOF'
+${params_json}
+ROW_EOF
+
+    cat > pipeline_params.json << 'PIPELINE_EOF'
+${pipeline_params_json}
+PIPELINE_EOF
+
+    python3 << 'PYEOF'
+import json, re, yaml
+
+with open('${notebook}') as f:
+    content = f.read()
+
+# Match YAML front matter, tolerating both Unix and Windows line endings.
+match = re.match(r'^---\\r?\\n(.*?)\\r?\\n---', content, re.DOTALL)
+if not match:
+    raise ValueError("Notebook ${notebook} has no YAML front matter")
+declared = set((yaml.safe_load(match.group(1)) or {}).get('params', {}).keys())
+
+with open('row_params.json') as f:
+    full = json.load(f)
+
+# Merge in pipeline-level params only when the notebook declares them.
+# Row params win over pipeline defaults if both are present.
+with open('pipeline_params.json') as f:
+    for k, v in json.load(f).items():
+        if k in declared and k not in full:
+            full[k] = v
+
+with open('params.json', 'w') as f:
+    json.dump({k: v for k, v in full.items() if k in declared}, f)
+PYEOF
+
+    quarto render ${notebook} --execute-params params.json --output-dir .
+    """
+}

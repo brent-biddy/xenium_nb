@@ -1,0 +1,129 @@
+---
+title: "02 — Subset Follicle"
+params:
+  sample_id: "default"
+  data_path: "."
+  cell_ids_file: "assets/stage_quality_area_all_rois.csv"
+  radius: 250
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  warning: false
+---
+
+```{python}
+import os
+import pandas as pd
+import spatialdata
+import session_info
+from timer import timer, timing_summary
+
+with timer("Setup"):
+    sample_id      = params["sample_id"]
+    data_path      = params["data_path"]
+    cell_ids_file  = params["cell_ids_file"]
+    default_radius = float(params["radius"])
+    # zarr store written by 01_create_spatialdata for this sample
+    zarr_path = os.path.join(data_path, sample_id, "01_create_spatialdata", "output", f"{sample_id}.zarr")
+```
+
+## Load SpatialData
+
+Reads the full-sample zarr store created by notebook 01.
+
+```{python}
+with timer("Read zarr"):
+    sdata = spatialdata.read_zarr(zarr_path)
+sdata
+```
+
+## Load cell IDs for this sample
+
+Reads the cell ID reference file and filters to the cells annotated for this sample.
+Each cell may have an optional per-cell radius; missing values fall back to the default radius.
+
+```{python}
+with timer("Load cell IDs"):
+    _df = pd.read_csv(cell_ids_file).query("`Donor.ROI` == @sample_id")
+    if "radius" not in _df.columns:
+        # no per-cell radius column — apply default to all cells
+        _df["radius"] = default_radius
+    else:
+        # fill only missing values; explicit per-cell values are kept
+        _df["radius"] = _df["radius"].fillna(default_radius)
+    # keep all metadata columns so they can be embedded in each follicle zarr
+    cells = _df.drop(columns=["Donor.ROI"]).reset_index(drop=True)
+print(f"{len(cells)} cell(s) found for sample '{sample_id}':")
+print(cells[["cell_id", "radius"]].to_string(index=False))
+```
+
+## Subset FOV around each cell
+
+For each cell, the centroid is read directly from the `cell_circles` element of the
+`SpatialData` object. A square bounding box of ± radius µm is then used to spatially
+query the full-sample `SpatialData` object, and the resulting subset is written to
+its own zarr store.
+
+```{python}
+with timer("Load cell circles"):
+    circles = sdata["cell_circles"]
+
+os.makedirs("output", exist_ok=True)
+
+for _, row in cells.iterrows():
+    cell_id = row["cell_id"]
+    radius  = float(row["radius"])
+
+    with timer(f"Subset {cell_id}"):
+        # cell_circles stores pre-computed centroids as Point geometries
+        centroid = circles.loc[cell_id, "geometry"]
+        cx, cy   = centroid.x, centroid.y
+
+        sdata_fov = sdata.query.bounding_box(
+            axes=("x", "y"),
+            min_coordinate=[cx - radius, cy - radius],
+            max_coordinate=[cx + radius, cy + radius],
+            target_coordinate_system="global",
+        )
+
+    with timer(f"Write {cell_id}"):
+        out = os.path.join("output", f"{cell_id}.zarr")
+        # embed cell-level metadata as obs columns on the target cell
+        if "table" in sdata_fov.tables:
+            obs = sdata_fov["table"].obs
+            obs["follicle_id"] = cell_id
+            if cell_id not in obs.index:
+                print(f"  WARNING: {cell_id} not in table.obs — per-cell metadata not embedded")
+            else:
+                meta = row.drop(labels=["cell_id", "radius"]).to_dict()
+                for col, val in meta.items():
+                    obs.loc[cell_id, col] = val
+        sdata_fov.write(out, overwrite=True)
+
+    print(f"  {cell_id}: centroid=({cx:.1f}, {cy:.1f})  radius={radius}µm  →  {out}")
+```
+
+## Summary
+
+```{python}
+with timer("Summary"):
+    print(f"Sample:        {sample_id}")
+    print(f"Input zarr:    {zarr_path}")
+    print(f"Cells written: {len(cells)}")
+    for _, row in cells.iterrows():
+        print(f"  output/{row['cell_id']}.zarr  (radius={row['radius']}µm)")
+```
+
+## Timings
+
+```{python}
+timing_summary()
+```
+
+## Session Info
+
+```{python}
+session_info.show()
+```

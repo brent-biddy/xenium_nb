@@ -1,0 +1,543 @@
+﻿Donor.ROI,Image,User,Stage.Labels,Quality,Notes,Time,cell_id,cell_area
+ROI1,ROI1_aaaaimck-1.png,Taylor,early transitioning,good,,22:31.9,aaaaimck-1,669.2156493
+ROI1,ROI1_aaaalpdj-1.png,Taylor,late transitioning,good,,23:55.1,aaaalpdj-1,790.2795599
+ROI1,ROI1_aaabfpcg-1.png,Taylor,early transitioning,okay,"less than half the oocyte captured, but still oocyte specific",29:09.4,aaabfpcg-1,244.4307901
+ROI1,ROI1_aaabgdkk-1.png,Taylor,secondary;other,okay,this oocyte looks very misshapen so we should watch for abnormal signatures; follicle looks like it is about to create an antrum,29:57.4,aaabgdkk-1,1560.329119
+ROI1,ROI1_aaacbjaf-1.png,Taylor,primordial,okay,oocyte specific but pretty much just the nucleus,30:21.3,aaacbjaf-1,328.6923557
+ROI1,ROI1_aaafefio-1.png,Taylor,primordial,good,,31:02.4,aaafefio-1,729.3637765
+ROI1,ROI1_aaafndjb-1.png,Taylor,early transitioning,good,,31:14.3,aaafndjb-1,575.6970521
+ROI1,ROI1_aaafpofm-1.png,Taylor,primary,good,slight overlap with GCs but not terrible,31:32.6,aaafpofm-1,585.3153337
+ROI1,ROI1_aaaijgjh-1.png,Taylor,late transitioning,good,,31:44.4,aaaijgjh-1,501.7762682
+ROI1,ROI1_aaajhlki-1.png,Taylor,primordial,poor,overlap with GCs,32:01.9,aaajhlki-1,923.5356585
+ROI1,ROI1_aaajnemh-1.png,Taylor,primordial,good,,33:23.8,aaajnemh-1,509.994706
+ROI1,ROI1_aaakgcjc-1.png,Taylor,primordial,good,,33:33.9,aaakgcjc-1,595.4754904
+ROI1,ROI1_aaalhaaa-1.png,Taylor,early transitioning,good,,33:44.9,aaalhaaa-1,773.8426843
+ROI1,ROI1_aaameida-1.png,Taylor,late transitioning,good,,33:56.7,aaameida-1,780.6161221
+ROI1,ROI1_aaamelpo-1.png,Taylor,early transitioning,okay,oocyte specific but about half oocyte captured,34:14.5,aaamelpo-1,338.4009498
+ROI1,ROI1_aaanbjmd-1.png,Taylor,primordial,okay,"about half oocyte captured, oocyte doesn't look great",34:39.6,aaanbjmd-1,314.8293864
+ROI1,ROI1_aaanhakn-1.png,Taylor,primary,good,,34:49.4,aaanhakn-1,812.6319045
+ROI1,ROI1_aaanhmdg-1.png,Taylor,late transitioning,good,,35:02.4,aaanhmdg-1,611.5962722
+ROI1,ROI1_aaanihjo-1.png,Taylor,late transitioning,poor,captures GCs,35:17.1,aaanihjo-1,581.6576774
+ROI1,ROI1_aaaobcfe-1.png,Taylor,primary,good,,35:38.0,aaaobcfe-1,1290.746297
+ROI1,ROI1_aaapdang-1.png,Taylor,early transitioning,good,,35:53.5,aaapdang-1,475.3147048
+ROI1,ROI1_aaaphndo-1.png,Taylor,early transitioning,good,,36:09.9,aaaphndo-1,706.7856507
+ROI1,ROI1_aababmcd-1.png,Taylor,early transitioning,good,,36:29.4,aababmcd-1,644.3797109
+ROI1,ROI1_aabaebbj-1.png,Taylor,early transitioning,good,,36:37.6,aabaebbj-1,992.3989423
+ROI1,ROI1_aabakjnc-1.png,Taylor,primordial,good,"mostly nucleus, not a ton of cytoplasm",36:53.6,aabakjnc-1,394.9365768
+ROI1,ROI1_aabbcjjm-1.png,Taylor,primordial,good,,37:12.6,aabbcjjm-1,506.5628309
+ROI1,ROI1_aabbhpdh-1.png,Taylor,late transitioning,okay,about 1/2 oocyte captured,37:35.6,aabbhpdh-1,327.4731369
+ROI1,ROI1_aabcfgel-1.png,Taylor,primordial,good,,37:59.6,aabcfgel-1,391.369233
+ROI1,ROI1_aabdefka-1.png,Taylor,early transitioning,good,,38:09.5,aabdefka-1,419.185484
+ROI1,ROI1_aabdmgko-1.png,Taylor,transitioning,good,,38:29.7,aabdmgko-1,1154.103479
+ROI1,ROI1_aabdnkmi-1.png,Taylor,primordial,poor,reaches into GCs,39:04.7,aabdnkmi-1,1176.546136
+ROI1,ROI1_aabdocbo-1.png,Taylor,primordial,good,,39:13.9,aabdocbo-1,574.6133021
+ROI1,ROI1_aabdphmd-1.png,Taylor,transitioning,good,,39:36.2,aabdphmd-1,575.4261146
+ROI1,ROI1_aabfioge-1.png,Taylor,transitioning,poor,goes into GCs,39:52.8,aabfioge-1,615.2539286
+ROI1,ROI1_aabfjijn-1.png,Taylor,primordial,good,,40:02.8,aabfjijn-1,718.2101823
+ROI1,ROI1_aabfnnmf-1.png,Taylor,primordial,good,,40:15.7,aabfnnmf-1,637.1547106
+ROI1,ROI1_aabgcmdg-1.png,Taylor,primordial,good,,40:25.1,aabgcmdg-1,751.174246
+ROI1,ROI1_aabgimlf-1.png,Taylor,early transitioning,poor,goes out into GCs,40:42.4,aabgimlf-1,728.6412764
+ROI1,ROI1_aabgnnjn-1.png,Taylor,transitioning,poor,goes into GCs,41:01.8,aabgnnjn-1,308.7332925
+ROI1,ROI1_aabhamhb-1.png,Taylor,primordial,okay,a little bit of overlap into GCs but not too bad,41:21.4,aabhamhb-1,960.9701911
+ROI1,ROI1_aabhbidk-1.png,Taylor,late transitioning,okay,,41:38.3,aabhbidk-1,445.2406412
+ROI1,ROI1_aabhdbci-1.png,Taylor,primordial,good,,41:51.1,aabhdbci-1,865.8711252
+ROI1,ROI1_aabhfgfp-1.png,Taylor,primordial,good,,41:57.9,aabhfgfp-1,884.8819071
+ROI1,ROI1_aabhpgid-1.png,Taylor,early transitioning,good,,42:07.9,aabhpgid-1,753.2514336
+ROI1,ROI1_aabialgo-1.png,Taylor,primary,poor,"goes into GCs, hard to tell stage I think this is the end of a follicle",42:41.9,aabialgo-1,367.7073571
+ROI1,ROI1_aabicijk-1.png,Taylor,primordial,good,1/2 oocyte,42:55.0,aabicijk-1,443.2989223
+ROI1,ROI1_aabiikod-1.png,Taylor,late transitioning,poor,"goes into GCs, hard to tell stage I think it's the end of the folllicle",44:03.4,aabiikod-1,481.8623612
+ROI1,ROI1_aabijbjj-1.png,Taylor,primordial,good,,44:30.4,aabijbjj-1,367.4364196
+ROI1,ROI1_aabjknje-1.png,Taylor,early transitioning,good,,44:39.8,aabjknje-1,507.6917372
+ROI1,ROI1_aabjloam-1.png,Taylor,early transitioning,good,,44:55.8,aabjloam-1,959.7058161
+ROI1,ROI1_aabjmjcb-1.png,Taylor,late transitioning,poor,"really hard to tell b/c end of follicle, probably exclude",45:27.8,aabjmjcb-1,495.6801742
+ROI1,ROI1_aabjmmfg-1.png,Taylor,primordial,good,,45:36.7,aabjmmfg-1,423.8365779
+ROI1,ROI1_aabjnjpf-1.png,Taylor,early transitioning,good,,45:49.9,aabjnjpf-1,772.7589343
+ROI1,ROI1_aabjolfh-1.png,Taylor,transitioning,good,,46:01.5,aabjolfh-1,682.9431498
+ROI1,ROI1_aabkdjij-1.png,Taylor,primary,poor,hard to tell stage b/c end of follicle,46:26.0,aabkdjij-1,462.264548
+ROI1,ROI1_aabkefho-1.png,Taylor,transitioning,good,,46:35.6,aabkefho-1,398.5039207
+ROI1,ROI1_aablalhf-1.png,Taylor,primordial,good,,46:48.7,aablalhf-1,563.5500205
+ROI1,ROI1_aablcloe-1.png,Taylor,primordial,good,,47:51.9,aablcloe-1,360.6629818
+ROI1,ROI1_aabldddb-1.png,Taylor,transitioning,good,,48:14.3,aabldddb-1,412.9990775
+ROI1,ROI1_aablfpfn-1.png,Taylor,primordial,good,about half oocyte captured,48:28.3,aablfpfn-1,384.8667327
+ROI1,ROI1_aablidlg-1.png,Taylor,primary,okay,little bit of GCs captured,49:25.4,aablidlg-1,670.1639306
+ROI1,ROI1_aabljphh-1.png,Taylor,primordial,good,,49:54.2,aabljphh-1,397.2395457
+ROI1,ROI1_aablmlmn-1.png,Taylor,early transitioning,good,,50:34.0,aablmlmn-1,372.5842323
+ROI1,ROI1_aabmbnen-1.png,Taylor,primordial,poor,overlapping with GCs,50:55.8,aabmbnen-1,704.3472131
+ROI1,ROI1_aabmjgfk-1.png,Taylor,early transitioning,okay,"about half oocyte, mostly nucleus",51:16.7,aabmjgfk-1,471.9279859
+ROI1,ROI1_aabmocgc-1.png,Taylor,early transitioning,good,,51:25.7,aabmocgc-1,385.1376702
+ROI1,ROI1_aabmopkh-1.png,Taylor,secondary,good,,52:01.4,aabmopkh-1,734.6922142
+ROI1,ROI1_aabncnje-1.png,Taylor,primordial,good,,52:09.6,aabncnje-1,446.8662662
+ROI1,ROI1_aabnefgj-1.png,Taylor,primordial,good,,52:18.6,aabnefgj-1,774.5651844
+ROI1,ROI1_aabnlcni-1.png,Taylor,primordial,good,,52:26.2,aabnlcni-1,527.7862692
+ROI1,ROI1_aabnnjkl-1.png,Taylor,primordial,good,,52:33.0,aabnnjkl-1,445.2406412
+ROI1,ROI1_aaboancn-1.png,Taylor,early transitioning,good,,52:45.1,aaboancn-1,628.3040853
+ROI1,ROI1_aabocefp-1.png,Taylor,secondary,good,"follicle is pretty misshappen in the tissue, looks like it's about to start forming an antrum? ROI just capturing nucleus",54:06.4,aabocefp-1,430.2939219
+ROI1,ROI1_aabodlnh-1.png,Taylor,primordial,good,,54:14.6,aabodlnh-1,404.6000147
+ROI1,ROI1_aaboechg-1.png,Taylor,primary,poor,"end of follicle, goes into GCs",54:37.5,aaboechg-1,479.6045487
+ROI1,ROI1_aabojccd-1.png,Taylor,primary,good,,54:47.5,aabojccd-1,1352.068487
+ROI1,ROI1_aabojnlg-1.png,Taylor,primary,good,,55:00.2,aabojnlg-1,1230.462701
+ROI1,ROI1_aaboljda-1.png,Taylor,primordial,good,,55:12.7,aaboljda-1,935.8633152
+ROI1,ROI1_aabonbjp-1.png,Taylor,transitioning,poor,goes into GCs,55:43.2,aabonbjp-1,588.8375214
+ROI1,ROI1_aabooafo-1.png,Taylor,primordial,good,,55:51.6,aabooafo-1,650.3403361
+ROI1,ROI1_aabooemh-1.png,Taylor,primordial,good,,56:47.2,aabooemh-1,407.0384523
+ROI1,ROI1_aabpbmel-1.png,Taylor,primordial,good,,56:55.1,aabpbmel-1,1142.543479
+ROI1,ROI1_aabpdddg-1.png,Taylor,primordial,good,,57:01.6,aabpdddg-1,1047.895976
+ROI1,ROI1_aabpdmcl-1.png,Taylor,transitioning,okay,end of follicle,57:17.9,aabpdmcl-1,514.9618937
+ROI1,ROI1_aabpfcik-1.png,Taylor,transitioning,okay,goes into GCs a little bit,57:39.2,aabpfcik-1,618.6858037
+ROI1,ROI1_aabpigli-1.png,Taylor,transitioning,good,,57:49.8,aabpigli-1,817.9151859
+ROI1,ROI1_aabpjhmk-1.png,Taylor,primordial,good,,58:04.5,aabpjhmk-1,448.1306413
+ROI1,ROI1_aabplfgh-1.png,Taylor,transitioning,good,end of follicle,58:34.6,aabplfgh-1,721.4614324
+ROI1,ROI1_aabpnkii-1.png,Taylor,transitioning,good,,58:47.6,aabpnkii-1,833.4489365
+ROI1,ROI1_aepceacn-1.png,Taylor,primordial,good,follicle might not be super healthy,59:00.0,aepceacn-1,325.1250118
+ROI1,ROI1_afcggpnj-1.png,Taylor,primordial,good,,59:07.0,afcggpnj-1,440.4540785
+ROI1,ROI1_afhakmdc-1.png,Taylor,primary,good,pretty much just nucleus in ROI,59:21.1,afhakmdc-1,361.7467319
+ROI1,ROI1_afhhcjop-1.png,Taylor,transitioning,good,,59:41.2,afhhcjop-1,381.8864201
+ROI1,ROI1_afijbjpb-1.png,Taylor,primordial,okay,less than half oocyte,00:03.9,afijbjpb-1,333.4789184
+ROI1,ROI1_afpehldn-1.png,Taylor,early transitioning,good,,00:14.1,afpehldn-1,350.5931377
+ROI1,ROI1_ahnhimln-1.png,Taylor,transitioning,poor,boundaries not clear,00:28.6,ahnhimln-1,440.725016
+ROI1,ROI1_aifkfgaf-1.png,Taylor,primordial,okay,just nucleus,00:38.6,aifkfgaf-1,216.7048516
+ROI1,ROI1_aphkmplb-1.png,Taylor,transitioning,poor,goes into GCs,00:48.8,aphkmplb-1,620.356585
+ROI1,ROI1_bfhmjckb-1.png,Taylor,primordial,terrible,"goes into GCs, less than half oocyte captured",01:13.0,bfhmjckb-1,287.0582917
+ROI1,ROI1_bijmdool-1.png,Taylor,transitioning,terrible,"GCs captured, less than half oocyte captured",01:33.8,bijmdool-1,310.8556363
+ROI1,ROI1_ccdehkmh-1.png,Taylor,transitioning,poor,captured GCs,01:50.2,ccdehkmh-1,264.8865721
+ROI1,ROI1_cfabnpic-1.png,Taylor,primordial,poor,captured GCs,02:04.5,cfabnpic-1,784.905966
+ROI1,ROI1_chgjkbjn-1.png,Taylor,primordial,okay,just nucleus,02:15.4,chgjkbjn-1,174.0321938
+ROI1,ROI1_chgnkefb-1.png,Taylor,late transitioning,poor,"goes into GCs, hard to tell stage at end of follicle",02:42.4,chgnkefb-1,300.2890734
+ROI1,ROI1_chkocgid-1.png,Taylor,early transitioning,terrible,"captured GCs, less than half oocyte",03:01.4,chkocgid-1,327.5182931
+ROI1,ROI1_dofiecgb-1.png,Taylor,transitioning,good,,03:11.3,dofiecgb-1,357.7729817
+ROI1,ROI1_fgapocgh-1.png,Taylor,transitioning,terrible,GC overlap,03:26.9,fgapocgh-1,488.1842365
+ROI1,ROI1_fnbdgfbd-1.png,Taylor,primordial,poor,GC overlap,03:38.0,fnbdgfbd-1,383.9636077
+ROI1,ROI1_fnhbibdg-1.png,Taylor,transitioning,terrible,GC overlap,03:50.1,fnhbibdg-1,291.2578231
+ROI1,ROI1_gbcoplin-1.png,Taylor,primary,terrible,"GCs, end of follicle",04:18.0,gbcoplin-1,318.4870428
+ROI1,ROI1_geaimfea-1.png,Taylor,primordial,okay,end of follicle difficult to stage,04:41.4,geaimfea-1,348.1547001
+ROI1,ROI1_kmeoinci-1.png,Taylor,primordial,good,,04:50.2,kmeoinci-1,377.732045
+ROI1,ROI1_monlmgcc-1.png,Taylor,transitioning,poor,captures GCs,05:02.0,monlmgcc-1,248.720634
+ROI1,ROI1_nflabcno-1.png,Taylor,primordial,okay,goes into GCs a little,05:19.1,nflabcno-1,708.2306507
+ROI1,ROI1_ngpolkkd-1.png,Taylor,primordial,good,,05:26.1,ngpolkkd-1,509.8592373
+ROI1,ROI1_oebenbgk-1.png,Taylor,late transitioning,good,,05:34.0,oebenbgk-1,985.2642545
+ROI1,ROI1_ohbegbge-1.png,Taylor,late transitioning,good,,05:41.0,ohbegbge-1,355.3797004
+ROI2,ROI2_aaaacpld-1.png,Taylor,transitioning,poor,GCs,05:51.6,aaaacpld-1,499.7893931
+ROI2,ROI2_aaaadmip-1.png,Taylor,transitioning,good,,06:02.3,aaaadmip-1,423.6559529
+ROI2,ROI2_aaaaemgi-1.png,Taylor,primordial,good,,06:08.7,aaaaemgi-1,NA
+ROI2,ROI2_aaaaeokl-1.png,Taylor,transitioning,okay,end of follicle difficult to stage,06:38.4,aaaaeokl-1,NA
+ROI2,ROI2_aaaaepgf-1.png,Taylor,primordial,good,,06:44.8,aaaaepgf-1,NA
+ROI2,ROI2_aaaafplh-1.png,Taylor,primordial,good,,06:52.0,aaaafplh-1,390.0145454
+ROI2,ROI2_aaaaiilm-1.png,Taylor,primary,good,end of follicle,07:02.6,aaaaiilm-1,390.3757954
+ROI2,ROI2_aaaajbge-1.png,Taylor,primordial,good,,07:18.7,aaaajbge-1,548.6033012
+ROI2,ROI2_aaabclgn-1.png,Taylor,primordial,good,,07:26.4,aaabclgn-1,643.3411171
+ROI2,ROI2_aaabnnen-1.png,Taylor,primary,good,,08:05.6,aaabnnen-1,638.2384607
+ROI2,ROI2_aaacbpck-1.png,Taylor,primary,good,,08:15.0,aaacbpck-1,428.0361093
+ROI2,ROI2_aaacilnf-1.png,Taylor,primordial,good,,08:22.8,aaacilnf-1,508.8657997
+ROI2,ROI2_aaackene-1.png,Taylor,primary,poor,hard to tell end of follicle,08:47.5,aaackene-1,257.3906343
+ROI2,ROI2_aaaclgnj-1.png,Taylor,late transitioning,good,,11:49.8,aaaclgnj-1,648.1276798
+ROI2,ROI2_aaacmbkh-1.png,Taylor,early transitioning,good,,11:59.3,aaacmbkh-1,394.8462643
+ROI2,ROI2_aaadbcin-1.png,Taylor,primordial,okay,little bit of GCs,12:14.2,aaadbcin-1,787.8862786
+ROI2,ROI2_aaadbdjj-1.png,Taylor,primordial,good,,12:27.8,aaadbdjj-1,562.3759579
+ROI2,ROI2_aaadniip-1.png,Taylor,early transitioning,good,,12:37.3,aaadniip-1,628.7556478
+ROI2,ROI2_aaadojhj-1.png,Taylor,primary,poor,"end of follicle at very edge of H&E section, hard to tell",14:08.2,aaadojhj-1,349.6448564
+ROI2,ROI2_aaaeakjp-1.png,Taylor,early transitioning,good,,14:20.7,aaaeakjp-1,638.6448669
+ROI2,ROI2_aaaeanlh-1.png,Taylor,early transitioning,good,,14:30.3,aaaeanlh-1,731.3506515
+ROI2,ROI2_aaaecdhf-1.png,Taylor,primary,okay,end of follicle,14:41.5,aaaecdhf-1,434.8547033
+ROI2,ROI2_aaaedbdc-1.png,Taylor,primordial,good,,14:48.5,aaaedbdc-1,480.6431424
+ROI2,ROI2_aaaejdbm-1.png,Taylor,transitioning,good,,15:09.4,aaaejdbm-1,521.9159564
+ROI2,ROI2_aaaelpha-1.png,Taylor,primary,okay,end of follicle with a little GC overlap,15:24.3,aaaelpha-1,630.9231479
+ROI2,ROI2_aaaeofbj-1.png,Taylor,primary,okay,"end of follcile, little bit of GC overlap",15:39.1,aaaeofbj-1,367.7976696
+ROI2,ROI2_aaaeohbc-1.png,Taylor,primordial,poor,hard to distinguish,15:59.3,aaaeohbc-1,535.4176757
+ROI2,ROI2_aaaeomno-1.png,Taylor,primary,good,,16:13.0,aaaeomno-1,850.0664371
+ROI2,ROI2_aaaepekf-1.png,Taylor,transitioning,poor,"end of follicle, GC overlap",16:28.8,aaaepekf-1,547.8356449
+ROI2,ROI2_aaafafmm-1.png,Taylor,primordial,good,,16:42.7,aaafafmm-1,629.2523666
+ROI2,ROI2_aaafcfde-1.png,Taylor,transitioning,okay,end of follicle,17:00.4,aaafcfde-1,459.8261104
+ROI2,ROI2_aaafchbg-1.png,Taylor,transitioning,good,,17:13.1,aaafchbg-1,477.9789236
+ROI2,ROI2_aaafdpho-1.png,Taylor,transitioning,terrible,"end, overlap GC",17:28.9,aaafdpho-1,276.5820413
+ROI2,ROI2_aaafgdfl-1.png,Taylor,early transitioning,good,,17:44.1,aaafgdfl-1,839.0483117
+ROI2,ROI2_aaafgpnd-1.png,Taylor,primary,good,end of follicle,18:02.1,aaafgpnd-1,339.1686061
+ROI2,ROI2_aaafibed-1.png,Taylor,primary,good,,18:11.1,aaafibed-1,850.9695621
+ROI2,ROI2_aaagadij-1.png,Taylor,early transitioning,good,,18:25.9,aaagadij-1,857.2462811
+ROI2,ROI2_aaaghgpd-1.png,Taylor,primordial,good,,18:31.9,aaaghgpd-1,790.9117475
+ROI2,ROI2_aaagiijl-1.png,Taylor,transitioning,good,,18:40.6,aaagiijl-1,477.1209548
+ROI2,ROI2_aaaglhbn-1.png,Taylor,early transitioning,good,,18:52.1,aaaglhbn-1,1043.244882
+ROI2,ROI2_aaagonap-1.png,Taylor,transitioning,good,,19:06.6,aaagonap-1,730.9894015
+ROI2,ROI2_aaagpjme-1.png,Taylor,transitioning,good,,19:20.6,aaagpjme-1,638.8254919
+ROI2,ROI2_aaahaajn-1.png,Taylor,primordial,good,,19:26.3,aaahaajn-1,277.3045413
+ROI2,ROI2_aaahhdad-1.png,Taylor,primordial,good,,19:34.7,aaahhdad-1,506.6079871
+ROI2,ROI2_aaahladg-1.png,Taylor,primordial,good,,20:13.1,aaahladg-1,877.6117506
+ROI2,ROI2_aaahnjik-1.png,Taylor,early transitioning,good,,20:21.5,aaahnjik-1,551.1772075
+ROI2,ROI2_aaahopii-1.png,Taylor,primordial,good,,20:27.9,aaahopii-1,491.8418929
+ROI2,ROI2_aaaiabhg-1.png,Taylor,late transitioning,good,,20:37.3,aaaiabhg-1,830.01706137880706
+ROI2,ROI2_aaaibcbm-1.png,Taylor,early transitioning,poor,GCs,20:58.0,aaaibcbm-1,636.2064293
+ROI2,ROI2_aaaicfbc-1.png,Taylor,primary,good,,21:11.1,aaaicfbc-1,860.7684687
+ROI2,ROI2_aaaienfj-1.png,Taylor,primordial,good,,21:19.0,aaaienfj-1,372.5842323
+ROI2,ROI2_aaaifkdc-1.png,Taylor,transitioning;primary,good,hard to tell end of follicle,21:46.8,aaaifkdc-1,746.7489334
+ROI2,ROI2_aabfbclp-1.png,Taylor,primordial,poor,GCs,21:56.7,aabfbclp-1,448.3112663
+ROI2,ROI2_aagnnenb-1.png,Taylor,primordial,good,,22:04.4,aagnnenb-1,345.5356375
+ROI2,ROI2_aahnbbee-1.png,Taylor,primordial,poor,overreaching,22:13.2,aahnbbee-1,399.5425145
+ROI2,ROI2_abdiboad-1.png,Taylor,primordial,poor,contains GCs,22:21.1,abdiboad-1,505.7048621
+ROI2,ROI2_abnifnce-1.png,Taylor,transitioning,good,end of follicle,22:31.9,abnifnce-1,411.9153275
+ROI2,ROI2_acedlonn-1.png,Taylor,transitioning,good,,22:42.4,acedlonn-1,472.5150172
+ROI2,ROI2_acfchlmo-1.png,Taylor,primary,good,,22:55.1,acfchlmo-1,298.9795421
+ROI2,ROI2_aciggedl-1.png,Taylor,primordial,good,,23:07.2,aciggedl-1,570.4137707
+ROI2,ROI2_aknplbpf-1.png,Taylor,primordial,good,,23:20.5,aknplbpf-1,343.7293875
+ROI2,ROI2_iaojoafp-1.png,Taylor,primordial,okay,"might contain a little bit of GCs, hard to tell",24:06.5,iaojoafp-1,375.8354824
+ROI2,ROI2_ogeljedc-1.png,Taylor,primordial,okay,oocyte specific but less than half,24:22.1,ogeljedc-1,137.7717238
+ROI3,ROI3_aaaagmki-1.png,Taylor,primordial,good,,52:05.1,aaaagmki-1,184.4181317
+ROI3,ROI3_aaaamabg-1.png,Taylor,early transitioning,good,,52:49.1,aaaamabg-1,583.3284587
+ROI3,ROI3_aaabgmdj-1.png,Taylor,early transitioning,good,"same oocyte as last, different ROI",53:11.6,aaabgmdj-1,480.3722049
+ROI3,ROI3_aaabmbmd-1.png,Taylor,transitioning,good,,53:34.4,aaabmbmd-1,388.2986078
+ROI3,ROI3_aaadcgjp-1.png,Taylor,primordial,good,,53:43.5,aaadcgjp-1,620.2662725
+ROI3,ROI3_abfgjojp-1.png,Taylor,primordial,good,,53:49.8,abfgjojp-1,222.9364143
+ROI3,ROI3_abfgnkab-1.png,Taylor,primordial,good,,54:13.5,abfgnkab-1,250.9332904
+ROI3,ROI3_abfnlgje-1.png,Taylor,early transitioning,good,,54:32.2,abfnlgje-1,311.0362613
+ROI3,ROI3_fgjocgmf-1.png,Taylor,other,terrible,mostly. GC,54:42.2,fgjocgmf-1,110.542504
+ROI3,ROI3_fgkakdfp-1.png,Taylor,other,terrible,mostly GC,54:49.1,fgkakdfp-1,125.7150046
+ROI3,ROI3_giaaoock-1.png,Taylor,primordial,poor,about half oocyte half GC,54:59.8,giaaoock-1,392.272358
+ROI3,ROI3_giadggha-1.png,Taylor,primordial,terrible,edge of oocyte and GC,55:23.6,giadggha-1,126.2568796
+ROI3,ROI3_giahbjko-1.png,Taylor,other,terrible,mostly GC,55:31.0,giahbjko-1,120.8832856
+ROI3,ROI3_gigjbkog-1.png,Taylor,other,terrible,this is a GC,55:43.7,gigjbkog-1,126.6632858
+ROI3,ROI3_gigjpcle-1.png,Taylor,other,terrible,this is a GC,57:03.6,gigjpcle-1,84.39703431
+ROI3,ROI3_gigkdcda-1.png,Taylor,primordial,terrible,"mostly GC, some oocyte",57:15.2,gigkdcda-1,178.4123502
+ROI3,ROI3_giobliba-1.png,Taylor,other,terrible,this is a GC,57:21.1,giobliba-1,79.11375287
+ROI3,ROI3_gjapaoof-1.png,Taylor,other,terrible,this is a GC,57:27.0,gjapaoof-1,111.7165666
+ROI3,ROI3_gjbalicb-1.png,Taylor,other,terrible,this is a GC,57:32.4,gjbalicb-1,82.90687801
+ROI3,ROI3_gjfgolhp-1.png,Taylor,other,terrible,this is a GC,57:40.3,gjfgolhp-1,161.1175058
+ROI3,ROI3_gjfibllp-1.png,Taylor,other,terrible,small bit of oocyte with GC,57:51.3,gjfibllp-1,165.8589123
+ROI3,ROI3_gjflibkc-1.png,Taylor,primordial,terrible,small bit of oocyte with GC,58:08.6,gjflibkc-1,163.6914122
+ROI3,ROI3_gmhlbkhi-1.png,Taylor,other,terrible,this is a GC,58:14.4,gmhlbkhi-1,91.48656582
+ROI3,ROI3_hbpnjbep-1.png,Taylor,other,terrible,this is a GC,58:19.9,hbpnjbep-1,106.2526601
+ROI3,ROI3_hbpommgm-1.png,Taylor,other,terrible,this is a GC,58:25.6,hbpommgm-1,130.3209422
+ROI3,ROI3_hcalofed-1.png,Taylor,other,terrible,this is a GC,58:31.1,hcalofed-1,41.453439
+ROI3,ROI3_hcbjammm-1.png,Taylor,other,terrible,this is a GC,58:39.5,hcbjammm-1,87.19672192
+ROI3,ROI3_hccbanpd-1.png,Taylor,other,terrible,this is a GC,58:45.1,hccbanpd-1,95.64094097
+ROI3,ROI3_hccbhfdf-1.png,Taylor,other,terrible,this is a GC,58:50.7,hccbhfdf-1,35.80890755
+ROI3,ROI3_lppfojfn-1.png,Taylor,other,terrible,this is a GC,58:56.7,lppfojfn-1,174.1676626
+ROI3,ROI3_maapfhbc-1.png,Taylor,transitioning,terrible,small bit of oocyte with GC,59:12.5,maapfhbc-1,166.9426623
+ROI3,ROI3_maoajmhj-1.png,Taylor,transitioning,terrible,small portion of oocyte with GC,59:24.9,maoajmhj-1,171.6389125
+ROI3,ROI3_mbkemeeh-1.png,Taylor,other,terrible,this is a GC,59:31.3,mbkemeeh-1,111.1746915
+ROI3,ROI3_mbkfeojk-1.png,Taylor,other,terrible,this is a GC,59:37.3,mbkfeojk-1,159.4467245
+ROI3,ROI3_mnaflohh-1.png,Taylor,primordial,good,,59:44.0,mnaflohh-1,189.6111006
+ROI4,ROI4_aaaaemgi-1.png,Taylor,primordial,good,,24:29.9,aaaaemgi-1,234.3157898
+ROI4,ROI4_aaaaeokl-1.png,Taylor,late transitioning,poor,"not sure about staging, end of follicle",24:57.2,aaaaeokl-1,282.813604
+ROI4,ROI4_aaaaepgf-1.png,Taylor,primordial,good,,25:03.4,aaaaepgf-1,243.8889151
+ROI4,ROI4_aaaagdim-1.png,Taylor,primordial,good,just nucleus,37:30.0,aaaagdim-1,159.8079746
+ROI4,ROI4_aaaagilm-1.png,Taylor,early transitioning,good,,37:39.3,aaaagilm-1,353.1670441
+ROI4,ROI4_aaaaiail-1.png,Taylor,primordial,good,looks like two follicles merged,37:55.2,aaaaiail-1,383.5572014
+ROI4,ROI4_aaaajofk-1.png,Taylor,primordial,good,,38:03.2,aaaajofk-1,306.1142299
+ROI4,ROI4_aaaaocbk-1.png,Taylor,primordial,good,end of follicle,38:23.0,aaaaocbk-1,364.817357
+ROI4,ROI4_aaaaoeba-1.png,Taylor,primary,poor,"very end of follicle, hard to discern",38:37.9,aaaaoeba-1,229.2131333
+ROI4,ROI4_aaabaadk-1.png,Taylor,primary,good,,38:46.3,aaabaadk-1,794.2081538
+ROI4,ROI4_aaaekmgf-1.png,Taylor,other,poor,"very end of follicle, hard to discern",39:03.0,aaaekmgf-1,130.998286
+ROI4,ROI4_aaahbjbc-1.png,Taylor,primordial,okay,"mostly just nucleus, parts of oocyte missing",39:37.2,aaahbjbc-1,204.3320387
+ROI4,ROI4_aaahhagi-1.png,Taylor,primordial,good,,39:53.3,aaahhagi-1,222.1687581
+ROI4,ROI4_aaakelge-1.png,Taylor,primordial,poor,exclude - not healthy,40:10.4,aaakelge-1,223.9298519
+ROI4,ROI4_aaaldphk-1.png,Taylor,primordial,good,,40:19.6,aaaldphk-1,306.9270424
+ROI4,ROI4_aabbemka-1.png,Taylor,primordial,good,,40:28.1,aabbemka-1,274.5951662
+ROI4,ROI4_aaefnilo-1.png,Taylor,other,okay,hard to tell end of follicle,40:46.9,aaefnilo-1,275.5434475
+ROI4,ROI4_aafeehcm-1.png,Taylor,early transitioning,good,,40:59.3,aafeehcm-1,427.7200155
+ROI4,ROI4_aafigkfh-1.png,Taylor,primordial,good,,41:06.2,aafigkfh-1,362.7853257
+ROI4,ROI4_aaggoplc-1.png,Taylor,late transitioning,good,,41:17.4,aaggoplc-1,419.5918902
+ROI4,ROI4_aagjfagh-1.png,Taylor,primordial,good,,41:24.5,aagjfagh-1,342.1489187
+ROI4,ROI4_aajliibo-1.png,Taylor,other,terrible,"hardly any oocyte, mostly GC",41:34.6,aajliibo-1,218.5111017
+ROI4,ROI4_abaeodmh-1.png,Taylor,early transitioning,good,less than half oocyte captured,41:52.2,abaeodmh-1,163.1043809
+ROI4,ROI4_abijfgeo-1.png,Taylor,late transitioning,good,mostly just nucleus,42:11.6,abijfgeo-1,155.7890682
+ROI4,ROI4_acphohhh-1.png,Taylor,other,terrible,mostly GC,42:19.1,acphohhh-1,160.9368808
+ROI4,ROI4_aghmjlmg-1.png,Taylor,other,terrible,"hardly any oocyte, GC",42:34.4,aghmjlmg-1,174.1676626
+ROI4,ROI4_ahigfgfj-1.png,Taylor,other,terrible,this is a GC,42:42.1,ahigfgfj-1,132.3529736
+ROI4,ROI4_bocakfcm-1.png,Taylor,primordial,poor,not a healthy oocyte,42:52.2,bocakfcm-1,360.2114193
+ROI4,ROI4_cadegdnj-1.png,Taylor,primordial,okay,little bit of GC overlap,43:03.2,cadegdnj-1,304.8498548
+ROI4,ROI4_cailggdo-1.png,Taylor,primordial,good,,43:09.2,cailggdo-1,322.0995429
+ROI4,ROI4_chfogfgk-1.png,Taylor,early transitioning,good,,43:18.3,chfogfgk-1,380.3962638
+ROI4,ROI4_chgehhmh-1.png,Taylor,early transitioning,poor,1/4 oocyte with a GC,43:36.2,chgehhmh-1,237.8379774
+ROI4,ROI4_chjcholb-1.png,Taylor,primordial,poor,1/4 oocyte with GC,43:54.7,chjcholb-1,263.4415721
+ROI4,ROI4_ckicheod-1.png,Taylor,primordial,poor,1/4 oocyte with GC,44:07.2,ckicheod-1,240.9086025
+ROI4,ROI4_cmnegjli-1.png,Taylor,other,terrible,poor quality oocyte with GCs,44:17.8,cmnegjli-1,262.719072
+ROI4,ROI4_cokeodgb-1.png,Taylor,primordial,poor,1/4 oocyte with GC,44:29.0,cokeodgb-1,277.4400101
+ROI4,ROI4_diojcnmb-1.png,Taylor,primordial,poor,1/4 oocyte with GC,44:39.8,diojcnmb-1,185.9534442
+ROI4,ROI4_dipoiblm-1.png,Taylor,primordial,good,,45:44.9,dipoiblm-1,397.6007957
+ROI4,ROI4_djgoahen-1.png,Taylor,primordial,okay,"1/4 oocyte, might be GC too",46:01.4,djgoahen-1,186.811413
+ROI4,ROI4_djhdcgmb-1.png,Taylor,other,okay,several GCs and not much oocyte,46:15.4,djhdcgmb-1,214.1761015
+ROI4,ROI4_djncdjkp-1.png,Taylor,other,terrible,mostly not oocyte,46:26.2,djncdjkp-1,263.4415721
+ROI4,ROI4_djpbapag-1.png,Taylor,other,terrible,poor quality oocyte with GC overlap,46:36.7,djpbapag-1,182.4764129
+ROI4,ROI4_dlnjdmao-1.png,Taylor,primary;secondary,good,,46:51.7,dlnjdmao-1,380.6220451
+ROI4,ROI4_dmejbcfl-1.png,Taylor,other,terrible,low quality oocyte with GCs,47:07.8,dmejbcfl-1,269.176416
+ROI4,ROI4_fnlakkeh-1.png,Taylor,other,poor,"edge of tissue that ripped, hard to tell what this really is",49:08.3,fnlakkeh-1,342.5101687
+ROI4,ROI4_gllpbfbh-1.png,Taylor,primordial,poor,1/4 oocyte with GC,49:21.5,gllpbfbh-1,260.7773532
+ROI4,ROI4_hanmfffh-1.png,Taylor,primordial,good,,49:30.7,hanmfffh-1,289.4064168
+ROI4,ROI4_hbndmafc-1.png,Taylor,primordial,poor,1/4 oocyte with GC,49:40.9,hbndmafc-1,233.8642272
+ROI4,ROI4_hlljhmel-1.png,Taylor,primordial,good,,49:49.3,hlljhmel-1,391.0982954
+ROI4,ROI4_joihaddo-1.png,Taylor,primordial,poor,GC overlap,50:07.0,joihaddo-1,316.003449
+ROI4,ROI4_jonhmemo-1.png,Taylor,other,terrible,not much oocyte,50:14.6,jonhmemo-1,158.7693808
+ROI4,ROI4_jonhnamg-1.png,Taylor,other,terrible,this is a GC,50:22.2,jonhnamg-1,101.6467224
+ROI4,ROI4_jonifgek-1.png,Taylor,early transitioning,terrible,oocyte + GCs,50:44.0,jonifgek-1,152.0410993
+ROI4,ROI4_kkhhcoda-1.png,Taylor,other,terrible,overreaching,51:00.6,kkhhcoda-1,245.2887589
+ROI4,ROI4_lelcoaom-1.png,Taylor,primary,okay,"hardly captured oocyte, just nucleus, but oocyte specific",51:18.2,lelcoaom-1,132.8948486
+ROI4,ROI4_lfldclpp-1.png,Taylor,primordial,good,,51:25.0,lfldclpp-1,430.9261094
+ROI4,ROI4_lihghiak-1.png,Taylor,primordial,terrible,mostly GC,51:35.5,lihghiak-1,151.5443805
+ROI4,ROI4_lihgndbi-1.png,Taylor,primordial,terrible,mostly GC and into stroma,51:55.4,lihgndbi-1,297.8957921
+ROI4,ROI4_lkahkaec-1.png,Taylor,primordial,okay,might have a little bit of GC,52:09.9,lkahkaec-1,380.08017
+ROI4,ROI4_lpgjbcni-1.png,Taylor,primordial,poor,has some GC,52:19.3,lpgjbcni-1,186.7662568
+ROI4,ROI4_mbbjcecm-1.png,Taylor,primordial,poor,1/4 oocyte with GC,52:34.3,mbbjcecm-1,224.5168831
+ROI4,ROI4_meojhapn-1.png,Taylor,other,terrible,poor quality oocyte,52:43.7,meojhapn-1,240.2312587
+ROI4,ROI4_mpfgdnkp-1.png,Taylor,primordial,good,,52:51.4,mpfgdnkp-1,560.9761141
+ROI4,ROI4_naaogmpa-1.png,Taylor,primordial,okay,just nucleus,53:00.3,naaogmpa-1,87.96437819
+ROI4,ROI4_nadlnnif-1.png,Taylor,primordial,good,,53:06.1,nadlnnif-1,527.7411129
+ROI4,ROI4_nadnibme-1.png,Taylor,other,terrible,not much oocyte,53:18.5,nadnibme-1,220.001258
+ROI4,ROI4_nagdabfd-1.png,Taylor,primordial,okay,1/3 oocyte with a little bit of GC,53:33.5,nagdabfd-1,229.4840708
+ROI4,ROI4_nagenohk-1.png,Taylor,primordial,good,,53:40.3,nagenohk-1,236.9800086
+ROI4,ROI4_najhobff-1.png,Taylor,primordial,poor,has a GC in it,53:50.6,najhobff-1,248.6303215
+ROI4,ROI4_nakmkblj-1.png,Taylor,primordial,okay,just nucleus,54:02.8,nakmkblj-1,108.7362539
+ROI4,ROI4_naknnajk-1.png,Taylor,other,terrible,lots of GC,54:22.4,naknnajk-1,244.6565714
+ROI4,ROI4_ncngmfha-1.png,Taylor,early transitioning,good,mostly nucleus,54:32.0,ncngmfha-1,165.091256
+ROI5,ROI5_aaaagckl-1.png,Taylor,primary;secondary,good,,54:43.1,aaaagckl-1,336.6850122
+ROI5,ROI5_aaaaplbh-1.png,Taylor,primordial,good,,54:50.9,aaaaplbh-1,1114.907853
+ROI5,ROI5_aaabgcdk-1.png,Taylor,primordial,good,,57:22.1,aaabgcdk-1,745.8909646
+ROI5,ROI5_aaabhgnn-1.png,Taylor,other,okay,end of follicle hard to tell,57:56.2,aaabhgnn-1,222.9815706
+ROI5,ROI5_aaadbkgb-1.png,Taylor,early transitioning,good,,58:06.1,aaadbkgb-1,719.6100261
+ROI5,ROI5_aaadmekh-1.png,Taylor,transitioning,good,,58:24.3,aaadmekh-1,1023.240662
+ROI5,ROI5_aaadmknn-1.png,Taylor,primordial,poor,overreaching,58:41.8,aaadmknn-1,648.714711
+ROI5,ROI5_aaaeboib-1.png,Taylor,primordial,good,,58:47.8,aaaeboib-1,397.1492332
+ROI5,ROI5_aaaeclee-1.png,Taylor,primordial,good,,58:54.2,aaaeclee-1,311.6232926
+ROI5,ROI5_aaaeflmd-1.png,Taylor,primordial,good,,59:02.9,aaaeflmd-1,382.9701702
+ROI5,ROI5_aaaegblk-1.png,Taylor,primordial,good,,59:10.7,aaaegblk-1,691.0261188
+ROI5,ROI5_abodalld-1.png,Taylor,other,terrible,this is a GC,59:24.1,abodalld-1,44.11765785
+ROI5,ROI5_abojcnlc-1.png,Taylor,other,terrible,this is a GC,59:35.4,abojcnlc-1,32.60281368
+ROI5,ROI5_abojecfb-1.png,Taylor,other,terrible,this is a GC,59:43.4,abojecfb-1,34.86062627
+ROI5,ROI5_abojmgpi-1.png,Taylor,other,terrible,this is a GC,59:50.7,abojmgpi-1,38.92468891
+ROI5,ROI5_abojompb-1.png,Taylor,other,terrible,this is a GC,00:34.2,abojompb-1,35.04125127
+ROI5,ROI5_abokekgk-1.png,Taylor,other,terrible,this is a GC,00:44.9,abokekgk-1,40.55031397
+ROI5,ROI5_abomfghg-1.png,Taylor,other,terrible,this is a GC,00:51.0,abomfghg-1,33.91234498
+ROI5,ROI5_abomofgc-1.png,Taylor,other,terrible,this is a GC,00:57.6,abomofgc-1,22.39750081
+ROI5,ROI5_abopbopk-1.png,Taylor,other,terrible,this is a GC,01:04.7,abopbopk-1,50.12343932
+ROI5,ROI5_abopmbld-1.png,Taylor,other,terrible,this is a GC,01:11.0,abopmbld-1,48.85906427
+ROI5,ROI5_abpafmfn-1.png,Taylor,other,terrible,this is a GC,01:16.9,abpafmfn-1,57.61937709
+ROI5,ROI5_abpahmad-1.png,Taylor,other,terrible,this is a GC,01:22.6,abpahmad-1,39.42140768
+ROI5,ROI5_acanemle-1.png,Taylor,other,terrible,this is a GC,01:28.6,acanemle-1,29.89343859
+ROI5,ROI5_acankgdb-1.png,Taylor,other,terrible,this is a GC,01:34.5,acankgdb-1,42.26625153
+ROI5,ROI5_acaoknja-1.png,Taylor,other,terrible,this is a GC,01:40.4,acaoknja-1,44.02734535
+ROI5,ROI5_acapdnfl-1.png,Taylor,other,terrible,this is a GC,01:46.0,acapdnfl-1,51.56843937
+ROI5,ROI5_acbadjoc-1.png,Taylor,other,terrible,this is a GC,01:51.5,acbadjoc-1,54.91000199
+ROI5,ROI5_acbakkeh-1.png,Taylor,other,terrible,this is a GC,01:57.3,acbakkeh-1,27.59046975
+ROI5,ROI5_acbbikcg-1.png,Taylor,other,terrible,this is a GC,02:02.5,acbbikcg-1,25.73906343
+ROI5,ROI5_acbcbjig-1.png,Taylor,other,terrible,this is a GC,02:08.6,acbcbjig-1,44.88531413
+ROI5,ROI5_acbcfndg-1.png,Taylor,other,terrible,this is a GC,02:13.9,acbcfndg-1,48.45265801
+ROI5,ROI5_acbdmchn-1.png,Taylor,other,terrible,this is a GC,02:19.8,acbdmchn-1,27.86140726
+ROI5,ROI5_acbjmoop-1.png,Taylor,other,terrible,this is a GC,02:25.9,acbjmoop-1,30.02890734
+ROI5,ROI5_acbkhgkg-1.png,Taylor,other,terrible,this is a GC,02:31.4,acbkhgkg-1,28.76453229
+ROI5,ROI5_acbknpml-1.png,Taylor,other,terrible,this is a GC,02:37.1,acbknpml-1,34.81547001
+ROI5,ROI5_achehlni-1.png,Taylor,other,terrible,this is a GC,02:42.5,achehlni-1,47.00765796
+ROI5,ROI5_akdofjhl-1.png,Taylor,other,terrible,this is a GC,02:50.7,akdofjhl-1,38.5634389
+ROI5,ROI5_akekljmf-1.png,Taylor,other,terrible,this is a GC,02:56.4,akekljmf-1,41.58890776
+ROI5,ROI5_akemgick-1.png,Taylor,other,terrible,this is a GC,03:01.5,akemgick-1,48.272033
+ROI5,ROI5_alidnaeh-1.png,Taylor,other,terrible,this is a GC,03:07.1,alidnaeh-1,132.4432861
+ROI5,ROI5_alifmcdc-1.png,Taylor,other,terrible,this is a GC,03:12.7,alifmcdc-1,19.3268757
+ROI5,ROI5_aligcloo-1.png,Taylor,other,terrible,this is a GC,03:17.9,aligcloo-1,35.44765754
+ROI5,ROI5_aliggail-1.png,Taylor,other,terrible,this is a GC,03:23.4,aliggail-1,55.04547075
+ROI5,ROI5_alijipng-1.png,Taylor,other,terrible,this is a GC,03:28.8,alij-1,NA
+ROI5,ROI5_alimemoe-1.png,Taylor,other,terrible,this is a GC,03:34.9,alimemoe-1,74.77875271
+ROI5,ROI5_amcdnhca-1.png,Taylor,other,terrible,this is a GC,03:40.4,amcdnhca-1,92.11875334
+ROI5,ROI5_amcjllji-1.png,Taylor,other,terrible,this is a GC,03:45.9,amcjllji-1,128.6953172
+ROI5,ROI5_amecigea-1.png,Taylor,other,terrible,this is a GC,03:51.6,amecigea-1,102.0079725
+ROI5,ROI5_amecmlle-1.png,Taylor,other,terrible,this is a GC,03:57.1,amecmlle-1,124.9925045
+ROI5,ROI5_amedbebk-1.png,Taylor,other,terrible,this is a GC,04:01.9,amedbebk-1,83.76484679
+ROI5,ROI5_amfipkjj-1.png,Taylor,other,terrible,this is a GC,04:06.9,amfipkjj-1,84.98406558
+ROI5,ROI5_amfmpdfh-1.png,Taylor,other,terrible,this is a GC,04:12.6,amfmpdfh-1,57.16781458
+ROI5,ROI5_ancbepdo-1.png,Taylor,other,terrible,this is a GC,04:18.1,ancbepdo-1,43.16937657
+ROI5,ROI5_apkkchon-1.png,Taylor,other,terrible,this is a GC,04:23.6,apkkchon-1,47.95593924
+ROI5,ROI5_apkkgmnm-1.png,Taylor,other,terrible,this is a GC,04:29.8,apkkgmnm-1,42.85328281
+ROI5,ROI5_apkkkijk-1.png,Taylor,other,terrible,this is a GC,04:35.2,apkkkijk-1,37.88609513
+ROI5,ROI5_aplbfbno-1.png,Taylor,other,terrible,this is a GC,04:40.4,aplbfbno-1,63.12843979
+ROI5,ROI5_bnlbdomj-1.png,Taylor,other,terrible,this is a GC,04:45.8,bnlbdomj-1,76.81078404
+ROI5,ROI5_bnlejboa-1.png,Taylor,other,terrible,this is a GC,04:51.3,bnlejboa-1,56.44531455
+ROI5,ROI5_bnmlceke-1.png,Taylor,other,terrible,this is a GC,04:56.9,bnmlceke-1,34.58968876
+ROI5,ROI5_bnmlgkhp-1.png,Taylor,other,terrible,this is a GC,05:02.8,bnmlgkhp-1,30.79656362
+ROI5,ROI5_bnmligkb-1.png,Taylor,other,terrible,this is a GC,05:09.4,bnmligkb-1,46.05937667
+ROI5,ROI5_bnmmelcp-1.png,Taylor,other,terrible,this is a GC,05:15.8,bnmmelcp-1,55.99375203
+ROI5,ROI5_bnmncflg-1.png,Taylor,other,terrible,this is a GC,05:21.8,bnmncflg-1,37.2539076
+ROI5,ROI5_bnmogakc-1.png,Taylor,other,terrible,this is a GC,05:28.7,bnmogakc-1,39.91812645
+ROI5,ROI5_bnohpddb-1.png,Taylor,other,terrible,this is a GC,05:34.7,bnohpddb-1,88.59656572
+ROI5,ROI5_bnoikidn-1.png,Taylor,other,terrible,this is a GC,05:41.7,bnoikidn-1,33.73171997
+ROI5,ROI5_bnpbfkej-1.png,Taylor,other,terrible,this is a GC,05:48.1,bnpbfkej-1,41.99531402
+ROI5,ROI5_bnpfeein-1.png,Taylor,other,terrible,this is a GC,05:54.7,bnpfeein-1,31.33843864
+ROI5,ROI5_bnpfpjon-1.png,Taylor,other,terrible,this is a GC,06:01.3,bnpfpjon-1,44.70468912
+ROI5,ROI5_bodehecd-1.png,Taylor,other,terrible,this is a GC,06:07.8,bodehecd-1,77.0365653
+ROI5,ROI5_bodenmjp-1.png,Taylor,other,terrible,this is a GC,06:14.0,bodenmjp-1,146.6675053
+ROI5,ROI5_bodfkiia-1.png,Taylor,other,terrible,this is a GC,06:22.0,bodfkiia-1,65.65718988
+ROI5,ROI5_bodgiohg-1.png,Taylor,other,terrible,this is a GC,06:29.7,bodgiohg-1,38.6537514
+ROI5,ROI5_boiekfoa-1.png,Taylor,other,terrible,this is a GC,06:36.5,boiekfoa-1,49.31062679
+ROI5,ROI5_boielboi-1.png,Taylor,other,terrible,this is a GC,06:42.8,boielboi-1,107.6073477
+ROI5,ROI5_boihlccl-1.png,Taylor,other,terrible,this is a GC,06:49.4,boihlccl-1,64.93468986
+ROI5,ROI5_boihobpb-1.png,Taylor,other,terrible,this is a GC,06:56.5,boihobpb-1,35.9443763
+ROI5,ROI5_bojdjblh-1.png,Taylor,other,terrible,this is a GC,07:02.3,bojdjblh-1,53.64562695
+ROI5,ROI5_bojecgab-1.png,Taylor,other,terrible,this is a GC,07:08.8,bojecgab-1,44.56922037
+ROI5,ROI5_bojejgio-1.png,Taylor,other,terrible,this is a GC,07:15.3,bojejgio-1,23.93281337
+ROI5,ROI5_bojeocll-1.png,Taylor,other,terrible,this is a GC,07:22.9,bojeocll-1,60.87062721
+ROI5,ROI5_bojfkokp-1.png,Taylor,other,terrible,this is a GC,07:29.5,bojfkokp-1,20.636407
+ROI5,ROI5_bojfoeoe-1.png,Taylor,other,terrible,this is a GC,07:35.5,bojfoeoe-1,87.55797193
+ROI5,ROI5_bokijgej-1.png,Taylor,other,terrible,this is a GC,07:42.8,bokijgej-1,44.38859536
+ROI5,ROI5_bokiopkn-1.png,Taylor,other,terrible,this is a GC,07:48.5,bokiopkn-1,71.6178151
+ROI5,ROI5_bokkglbb-1.png,Taylor,other,terrible,this is a GC,07:56.0,bokkglbb-1,42.71781405
+ROI5,ROI5_boklacll-1.png,Taylor,other,terrible,this is a GC,33:52.5,boklacll-1,48.45265801
+ROI5,ROI5_boklnmfj-1.png,Taylor,primary;secondary,poor,"very small ROI, might have a little bit of GC",34:19.7,boklnmfj-1,103.9948475
+ROI5,ROI5_bolceind-1.png,Taylor,primary;secondary,poor,"very small ROI, might have some GC",34:38.8,bolceind-1,79.11375287
+ROI5,ROI5_boldhcac-1.png,Taylor,other,terrible,this is a GC,34:45.6,boldhcac-1,64.52828359
+ROI5,ROI5_bolffgje-1.png,Taylor,other,terrible,this is a GC,35:10.7,bolffgje-1,66.0184399
+ROI5,ROI5_bomckkpo-1.png,Taylor,other,terrible,this is a GC,35:16.8,bomckkpo-1,139.1264113
+ROI5,ROI5_cajfleke-1.png,Taylor,other,terrible,this is a GC,35:22.8,cajfleke-1,59.51593966
+ROI5,ROI5_cajfljho-1.png,Taylor,other,terrible,this is a GC,35:29.8,cajfljho-1,29.39671982
+ROI5,ROI5_cajgbokh-1.png,Taylor,other,terrible,this is a GC,35:35.0,cajgbokh-1,31.5642199
+ROI5,ROI5_cajgcjbl-1.png,Taylor,other,terrible,this is a GC,35:40.3,cajgcjbl-1,35.58312629
+ROI5,ROI5_cajginge-1.png,Taylor,other,terrible,this is a GC,35:45.2,cajginge-1,31.29328239
+ROI5,ROI5_cakgdlkh-1.png,Taylor,other,terrible,this is a GC,35:50.0,cakgdlkh-1,49.98797056
+ROI5,ROI5_cakhcaem-1.png,Taylor,other,terrible,this is a GC,35:55.6,cakhcaem-1,50.48468933
+ROI5,ROI5_cakhefig-1.png,Taylor,other,terrible,this is a GC,36:00.9,cakhefig-1,76.22375277
+ROI5,ROI5_cakhpiil-1.png,Taylor,other,terrible,this is a GC,36:06.0,cakhpiil-1,70.98562758
+ROI5,ROI5_cbapjkgd-1.png,Taylor,primordial,poor,small ROI of oocyte with GC overlap,36:21.0,cbapjkgd-1,128.3792234
+ROI5,ROI5_cbbabold-1.png,Taylor,other,terrible,this is a GC,36:26.6,cbbabold-1,54.05203321
+ROI5,ROI5_cbbcbbkd-1.png,Taylor,other,terrible,this is a GC,36:33.7,cbbcbbkd-1,45.20140789
+ROI5,ROI5_cbbccajh-1.png,Taylor,other,terrible,this is a GC,36:39.3,cbbccajh-1,36.07984506
+ROI5,ROI5_cbbdfcad-1.png,Taylor,early transitioning,okay,1/4 oocyte,36:56.3,cbbdfcad-1,109.7296915
+ROI5,ROI5_cbbdpeok-1.png,Taylor,primordial,poor,1/4 oocyte with GC,37:08.2,cbbdpeok-1,86.02265937
+ROI5,ROI5_cbbfipch-1.png,Taylor,early transitioning,poor,1/4 oocyte with GC,37:23.4,cbbfipch-1,116.6837542
+ROI5,ROI5_cbbjdolo-1.png,Taylor,other,terrible,this is mostly GC,37:35.9,cbbjdolo-1,59.1095334
+ROI5,ROI5_cbbjehco-1.png,Taylor,other,terrible,this is a GC,37:41.6,cbbjehco-1,100.1114099
+ROI5,ROI5_cbchminh-1.png,Taylor,other,terrible,this is a GC,37:47.0,cbchminh-1,48.58812676
+ROI5,ROI5_cbchojcf-1.png,Taylor,other,terrible,this is a GC,37:52.5,cbchojcf-1,70.35344005
+ROI5,ROI5_cbcmnhfo-1.png,Taylor,other,terrible,this is a GC,37:59.5,cbcmnhfo-1,122.4185982
+ROI5,ROI5_cbcnaddj-1.png,Taylor,other,terrible,this is a GC,38:05.7,cbcnaddj-1,50.9814081
+ROI5,ROI5_cbcnjpki-1.png,Taylor,other,terrible,this is a GC,38:11.1,cbcnjpki-1,46.82703295
+ROI5,ROI5_cbedigob-1.png,Taylor,other,terrible,this is a GC,38:16.5,cbedigob-1,68.50203374
+ROI5,ROI5_cbehhnae-1.png,Taylor,other,terrible,this is a GC,38:21.8,cbehhnae-1,55.90343953
+ROI5,ROI5_cbeiojeh-1.png,Taylor,other,terrible,this is a GC,38:27.2,cbeiojeh-1,65.70234613
+ROI5,ROI5_cbggnjif-1.png,Taylor,primordial,poor,1/4 oocyte with GC,38:40.3,cbggnjif-1,133.52703609690101
+ROI5,ROI5_cbgngigl-1.png,Taylor,other,terrible,this is a GC,38:45.6,cbgngigl-1,69.04390876
+ROI5,ROI5_cbhmchhe-1.png,Taylor,other,terrible,this is a GC,38:50.9,cbhmchhe-1,101.0145349
+ROI5,ROI5_cbhoamml-1.png,Taylor,other,terrible,this is a GC,38:56.3,cbhoamml-1,94.60234718
+ROI5,ROI5_cbhplpge-1.png,Taylor,other,terrible,this is a GC,39:02.0,cbhplpge-1,70.85015882
+ROI5,ROI5_cbibphmj-1.png,Taylor,other,terrible,this is a GC,39:07.1,cbibphmj-1,49.98797056
+ROI5,ROI5_jmihpedl-1.png,Taylor,other,terrible,this is a GC,39:15.9,jmihpedl-1,28.49359478
+ROI5,ROI5_jmjcmfie-1.png,Taylor,other,terrible,this is a GC,39:21.0,jmjcmfie-1,52.87797067
+ROI5,ROI5_jmlpmdck-1.png,Taylor,other,terrible,this is a GC,39:26.2,jmlpmdck-1,42.98875156
+ROI5,ROI5_jmoajhhj-1.png,Taylor,other,terrible,this is a GC,39:31.6,jmoajhhj-1,39.64718894
+ROI5,ROI5_jmpbepip-1.png,Taylor,other,terrible,this is a GC,39:36.9,jmpbepip-1,31.29328239
+ROI5,ROI5_jmpcnnpp-1.png,Taylor,other,terrible,this is a GC,39:42.3,jmpcnnpp-1,60.10297093
+ROI5,ROI5_jnhllefa-1.png,Taylor,other,terrible,this is a GC,39:49.2,jnhllefa-1,57.9806271
+ROI5,ROI5_jnhlmoan-1.png,Taylor,other,terrible,this is a GC,39:54.1,jnhlmoan-1,37.43453261
+ROI5,ROI5_jnhnpohb-1.png,Taylor,other,terrible,this is a GC,39:59.6,jnhnpohb-1,55.94859578
+ROI5,ROI5_jnihcafh-1.png,Taylor,other,terrible,this is a GC,40:06.5,jnihcafh-1,115.2387542
+ROI5,ROI5_mjfogcmb-1.png,Taylor,other,terrible,this is a GC,40:11.7,mjfogcmb-1,32.87375119
+ROI5,ROI5_mjfpplhh-1.png,Taylor,other,terrible,this is a GC,40:17.4,mjfpplhh-1,36.98297009
+ROI5,ROI5_mjgadefi-1.png,Taylor,other,terrible,this is a GC,40:22.9,mjgadefi-1,32.73828244
+ROI5,ROI5_mjnjagkn-1.png,Taylor,other,terrible,this is a GC,40:28.1,mjnjagkn-1,30.52562611
+ROI5,ROI5_mjnjblha-1.png,Taylor,other,terrible,this is a GC,40:33.5,mjnjblha-1,32.60281368
+ROI5,ROI5_mkblgbnh-1.png,Taylor,other,terrible,this is a GC,40:39.1,mkblgbnh-1,36.44109507
+ROI5,ROI5_mkhdlill-1.png,Taylor,other,terrible,this is a GC,40:44.6,mkhdlill-1,39.60203269
+ROI5,ROI5_mkhfgfpa-1.png,Taylor,other,terrible,this is a GC,40:49.9,mkhfgfpa-1,42.17593903
+ROI5,ROI5_mkhgdaak-1.png,Taylor,other,terrible,this is a GC,40:55.3,mkhgdaak-1,25.24234467
+ROI5,ROI5_mkhgkbkj-1.png,Taylor,other,terrible,this is a GC,41:01.1,mkhgkbkj-1,63.71547106
+ROI5,ROI5_mllmljhb-1.png,Taylor,other,terrible,not capturing the oocyte correctly,41:17.2,mllmljhb-1,59.2901584
+ROI5,ROI5_mlmhakon-1.png,Taylor,other,terrible,not an oocyte,41:26.5,mlmhakon-1,86.8354719
+ROI5,ROI5_mlmhalni-1.png,Taylor,other,terrible,not an oocyte,41:36.9,mlmhalni-1,35.71859505
+ROI5,ROI5_moggjcnj-1.png,Taylor,other,terrible,these are cells,41:44.9,moggjcnj-1,101.5564099
+ROI5,ROI5_mpchpidk-1.png,Taylor,other,terrible,this is a GC,41:51.6,mpchpidk-1,48.1817205
+ROI5,ROI5_mpcmhkao-1.png,Taylor,late transitioning,poor,small oocyte ROI with GC overlap,42:12.0,mpcmhkao-1,103.1368787
+ROI5,ROI5_mpcnbdei-1.png,Taylor,other,terrible,mostly GC,42:19.8,mpcnbdei-1,63.26390855
+ROI5,ROI5_mpoeepim-1.png,Taylor,other,terrible,not oocyte,42:26.6,mpoeepim-1,52.83281442
+ROI5,ROI5_naabhgbh-1.png,Taylor,other,terrible,this is a GC,42:31.9,naabhgbh-1,30.93203237
+ROI5,ROI5_naaefhha-1.png,Taylor,other,terrible,this is a GC,42:37.8,naaefhha-1,39.46656393
+ROI5,ROI5_nabhdlji-1.png,Taylor,other,terrible,this is a GC,42:47.8,nabhdlji-1,59.42562716
+ROI6,ROI6_aaaabpba-1.png,Taylor,early transitioning,good,,00:49.3,aaaabpba-1,280.4654789
+ROI6,ROI6_aaaaeaam-1.png,Taylor,primordial,good,,03:03.8,aaaaeaam-1,209.7507889
+ROI6,ROI6_aaaafica-1.png,Taylor,transitioning,poor,"end of follicle hard to tell stage, with GC overlap",03:26.3,aaaafica-1,232.5095397
+ROI6,ROI6_aaaagdha-1.png,Taylor,early transitioning,okay,little bit of GC,05:09.7,aaaagdha-1,565.8529893
+ROI6,ROI6_aaaahbop-1.png,Taylor,primordial,good,,05:19.4,aaaahbop-1,468.2703295
+ROI6,ROI6_aaaaimef-1.png,Taylor,other,okay,"ROI itself is fine but it's hard to stage, end of follicle",05:44.9,aaaaimef-1,172.8581313
+ROI6,ROI6_aaaajeoi-1.png,Taylor,early transitioning,good,,05:55.0,aaaajeoi-1,192.4107882
+ROI6,ROI6_aaaaoifm-1.png,Taylor,late transitioning,good,,06:04.2,aaaaoifm-1,316.4550115
+ROI6,ROI6_aaaaomfa-1.png,Taylor,primordial,good,,06:11.1,aaaaomfa-1,499.0217369
+ROI6,ROI6_aaabdadi-1.png,Taylor,early transitioning,good,,07:00.2,aaabdadi-1,612.9058035
+ROI6,ROI6_aaabefef-1.png,Taylor,primordial,good,,07:10.8,aaabefef-1,653.5915862
+ROI6,ROI6_aaabgegl-1.png,Taylor,transitioning,okay,ROI is fine but hard to stage,07:27.6,aaabgegl-1,277.7109476
+ROI6,ROI6_aaabhldm-1.png,Taylor,primordial,good,,07:38.3,aaabhldm-1,571.362052
+ROI6,ROI6_aaabiifc-1.png,Taylor,early transitioning,good,,07:48.2,aaabiifc-1,463.8450168
+ROI6,ROI6_aaabiljo-1.png,Taylor,primordial,good,,07:55.2,aaabiljo-1,213.9503203
+ROI6,ROI6_aaabkbol-1.png,Taylor,primordial,good,,08:03.3,aaabkbol-1,243.7082901
+ROI6,ROI6_aaacahcj-1.png,Taylor,early transitioning,good,,08:15.9,aaacahcj-1,397.6911082
+ROI6,ROI6_aaacclaj-1.png,Taylor,early transitioning,good,,08:25.8,aaacclaj-1,727.2414326
+ROI6,ROI6_aaacfaoe-1.png,Taylor,primordial,good,right half of oocyte,08:36.0,aaacfaoe-1,595.8818966
+ROI6,ROI6_aaacflna-1.png,Taylor,primordial,good,,08:43.2,aaacflna-1,476.7597048
+ROI6,ROI6_aaacgnpp-1.png,Taylor,primordial,good,,08:48.1,aaacgnpp-1,491.3903303
+ROI6,ROI6_aaacheah-1.png,Taylor,early transitioning,okay,I think it might have some GC in it,09:01.4,aaacheah-1,538.1270508
+ROI6,ROI6_aaachioi-1.png,Taylor,primordial,good,,09:08.4,aaachioi-1,418.5532964
+ROI6,ROI6_aaachnlm-1.png,Taylor,primordial,good,,09:14.6,aaachnlm-1,509.091581
+ROI6,ROI6_aaaciapo-1.png,Taylor,early transitioning,good,,09:21.4,aaaciapo-1,778.087372
+ROI6,ROI6_aaacknlo-1.png,Taylor,primordial,good,,09:29.7,aaacknlo-1,661.629399
+ROI6,ROI6_aaacllom-1.png,Taylor,early transitioning,good,,09:37.4,aaacllom-1,348.6514189
+ROI6,ROI6_aaacmaog-1.png,Taylor,early transitioning,good,,09:44.6,aaacmaog-1,1761.996939
+ROI6,ROI6_aaacniej-1.png,Taylor,early transitioning,good,,10:19.8,aaacniej-1,714.5073697
+ROI6,ROI6_aaacnoic-1.png,Taylor,early transitioning,good,,10:26.9,aaacnoic-1,864.3809689
+ROI6,ROI6_aaadbmim-1.png,Taylor,primordial,good,,10:33.6,aaadbmim-1,790.0989349
+ROI6,ROI6_aaadbnbm-1.png,Taylor,late transitioning,okay,ROI is fine but hard to stage,10:47.6,aaadbnbm-1,228.264852
+ROI6,ROI6_aaadckmm-1.png,Taylor,primordial,good,,10:55.6,aaadckmm-1,399.813452
+ROI6,ROI6_aaadealk-1.png,Taylor,transitioning,okay,ROI is fine but hard to stage,11:12.6,aaadealk-1,401.8454833
+ROI6,ROI6_aaadfdei-1.png,Taylor,early transitioning,okay,overreaching into GCs,11:39.5,aaadfdei-1,448.6725163
+ROI6,ROI6_aaadflck-1.png,Taylor,transitioning,good,half oocyte,11:51.9,aaadflck-1,395.2978268
+ROI6,ROI6_aaadfokf-1.png,Taylor,transitioning,good,,12:03.9,aaadfokf-1,621.4403351
+ROI6,ROI6_aaadhkmk-1.png,Taylor,transitioning,good,,12:16.3,aaadhkmk-1,663.5711178
+ROI6,ROI6_aaadhmpk-1.png,Taylor,primordial,good,,12:23.8,aaadhmpk-1,576.6001772
+ROI6,ROI6_aaadmchd-1.png,Taylor,primary,good,,12:43.9,aaadmchd-1,736.092058
+ROI6,ROI6_aaadmoig-1.png,Taylor,transitioning,good,,12:51.7,aaadmoig-1,809.7870606
+ROI6,ROI6_aaadoghl-1.png,Taylor,primordial,good,,12:57.2,aaadoghl-1,707.3726819
+ROI6,ROI6_aaadombf-1.png,Taylor,primordial,good,,13:03.3,aaadombf-1,853.4983122
+ROI6,ROI6_aaadpaak-1.png,Taylor,primordial,good,,13:09.4,aaadpaak-1,571.31689573824406
+ROI6,ROI6_aaaedemg-1.png,Taylor,primary,okay,follicle not fully in plane and does have GC overlap,13:39.0,aaaedemg-1,598.18486546352506
+ROI6,ROI6_aaaeiabp-1.png,Taylor,transitioning,good,,13:45.4,aaaeiabp-1,479.6948612
+ROI6,ROI6_aaaejhgk-1.png,Taylor,primordial,okay,a little bit of GC,13:56.8,aaaejhgk-1,256.4875093
+ROI6,ROI6_aaaejieh-1.png,Taylor,primary,good,,14:05.5,aaaejieh-1,1022.879412
+ROI6,ROI6_aaaelafj-1.png,Taylor,primordial,good,,14:11.8,aaaelafj-1,677.8856496
+ROI6,ROI6_aaaepbpd-1.png,Taylor,primordial,good,,14:18.6,aaaepbpd-1,1418.628801
+ROI6,ROI6_aaafbepe-1.png,Taylor,primordial,good,left side / nucleus of oocyte,14:34.2,aaafbepe-1,444.5632974
+ROI6,ROI6_aaafcalm-1.png,Taylor,transitioning,good,,14:43.6,aaafcalm-1,355.5151692
+ROI6,ROI6_aaafccal-1.png,Taylor,transitioning,poor,GC overlap,14:57.4,aaafccal-1,470.2572046
+ROI6,ROI6_aaafcdoh-1.png,Taylor,primordial,good,,15:06.2,aaafcdoh-1,840.5836243
+ROI6,ROI6_aaafckfc-1.png,Taylor,early transitioning,good,,15:14.0,aaafckfc-1,777.364872
+ROI6,ROI6_aaafdmme-1.png,Taylor,early transitioning,good,,15:22.2,aaafdmme-1,751.535496
+ROI6,ROI6_aaafelhb-1.png,Taylor,transitioning,good,,15:31.2,aaafelhb-1,651.5143986
+ROI6,ROI6_aaafepki-1.png,Taylor,late transitioning,good,,15:40.1,aaafepki-1,497.1703305
+ROI6,ROI6_aaafepnp-1.png,Taylor,primordial,good,,15:46.1,aaafepnp-1,441.3120473
+ROI6,ROI6_aaaffoii-1.png,Taylor,other,poor,very edge hard to stage and GC overlap,16:02.1,aaaffoii-1,313.2940739
+ROI6,ROI6_aaafhiad-1.png,Taylor,late transitioning,good,,16:10.8,aaafhiad-1,264.2995408
+ROI6,ROI6_aaafhjgg-1.png,Taylor,primordial,good,,16:16.5,aaafhjgg-1,457.8843916
+ROI6,ROI6_aaafiagk-1.png,Taylor,transitioning,good,,16:43.7,aaafiagk-1,926.1547211
+ROI6,ROI6_aaafiglf-1.png,Taylor,primordial,good,,16:52.3,aaafiglf-1,518.8453313
+ROI6,ROI6_aaafiknb-1.png,Taylor,primordial,good,pretty good does overlap one GC,17:13.7,aaafiknb-1,708.6822132
+ROI6,ROI6_aaafjegf-1.png,Taylor,primordial,good,,17:20.1,aaafjegf-1,803.3297167
+ROI6,ROI6_aaafkejg-1.png,Taylor,transitioning,good,,17:31.2,aaafkejg-1,402.2518896
+ROI6,ROI6_aaafkkck-1.png,Taylor,early transitioning,good,,17:39.7,aaafkkck-1,696.2190878
+ROI6,ROI6_aaafmdka-1.png,Taylor,primordial,good,,17:46.4,aaafmdka-1,423.2947029
+ROI6,ROI6_aaafomic-1.png,Taylor,primordial,good,,17:52.3,aaafomic-1,781.7450284
+ROI6,ROI6_aaafplgb-1.png,Taylor,primary,good,,18:03.8,aaafplgb-1,836.8356554
+ROI6,ROI6_aaagbhdk-1.png,Taylor,early transitioning,good,,18:10.8,aaagbhdk-1,868.8062815
+ROI6,ROI6_aaagbocm-1.png,Taylor,primary;secondary,good,,19:04.4,aaagbocm-1,1832.350379
+ROI6,ROI6_aaagdjac-1.png,Taylor,transitioning,good,,19:11.1,aaagdjac-1,561.1567391
+ROI6,ROI6_aaagibop-1.png,Taylor,early transitioning,good,,19:19.5,aaagibop-1,405.2322022
+ROI6,ROI6_aaagljlc-1.png,Taylor,early transitioning,good,,19:28.5,aaagljlc-1,501.7762682
+ROI6,ROI6_aaagpejf-1.png,Taylor,primordial,good,,19:37.2,aaagpejf-1,509.452831
+ROI6,ROI6_aaagphkb-1.png,Taylor,early transitioning,good,,19:46.6,aaagphkb-1,848.3504995
+ROI6,ROI6_aaaheihg-1.png,Taylor,primordial,good,,19:54.1,aaaheihg-1,773.9781531
+ROI6,ROI6_aaccmnkf-1.png,Taylor,transitioning,good,end of follicle,20:18.7,aaccmnkf-1,474.637361
+ROI6,ROI6_aacgghcm-1.png,Taylor,transitioning,good,edge of follicle,20:28.3,aacgghcm-1,201.2162573
+ROI6,ROI6_aajjphef-1.png,Taylor,transitioning,good,,20:35.8,aajjphef-1,374.6614198
+ROI6,ROI6_aanojfkf-1.png,Taylor,transitioning,good,,20:42.7,aanojfkf-1,700.7798692
+ROI6,ROI6_aaokeeoa-1.png,Taylor,primordial,good,,20:50.5,aaokeeoa-1,417.3792339
+ROI6,ROI6_aapckcpj-1.png,Taylor,transitioning,good,right side oocyte,21:08.8,aapckcpj-1,280.6009477
+ROI6,ROI6_abafckce-1.png,Taylor,transitioning,good,,21:16.6,abafckce-1,455.807204
+ROI6,ROI6_abbcalon-1.png,Taylor,transitioning,okay,very edge,21:32.9,abbcalon-1,321.2867304
+ROI6,ROI6_abblkcdd-1.png,Taylor,primordial,good,,21:43.2,abblkcdd-1,465.3351731
+ROI6,ROI6_aegniemp-1.png,Taylor,other,poor,50/50 oocyte/GC,21:59.9,aegniemp-1,294.1929794
+ROI6,ROI6_bimfdnjj-1.png,Taylor,other,poor,50/50 oocyte and GC,22:12.3,bimfdnjj-1,285.6132916
+ROI6,ROI6_binnjogh-1.png,Taylor,early transitioning,good,,22:20.2,binnjogh-1,364.0497007
+ROI6,ROI6_cbndcgdi-1.png,Taylor,other,poor,poor quality oocyte,22:33.0,cbndcgdi-1,453.278454
+ROI6,ROI6_cjfpbmfi-1.png,Taylor,other,poor,50/50 oocyte and GC,22:43.2,cjfpbmfi-1,210.8796952
+ROI6,ROI6_ddoopkig-1.png,Taylor,early transitioning,poor,weird segmentation,23:04.5,ddoopkig-1,325.2604806
+ROI6,ROI6_eaamjoch-1.png,Taylor,other,poor,poor oocyte quality,23:14.4,eaamjoch-1,494.5061117
+ROI6,ROI6_eiojcpmb-1.png,Taylor,other,terrible,not great segmentation,23:22.9,eiojcpmb-1,239.5539149
+ROI6,ROI6_eponcojg-1.png,Taylor,other,poor,a lot of GC,23:29.9,eponcojg-1,410.0187649
+ROI6,ROI6_jnmpbnpa-1.png,Taylor,primordial,good,overreaching into one GC,24:01.1,jnmpbnpa-1,737.4919018
