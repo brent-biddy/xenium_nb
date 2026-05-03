@@ -1,8 +1,8 @@
 ---
 title: "02 — Subset Follicle"
 params:
-  sample_id: "default"
-  data_path: "."
+  sample: "default"
+  path: "."
   cell_ids_file: "assets/stage_quality_area_all_rois.csv"
   radius: 250
 format:
@@ -21,12 +21,12 @@ import session_info
 from timer import timer, timing_summary
 
 with timer("Setup"):
-    sample_id      = params["sample_id"]
-    data_path      = params["data_path"]
+    sample         = params["sample"]
+    path           = params["path"]
     cell_ids_file  = params["cell_ids_file"]
     default_radius = float(params["radius"])
     # zarr store written by 01_create_spatialdata for this sample
-    zarr_path = os.path.join(data_path, sample_id, "01_create_spatialdata", "output", f"{sample_id}.zarr")
+    zarr_path = os.path.join(path, sample, "01_create_spatialdata", "output", f"{sample}.zarr")
 ```
 
 ## Load SpatialData
@@ -46,7 +46,7 @@ Each cell may have an optional per-cell radius; missing values fall back to the 
 
 ```{python}
 with timer("Load cell IDs"):
-    _df = pd.read_csv(cell_ids_file).query("`Donor.ROI` == @sample_id")
+    _df = pd.read_csv(cell_ids_file).query("`Donor.ROI` == @sample")
     if "radius" not in _df.columns:
         # no per-cell radius column — apply default to all cells
         _df["radius"] = default_radius
@@ -55,7 +55,7 @@ with timer("Load cell IDs"):
         _df["radius"] = _df["radius"].fillna(default_radius)
     # keep all metadata columns so they can be embedded in each follicle zarr
     cells = _df.drop(columns=["Donor.ROI"]).reset_index(drop=True)
-print(f"{len(cells)} cell(s) found for sample '{sample_id}':")
+print(f"{len(cells)} cell(s) found for sample '{sample}':")
 print(cells[["cell_id", "radius"]].to_string(index=False))
 ```
 
@@ -109,7 +109,7 @@ for _, row in cells.iterrows():
 
 ```{python}
 with timer("Summary"):
-    print(f"Sample:        {sample_id}")
+    print(f"Sample:        {sample}")
     print(f"Input zarr:    {zarr_path}")
     print(f"Cells written: {len(cells)}")
     for _, row in cells.iterrows():

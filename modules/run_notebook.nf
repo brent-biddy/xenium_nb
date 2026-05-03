@@ -1,5 +1,5 @@
 process RUN_NOTEBOOK {
-    tag "${sample_id}:${notebook.baseName}"
+    tag "${sample}:${notebook.baseName}"
 
     // Publish HTML under <roi_id>/<notebook>/ with the sample-scoped filename.
     // Other outputs (zarr stores etc.) are published under output/ as written.
@@ -10,9 +10,9 @@ process RUN_NOTEBOOK {
     input:
     tuple path(notebook),
           path('timer.py'),       // staged into work dir so notebooks can `from timer import timer`
-          val(sample_id),
+          val(sample),
           val(publish_dir),       // resolved in main.nf: <outdir>/<roi_id>/<notebook_basename>
-          val(output_name),       // resolved in main.nf: <sample_id>_<notebook_basename>.html
+          val(output_name),       // resolved in main.nf: <sample>_<notebook_basename>.html
           val(params_json)        // params JSON built from the samplesheet row
 
     output:

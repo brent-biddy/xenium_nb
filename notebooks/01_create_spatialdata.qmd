@@ -1,8 +1,8 @@
 ---
 title: "01 — Load Xenium → SpatialData"
 params:
-  sample_id: "default"
-  data_path: "."
+  sample: "default"
+  path: "."
   n_jobs: 1
 format:
   html:
@@ -20,10 +20,10 @@ import session_info
 from timer import timer, timing_summary
 
 with timer("Setup"):
-    sample_id   = params["sample_id"]
-    data_path   = params["data_path"]
+    sample      = params["sample"]
+    path        = params["path"]
     n_jobs      = int(params["n_jobs"])
-    output_path = os.path.join("output", f"{sample_id}.zarr")
+    output_path = os.path.join("output", f"{sample}.zarr")
 ```
 
 ## Load
@@ -35,7 +35,7 @@ into a single `SpatialData` object.
 ```{python}
 with timer("Read Xenium"):
     sdata = spatialdata_io.xenium(
-        path=data_path,
+        path=path,
         n_jobs=n_jobs,
     )
 sdata
@@ -59,8 +59,8 @@ Lists all elements contained in the zarr store, including images, shapes, points
 
 ```{python}
 with timer("Summary"):
-    print(f"Sample:      {sample_id}")
-    print(f"Input path:  {data_path}")
+    print(f"Sample:      {sample}")
+    print(f"Input path:  {path}")
     print(f"Output zarr: {output_path}")
     print()
     print("Elements:")

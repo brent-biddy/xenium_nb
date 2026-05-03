@@ -1,10 +1,10 @@
 ---
 title: "03 — Plot Follicle"
 params:
-  sample_id: "default"
+  sample: "default"
   roi_id: "default"
   cell_id: "default"
-  data_path: "."
+  path: "."
 format:
   html:
     embed-resources: true
@@ -21,12 +21,12 @@ import session_info
 from timer import timer, timing_summary
 
 with timer("Setup"):
-    sample_id = params["sample_id"]
-    roi_id    = params["roi_id"]
-    cell_id   = params["cell_id"]
-    data_path = params["data_path"]
+    sample  = params["sample"]
+    roi_id  = params["roi_id"]
+    cell_id = params["cell_id"]
+    path    = params["path"]
     # follicle zarr written by 02_subset_follicle for this cell
-    zarr_path = os.path.join(data_path, roi_id, "02_subset_follicle", "output", f"{cell_id}.zarr")
+    zarr_path = os.path.join(path, roi_id, "02_subset_follicle", "output", f"{cell_id}.zarr")
 ```
 
 ## Load follicle SpatialData
@@ -60,7 +60,7 @@ for img_key in image_keys:
         (
             sdata.pl
             .render_images(element=img_key)
-            .pl.show(title=f"{sample_id} — {img_key}", figsize=(6, 6))
+            .pl.show(title=f"{sample} — {img_key}", figsize=(6, 6))
         )
 ```
 

@@ -1,4 +1,4 @@
-sample_id,roi_id,cell_id,data_path,Image,User,Stage.Labels,Quality,Notes,Time,cell_area
+sample,roi_id,cell_id,path,Image,User,Stage.Labels,Quality,Notes,Time,cell_area
 ROI1_aaaaimck-1,ROI1,aaaaimck-1,results,ROI1_aaaaimck-1.png,Taylor,early transitioning,good,,22:31.9,669.2156493
 ROI1_aaaalpdj-1,ROI1,aaaalpdj-1,results,ROI1_aaaalpdj-1.png,Taylor,late transitioning,good,,23:55.1,790.2795599
 ROI1_aaabfpcg-1,ROI1,aaabfpcg-1,results,ROI1_aaabfpcg-1.png,Taylor,early transitioning,okay,"less than half the oocyte captured, but still oocyte specific",29:09.4,244.4307901

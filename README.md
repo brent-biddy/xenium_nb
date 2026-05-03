@@ -53,23 +53,23 @@ xenium_nb/
 
 ### Sample-level (`assets/samplesheet.csv`)
 
-Used for passes 1 and 2. `data_path` points to the raw Xenium output directory for pass 1, and to the base results directory for pass 2.
+Used for passes 1 and 2. `path` points to the raw Xenium output directory for pass 1, and to the base results directory for pass 2.
 
 ```csv
-sample_id,data_path
+sample,path
 ROI1,/path/to/ROI1/xenium_output
 ROI2,/path/to/ROI2/xenium_output
 ```
 
 ### Follicle-level (`assets/follicle_samplesheet.csv`)
 
-Used for pass 3. Generated automatically by `bin/make_follicle_samplesheet.py`. Each row is one annotated follicle cell; `sample_id` is `<ROI>_<cell_id>` and `data_path` is the base results directory.
+Used for pass 3. Generated automatically by `bin/make_follicle_samplesheet.py`. Each row is one annotated follicle cell; `sample` is `<ROI>_<cell_id>`, `roi_id` and `cell_id` are emitted explicitly, and `path` is the base results directory.
 
 ```csv
-sample_id,data_path
-ROI1_aaaaimck-1,results/
-ROI1_aaaalpdj-1,results/
-ROI2_aaabfpcg-1,results/
+sample,roi_id,cell_id,path
+ROI1_aaaaimck-1,ROI1,aaaaimck-1,results
+ROI1_aaaalpdj-1,ROI1,aaaalpdj-1,results
+ROI2_aaabfpcg-1,ROI2,aaabfpcg-1,results
 ```
 
 ### Cell ID reference file (`assets/stage_quality_area_all_rois.csv`)
@@ -90,7 +90,7 @@ nextflow run main.nf \
 
 ### Pass 2 — Subset follicles
 
-Update `assets/samplesheet.csv` so `data_path` points to the base results directory (e.g. `results/`), then run:
+Update `assets/samplesheet.csv` so `path` points to the base results directory (e.g. `results/`), then run:
 
 ```bash
 nextflow run main.nf \
@@ -175,6 +175,6 @@ results/
 
 ## Adding notebooks
 
-1. Create a new `.qmd` file in `notebooks/` with a YAML params block declaring `sample_id`, `data_path`, and any additional params needed.
+1. Create a new `.qmd` file in `notebooks/` with a YAML params block declaring `sample`, `path`, and any additional params needed.
 2. Add the notebook path to `params.notebooks` in `nextflow.config` or pass it via `--notebooks` on the CLI.
 3. Any params not declared in the notebook's front matter are automatically filtered out before rendering.

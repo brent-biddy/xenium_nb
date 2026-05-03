@@ -15,16 +15,16 @@ workflow {
     // Pipeline-level params (cell_ids_file, radius, n_jobs) are merged in
     // by the process only when a notebook declares them.
     //
-    // Required columns: sample_id, data_path
-    // Optional columns: roi_id (used to group outputs); falls back to sample_id
+    // Required columns: sample, path
+    // Optional columns: roi_id (used to group outputs); falls back to sample
     def samples = Channel
         .fromPath(params.samplesheet)
         .splitCsv(header: true)
         .map { row ->
-            if (!row.sample_id) error "Samplesheet row missing 'sample_id': ${row}"
-            if (!row.data_path) error "Samplesheet row missing 'data_path': ${row}"
-            def roi_id = row.roi_id ?: row.sample_id
-            tuple(row.sample_id, roi_id, JsonOutput.toJson(row))
+            if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
+            if (!row.path)   error "Samplesheet row missing 'path': ${row}"
+            def roi_id = row.roi_id ?: row.sample
+            tuple(row.sample, roi_id, JsonOutput.toJson(row))
         }
 
     // Resolve notebook paths from config
@@ -39,10 +39,10 @@ workflow {
     // under their parent ROI directory.
     samples
         .combine(notebooks)
-        .map { sample_id, roi_id, json, nb ->
+        .map { sample, roi_id, json, nb ->
             def publish_dir = "${params.outdir}/${roi_id}/${nb.baseName}"
-            def output_name = "${sample_id}_${nb.baseName}.html"
-            tuple(nb, timer_script, sample_id, publish_dir, output_name, json)
+            def output_name = "${sample}_${nb.baseName}.html"
+            tuple(nb, timer_script, sample, publish_dir, output_name, json)
         }
         | RUN_NOTEBOOK
 }
