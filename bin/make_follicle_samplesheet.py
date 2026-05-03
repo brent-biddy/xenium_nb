@@ -1,34 +1,59 @@
 #!/usr/bin/env python3
 """
-Generate a follicle-level samplesheet for notebook 03_plot_follicle.qmd.
+Generate a follicle-level samplesheet.
 
 Each row corresponds to one annotated follicle cell. The 'sample' column is
 constructed as <Donor.ROI>_<cell_id> (e.g. ROI1_aaaaimck-1) for unique
 identification, and 'roi_id' / 'cell_id' columns are emitted explicitly so
-notebook 03 can derive the follicle zarr path as:
-    <path>/<roi_id>/02_subset_follicle/output/<cell_id>.zarr
+main.nf can group outputs by ROI.
 
-'path' is set to the pipeline outdir so it is the same for all rows
-belonging to the same pipeline run. All other columns from the cell IDs
-file (Stage.Labels, Quality, etc.) are carried over as notebook params.
+The 'path' column points at the exact upstream zarr each row needs, so
+Nextflow stages it directly into the notebook work dir:
+
+    --upstream 01_create_spatialdata
+        path = <outdir>/<roi_id>/01_create_spatialdata/output/<roi_id>.zarr
+        (use this to feed notebook 02_subset_follicle)
+
+    --upstream 02_subset_follicle
+        path = <outdir>/<roi_id>/02_subset_follicle/output/<cell_id>.zarr
+        (use this to feed notebook 03_plot_follicle)
+
+All other columns from the cell IDs file (Stage.Labels, Quality, etc.) are
+carried over as notebook params.
 
 Usage:
     python bin/make_follicle_samplesheet.py \\
         --cell-ids assets/stage_quality_area_all_rois.csv \\
         --outdir   results \\
+        --upstream 01_create_spatialdata \\
         --output   assets/follicle_samplesheet.csv
 """
 
 import argparse
+from pathlib import Path
 import pandas as pd
+
+
+UPSTREAM_CHOICES = ("01_create_spatialdata", "02_subset_follicle")
 
 
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--cell-ids", required=True, help="Cell IDs CSV (Donor.ROI, cell_id, ...)")
-    p.add_argument("--outdir",   required=True, help="Pipeline outdir used as the 'path' column (e.g. results)")
+    p.add_argument("--outdir",   required=True, help="Pipeline outdir (e.g. results)")
+    p.add_argument("--upstream", required=True, choices=UPSTREAM_CHOICES,
+                   help="Which upstream notebook's zarr each row should point at")
     p.add_argument("--output",   required=True, help="Path to write follicle samplesheet")
     return p.parse_args()
+
+
+def zarr_path(outdir: str, upstream: str, roi_id: str, cell_id: str) -> str:
+    base = Path(outdir) / roi_id / upstream / "output"
+    if upstream == "01_create_spatialdata":
+        return str(base / f"{roi_id}.zarr")
+    if upstream == "02_subset_follicle":
+        return str(base / f"{cell_id}.zarr")
+    raise ValueError(f"Unknown upstream: {upstream}")
 
 
 def main():
@@ -36,20 +61,15 @@ def main():
 
     cell_ids = pd.read_csv(args.cell_ids)
 
-    # Combine ROI and cell ID into a unique 'sample' identifier
     cell_ids["sample"] = cell_ids["Donor.ROI"] + "_" + cell_ids["cell_id"]
-
-    # Explicit roi_id and cell_id columns let notebook 03 use them directly
-    # (no fragile string splitting) and let main.nf group outputs by ROI.
     cell_ids["roi_id"] = cell_ids["Donor.ROI"]
-
-    # 'path' is the base results directory — notebook 03 derives the
-    # follicle zarr path from roi_id + cell_id + path at runtime
-    cell_ids["path"] = args.outdir
+    cell_ids["path"] = [
+        zarr_path(args.outdir, args.upstream, roi, cid)
+        for roi, cid in zip(cell_ids["roi_id"], cell_ids["cell_id"])
+    ]
 
     cell_ids = cell_ids.drop(columns=["Donor.ROI"])
 
-    # Ensure key columns come first
     cols = ["sample", "roi_id", "cell_id", "path"] + [
         c for c in cell_ids.columns
         if c not in ("sample", "roi_id", "cell_id", "path")
