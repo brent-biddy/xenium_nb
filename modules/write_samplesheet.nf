@@ -16,6 +16,10 @@ import csv
 import json
 
 rows = json.loads('''${rows_json}''')
+if rows and isinstance(rows[0], str):
+    if len(rows) % 2 != 0:
+        raise ValueError(f"Expected an even number of flat row values, got {len(rows)}")
+    rows = [rows[i:i + 2] for i in range(0, len(rows), 2)]
 
 with open('${output_name}', 'w', newline='') as fh:
     writer = csv.writer(fh)
