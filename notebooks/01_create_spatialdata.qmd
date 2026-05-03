@@ -13,6 +13,7 @@ execute:
 ---
 
 ```{python}
+import json
 import os
 import spatialdata_io
 import spatialdata
@@ -20,7 +21,12 @@ import spatialdata
 from timer import timer, timing_summary
 
 with timer("Setup"):
-    # sample, path, n_jobs are injected by Quarto from --execute-params
+    with open("params.json") as f:
+        params = json.load(f)
+
+    sample = params["sample"]
+    path = params["path"]
+    n_jobs = int(params["n_jobs"])
     output_path = os.path.join("output", f"{sample}.zarr")
 ```
 

@@ -2,6 +2,8 @@
 
 A Nextflow pipeline for analysing 10x Xenium spatial transcriptomics data using Quarto notebooks. Each notebook runs as an independent Nextflow process, producing a rendered HTML report alongside any output files.
 
+Notebook parameters are staged into each task work directory as `params.json` and loaded explicitly by the notebook code.
+
 ---
 
 ## Overview
@@ -20,7 +22,7 @@ The pipeline runs in three passes, each driven by its own samplesheet:
 
 - [Nextflow](https://www.nextflow.io/) ≥ 23.0
 - [Quarto](https://quarto.org/) ≥ 1.4
-- Python packages: `spatialdata`, `spatialdata-io`, `spatialdata-plot`, `session-info`, `pyyaml`
+- Python packages: `spatialdata`, `spatialdata-io`, `spatialdata-plot`, `session-info`, `pyyaml`, `nbformat`
 
 ---
 
@@ -53,7 +55,7 @@ xenium_nb/
 
 ### Sample-level (`assets/samplesheet.csv`)
 
-Used for passes 1 and 2. `path` points to the raw Xenium output directory for pass 1, and to the base results directory for pass 2.
+Used for passes 1 and 2. `path` points to the raw Xenium output directory for pass 1, and to the base results directory for pass 2. Relative paths are resolved against the directory where you launch `nextflow run`.
 
 ```csv
 sample,path
@@ -63,7 +65,7 @@ ROI2,/path/to/ROI2/xenium_output
 
 ### Follicle-level (`assets/follicle_samplesheet.csv`)
 
-Used for pass 3. Generated automatically by `bin/make_follicle_samplesheet.py`. Each row is one annotated follicle cell; `sample` is `<ROI>_<cell_id>`, `roi_id` and `cell_id` are emitted explicitly, and `path` is the base results directory.
+Used for pass 3. Generated automatically by `bin/make_follicle_samplesheet.py`. Each row is one annotated follicle cell; `sample` is `<ROI>_<cell_id>`, `roi_id` and `cell_id` are emitted explicitly, and `path` is the base results directory. Relative paths are resolved against the directory where you launch `nextflow run`.
 
 ```csv
 sample,roi_id,cell_id,path

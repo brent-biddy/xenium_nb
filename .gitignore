@@ -4,3 +4,4 @@ work/
 *.log
 __pycache__/
 .DS_Store
+*.quarto_ipynb

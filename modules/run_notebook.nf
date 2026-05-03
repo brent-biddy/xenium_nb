@@ -20,7 +20,7 @@ process RUN_NOTEBOOK {
     path "output/**", optional: true
 
     script:
-    // Pipeline-level params injected only if the notebook declares them.
+    // Pipeline-level params are written only if the notebook declares them.
     // n_jobs comes from task.cpus so it tracks whatever the executor allocated.
     def pipeline_params_json = groovy.json.JsonOutput.toJson([
         cell_ids_file: params.cell_ids_file,
@@ -68,6 +68,20 @@ with open('params.json', 'w') as f:
     json.dump({k: v for k, v in full.items() if k in declared}, f)
 PYEOF
 
-    quarto render ${notebook} --execute-params params.json --output-dir .
+    python3 << 'PYEOF'
+import importlib.util
+import sys
+
+missing = [pkg for pkg in ("nbformat",) if importlib.util.find_spec(pkg) is None]
+if missing:
+    sys.stderr.write(
+        "Missing Python packages required for Quarto Jupyter execution: "
+        + ", ".join(missing)
+        + "\\n"
+    )
+    sys.exit(1)
+PYEOF
+
+    quarto render ${notebook} --output-dir .
     """
 }

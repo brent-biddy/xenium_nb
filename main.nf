@@ -23,6 +23,9 @@ workflow {
         .map { row ->
             if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
+            // Resolve sample input paths relative to the launch directory so
+            // notebooks see stable absolute paths from their isolated work dirs.
+            row.path = file(row.path).toAbsolutePath().toString()
             def roi_id = row.roi_id ?: row.sample
             tuple(row.sample, roi_id, JsonOutput.toJson(row))
         }

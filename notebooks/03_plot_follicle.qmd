@@ -14,6 +14,7 @@ execute:
 ---
 
 ```{python}
+import json
 import os
 import spatialdata
 import spatialdata_plot
@@ -21,7 +22,13 @@ import spatialdata_plot
 from timer import timer, timing_summary
 
 with timer("Setup"):
-    # sample, roi_id, cell_id, path are injected by Quarto
+    with open("params.json") as f:
+        params = json.load(f)
+
+    sample = params["sample"]
+    roi_id = params["roi_id"]
+    cell_id = params["cell_id"]
+    path = params["path"]
     # follicle zarr written by 02_subset_follicle for this cell
     zarr_path = os.path.join(path, roi_id, "02_subset_follicle", "output", f"{cell_id}.zarr")
 ```

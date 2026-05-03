@@ -14,6 +14,7 @@ execute:
 ---
 
 ```{python}
+import json
 import os
 import pandas as pd
 import spatialdata
@@ -21,7 +22,13 @@ import spatialdata
 from timer import timer, timing_summary
 
 with timer("Setup"):
-    # sample, path, cell_ids_file, radius are injected by Quarto
+    with open("params.json") as f:
+        params = json.load(f)
+
+    sample = params["sample"]
+    path = params["path"]
+    cell_ids_file = params["cell_ids_file"]
+    radius = float(params["radius"])
     default_radius = float(radius)
     # zarr store written by 01_create_spatialdata for this sample
     zarr_path = os.path.join(path, sample, "01_create_spatialdata", "output", f"{sample}.zarr")
