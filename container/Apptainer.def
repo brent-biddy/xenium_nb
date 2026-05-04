@@ -1,0 +1,54 @@
+Bootstrap: docker
+From: mambaorg/micromamba:1.5.10
+
+%files
+    environment.container.yml /environment.yml
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        curl \
+        ca-certificates \
+        gdebi-core \
+        git \
+        procps \
+        tini
+    rm -rf /var/lib/apt/lists/*
+
+    QUARTO_VERSION=1.6.42
+    curl -fsSLo /tmp/quarto.deb \
+        "https://github.com/quarto-dev/quarto-cli/releases/download/v${QUARTO_VERSION}/quarto-${QUARTO_VERSION}-linux-amd64.deb"
+    gdebi -n /tmp/quarto.deb
+    rm -f /tmp/quarto.deb
+
+    test -f /environment.yml
+    micromamba create -y -n xenium -f /environment.yml
+    /opt/conda/envs/xenium/bin/python -m ipykernel install --sys-prefix --name xenium --display-name "Python (xenium)"
+    micromamba clean --all --yes
+
+    mkdir -p /tmp/matplotlib /tmp/numba-cache /tmp/.cache
+
+%environment
+    export PATH=/opt/conda/envs/xenium/bin:/opt/conda/bin:$PATH
+    export MPLCONFIGDIR=/tmp/matplotlib
+    export NUMBA_CACHE_DIR=/tmp/numba-cache
+    export XDG_CACHE_HOME=/tmp/.cache
+    export PYTHONUNBUFFERED=1
+
+%runscript
+    exec /usr/bin/tini -- "$@"
+
+%test
+    export PATH=/opt/conda/envs/xenium/bin:/opt/conda/bin:$PATH
+    python - <<'PY'
+import nbformat
+import yaml
+import spatialdata
+import spatialdata_io
+import spatialdata_plot
+import scanpy
+import squidpy
+print("python runtime ok")
+PY

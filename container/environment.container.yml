@@ -1,0 +1,19 @@
+name: xenium
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - ipykernel
+  - matplotlib
+  - nbclient
+  - nbformat
+  - numpy
+  - pandas
+  - pyyaml
+  - scanpy
+  - session-info
+  - spatialdata
+  - spatialdata-io
+  - spatialdata-plot
+  - squidpy

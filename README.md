@@ -18,8 +18,8 @@ Notebook parameters are staged into each task work directory as `params.json` an
 ## Requirements
 
 - [Nextflow](https://www.nextflow.io/) ≥ 23.0
-- [Quarto](https://quarto.org/) ≥ 1.4
-- Python packages: `spatialdata`, `spatialdata-io`, `spatialdata-plot`, `session-info`, `pyyaml`, `nbformat`
+- For default non-container local runs: [Quarto](https://quarto.org/) ≥ 1.4 and the required Python notebook packages
+- For containerized local runs: Apptainer
 
 ---
 
@@ -162,6 +162,7 @@ Key parameters (set in `nextflow.config` or passed via `--param value`):
 | `samplesheet` | `null` | Path to samplesheet CSV |
 | `outdir` | `results` | Output directory |
 | `cell_ids_file` | `full` | Cell ID reference file key or direct path |
+| `container_image` | `babiddy755/xenium_nb:latest` | Container reference for OSCER and `local_apptainer`; may be a registry tag or a local `.sif` path |
 | `cell_ids_registry` | built-in map | Named cell ID files available to `build.nf` |
 | `radius` | `250` | Default bounding box radius (µm) |
 | `run_subset_follicle` | `true` | Whether `build.nf` should run `subset_follicle.qmd` after building sample-level zarrs |
@@ -182,6 +183,8 @@ The built-in analysis registry currently defines:
 | Profile | Description |
 |---------|-------------|
 | (default) | Local execution, no container |
+| `local_docker` | Local execution with Docker using `--container_image` as a registry tag or local image name. |
+| `local_apptainer` | Local execution with Apptainer. Override `--container_image` with a local `.sif` path after building `container/Apptainer.def`. |
 | `oscer` | SLURM executor on OSCER HPC, Apptainer container, scratch-based work directory and image cache. Memory scales 32→64→96 GB across retries. |
 
 Activate with `-profile oscer`:
@@ -190,6 +193,26 @@ Activate with `-profile oscer`:
 nextflow run build.nf \
     --samplesheet assets/samplesheet.csv \
     -profile oscer
+```
+
+For local Apptainer validation:
+
+```bash
+nextflow run analyze.nf \
+    -profile local_apptainer \
+    --samplesheet /tmp/xenium_nb_test/follicle_analysis_inputs.csv \
+    --notebooks plot_follicle \
+    --outdir /home/babiddy/xenium_nb_results_fresh \
+    --container_image /path/to/xenium_tools_squidpy_local.sif
+```
+
+To publish the same runtime for OSCER:
+
+```bash
+./container/build_docker.sh
+docker tag xenium_tools_squidpy:local babiddy755/xenium_nb:<tag>
+docker push babiddy755/xenium_nb:<tag>
+nextflow run build.nf --samplesheet assets/samplesheet.csv -profile oscer --container_image babiddy755/xenium_nb:<tag>
 ```
 
 ---

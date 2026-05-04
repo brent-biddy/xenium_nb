@@ -1,5 +1,6 @@
 ---
 title: "Subset Follicle"
+jupyter: xenium
 params:
   sample: "default"
   path: "."

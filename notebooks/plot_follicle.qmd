@@ -1,5 +1,6 @@
 ---
 title: "Plot Follicle"
+jupyter: xenium
 params:
   sample: "default"
   path: "."

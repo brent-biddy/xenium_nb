@@ -1,5 +1,6 @@
 ---
 title: "Load Xenium → SpatialData"
+jupyter: xenium
 params:
   sample: "default"
   path: "."
