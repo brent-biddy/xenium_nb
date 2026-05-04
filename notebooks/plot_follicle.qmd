@@ -28,6 +28,9 @@ with timer("Setup"):
 
     sample = params["sample"]
     cell_id = Path(params["path"]).stem
+    # Sample is constructed as "<roi>_<cell_id>"; strip the cell_id suffix to get the ROI.
+    suffix = f"_{cell_id}"
+    roi = sample[: -len(suffix)] if sample.endswith(suffix) else sample
     # 'path' is the staged follicle-level zarr produced by subset_follicle.
     zarr_path = params["path"]
 ```
@@ -42,8 +45,10 @@ sdata
 with timer("Locate target cell"):
     target_cell = None
     highlight_element = None
+    outline_element = None
     highlight_column = "_plot_follicle_highlight"
     if "cell_boundaries" in sdata.shapes:
+        outline_element = "cell_boundaries"
         boundaries = sdata["cell_boundaries"]
         if cell_id in boundaries.index:
             highlight_element = "cell_boundaries"
@@ -51,6 +56,8 @@ with timer("Locate target cell"):
             boundaries.loc[cell_id, highlight_column] = "target"
             target_cell = transform(boundaries.loc[[cell_id]], to_coordinate_system="global").iloc[0].geometry.centroid
     if highlight_element is None and "cell_circles" in sdata.shapes:
+        if outline_element is None:
+            outline_element = "cell_circles"
         circles = sdata["cell_circles"]
         if cell_id in circles.index:
             highlight_element = "cell_circles"
@@ -79,47 +86,62 @@ figure_specs = []
 figure_dir = Path("plot_follicle_figures")
 figure_dir.mkdir(exist_ok=True)
 
+def _render_panel(img_key, ch, vmin, vmax, draw_all_cells, title, figure_path):
+    plot = sdata.pl.render_images(
+        element=img_key,
+        channel=ch,
+        cmap="gray",
+        norm=Normalize(vmin=vmin, vmax=vmax),
+    )
+    if draw_all_cells and outline_element is not None:
+        plot = plot.pl.render_shapes(
+            element=outline_element,
+            fill_alpha=0.0,
+            outline_alpha=0.3,
+            outline_color="yellow",
+            outline_width=0.3,
+        )
+    if highlight_element is not None:
+        plot = plot.pl.render_shapes(
+            element=highlight_element,
+            color=highlight_column,
+            groups=["target"],
+            palette=["red"],
+            fill_alpha=0.0,
+            outline_color="red",
+            outline_width=0.5,
+        )
+    ax = plot.pl.show(
+        title=title,
+        figsize=(6, 6),
+        coordinate_systems="global",
+        return_ax=True,
+    )
+    ax.figure.savefig(figure_path, dpi=200, bbox_inches="tight")
+    plt.close(ax.figure)
+
+
 for img_key in image_keys:
     img = sdata.images[img_key]
     arr = next(iter(img.children.values())).image if hasattr(img, "children") else img
     for ch in arr.coords["c"].values:
         channel_name = str(ch)
         safe_channel = channel_name.replace("/", "_").replace(" ", "_")
-        figure_path = figure_dir / f"{img_key}_{safe_channel}.png"
+        plain_path = figure_dir / f"{img_key}_{safe_channel}_plain.png"
+        outlined_path = figure_dir / f"{img_key}_{safe_channel}_outlined.png"
 
         with timer(f"Plot {img_key}[{channel_name}]"):
             vmin, vmax = np.percentile(np.asarray(arr.sel(c=ch)), [1, 99.5])
-            plot = sdata.pl.render_images(
-                element=img_key,
-                channel=ch,
-                cmap="gray",
-                norm=Normalize(vmin=vmin, vmax=vmax),
-            )
-            if highlight_element is not None:
-                plot = plot.pl.render_shapes(
-                    element=highlight_element,
-                    color=highlight_column,
-                    groups=["target"],
-                    palette=["red"],
-                    fill_alpha=0.0,
-                    outline_color="red",
-                    outline_width=2.0,
-                )
-
-            ax = plot.pl.show(
-                title=f"{sample} — {img_key} — {channel_name}",
-                figsize=(6, 6),
-                coordinate_systems="global",
-                return_ax=True,
-            )
-            ax.figure.savefig(figure_path, dpi=200, bbox_inches="tight")
-            plt.close(ax.figure)
+            title = f"{roi} / {cell_id} — {img_key} — {channel_name}"
+            _render_panel(img_key, ch, vmin, vmax, False, title, plain_path)
+            _render_panel(img_key, ch, vmin, vmax, True, title, outlined_path)
 
         figure_specs.append(
             {
                 "image_key": img_key,
                 "channel": channel_name,
-                "path": str(figure_path),
+                "plain_path": str(plain_path),
+                "outlined_path": str(outlined_path),
             }
         )
 ```
@@ -128,13 +150,29 @@ for img_key in image_keys:
 #| output: asis
 
 for spec in figure_specs:
-    print(f"## {spec['image_key']} - {spec['channel']}\n")
+    print(f"## {spec['image_key']} - {spec['channel']} (oocyte)\n")
     print(
-        f"The grayscale panel shows the `{spec['channel']}` channel from `{spec['image_key']}` "
-        "for this follicle subset. The red outline marks the cell boundary used to define "
-        "the subset window.\n"
+        f"The image shows a cropped view of `{roi}` centered on the oocyte "
+        f"(cell ID `{cell_id}`), drawn from the `{spec['image_key']}` morphology image. "
+        f"The `{spec['channel']}` channel is shown in "
+        "grayscale, with intensities scaled to the 1st–99.5th percentile and the colorbar "
+        "reporting the underlying fluorescence values. Shown in red is the default Xenium "
+        f"cell segmentation for the oocyte (`{cell_id}`) the crop is centered on. Axis units "
+        "are global microns in the slide coordinate system.\n"
     )
-    print(f"![]({spec['path']})\n")
+    print(f"![]({spec['plain_path']})\n")
+
+    print(f"## {spec['image_key']} - {spec['channel']} (oocyte + neighbors)\n")
+    print(
+        f"The image shows a cropped view of `{roi}` centered on the oocyte "
+        f"(cell ID `{cell_id}`), drawn from the `{spec['image_key']}` morphology image. "
+        f"The `{spec['channel']}` channel is shown in "
+        "grayscale, with intensities scaled to the 1st–99.5th percentile. Shown in red and "
+        "yellow are the default Xenium cell segmentations: yellow outlines mark every "
+        f"neighboring cell in the crop, and red marks the oocyte (`{cell_id}`) "
+        "the crop is centered on.\n"
+    )
+    print(f"![]({spec['outlined_path']})\n")
 ```
 
 ```{python}
