@@ -18,8 +18,6 @@ from pathlib import Path
 import spatialdata
 import spatialdata_plot
 from spatialdata import transform
-from spatialdata.models import ShapesModel
-from spatialdata.transformations import get_transformation, set_transformation
 # import session_info  # not in current container
 from timer import timer, timing_summary
 
@@ -42,31 +40,22 @@ sdata
 ```{python}
 with timer("Locate target cell"):
     target_cell = None
-    target_circle_key = None
+    highlight_element = None
+    highlight_column = "_plot_follicle_highlight"
     if "cell_boundaries" in sdata.shapes:
         boundaries = sdata["cell_boundaries"]
         if cell_id in boundaries.index:
-            target_circle_key = "target_cell_boundary"
-            target_boundary = ShapesModel.parse(boundaries.loc[[cell_id]].copy())
-            set_transformation(
-                target_boundary,
-                get_transformation(boundaries, get_all=True).copy(),
-                set_all=True,
-            )
-            sdata[target_circle_key] = target_boundary
-            target_cell = transform(sdata[target_circle_key], to_coordinate_system="global").iloc[0].geometry.centroid
-    if target_circle_key is None and "cell_circles" in sdata.shapes:
+            highlight_element = "cell_boundaries"
+            boundaries[highlight_column] = "other"
+            boundaries.loc[cell_id, highlight_column] = "target"
+            target_cell = transform(boundaries.loc[[cell_id]], to_coordinate_system="global").iloc[0].geometry.centroid
+    if highlight_element is None and "cell_circles" in sdata.shapes:
         circles = sdata["cell_circles"]
         if cell_id in circles.index:
-            target_circle_key = "target_cell_circle"
-            target_circle = ShapesModel.parse(circles.loc[[cell_id]].copy())
-            set_transformation(
-                target_circle,
-                get_transformation(circles, get_all=True).copy(),
-                set_all=True,
-            )
-            sdata[target_circle_key] = target_circle
-            target_cell = transform(sdata[target_circle_key], to_coordinate_system="global").iloc[0].geometry
+            highlight_element = "cell_circles"
+            circles[highlight_column] = "other"
+            circles.loc[cell_id, highlight_column] = "target"
+            target_cell = transform(circles.loc[[cell_id]], to_coordinate_system="global").iloc[0].geometry
 
 if target_cell is None:
     print(f"Target cell '{cell_id}' not found in cell_boundaries or cell_circles; plots will be rendered without a highlight.")
@@ -105,10 +94,12 @@ for img_key in image_keys:
                 cmap="gray",
                 norm=Normalize(vmin=vmin, vmax=vmax),
             )
-            if target_circle_key is not None:
+            if highlight_element is not None:
                 plot = plot.pl.render_shapes(
-                    element=target_circle_key,
-                    color="red",
+                    element=highlight_element,
+                    color=highlight_column,
+                    groups=["target"],
+                    palette=["red"],
                     fill_alpha=0.0,
                     outline_color="red",
                     outline_width=2.0,
