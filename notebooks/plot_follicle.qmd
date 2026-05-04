@@ -19,6 +19,7 @@ import spatialdata
 import spatialdata_plot
 from spatialdata import transform
 from spatialdata.models import ShapesModel
+from spatialdata.transformations import get_transformation, set_transformation
 # import session_info  # not in current container
 from timer import timer, timing_summary
 
@@ -46,13 +47,25 @@ with timer("Locate target cell"):
         boundaries = sdata["cell_boundaries"]
         if cell_id in boundaries.index:
             target_circle_key = "target_cell_boundary"
-            sdata[target_circle_key] = ShapesModel.parse(boundaries.loc[[cell_id]].copy())
+            target_boundary = ShapesModel.parse(boundaries.loc[[cell_id]].copy())
+            set_transformation(
+                target_boundary,
+                get_transformation(boundaries, get_all=True).copy(),
+                set_all=True,
+            )
+            sdata[target_circle_key] = target_boundary
             target_cell = transform(sdata[target_circle_key], to_coordinate_system="global").iloc[0].geometry.centroid
     if target_circle_key is None and "cell_circles" in sdata.shapes:
         circles = sdata["cell_circles"]
         if cell_id in circles.index:
             target_circle_key = "target_cell_circle"
-            sdata[target_circle_key] = ShapesModel.parse(circles.loc[[cell_id]].copy())
+            target_circle = ShapesModel.parse(circles.loc[[cell_id]].copy())
+            set_transformation(
+                target_circle,
+                get_transformation(circles, get_all=True).copy(),
+                set_all=True,
+            )
+            sdata[target_circle_key] = target_circle
             target_cell = transform(sdata[target_circle_key], to_coordinate_system="global").iloc[0].geometry
 
 if target_cell is None:
@@ -104,6 +117,7 @@ for img_key in image_keys:
             ax = plot.pl.show(
                 title=f"{sample} — {img_key} — {channel_name}",
                 figsize=(6, 6),
+                coordinate_systems="global",
                 return_ax=True,
             )
             ax.figure.savefig(figure_path, dpi=200, bbox_inches="tight")
