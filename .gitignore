@@ -5,3 +5,5 @@ work/
 __pycache__/
 .DS_Store
 *.quarto_ipynb
+containers/
+.apptainer-cache/
