@@ -162,7 +162,7 @@ Key parameters (set in `nextflow.config` or passed via `--param value`):
 | `samplesheet` | `null` | Path to samplesheet CSV |
 | `outdir` | `results` | Output directory |
 | `cell_ids_file` | `full` | Cell ID reference file key or direct path |
-| `container_image` | `babiddy755/xenium_nb:latest` | Container reference for OSCER and `local_apptainer`; may be a registry tag or a local `.sif` path |
+| `container_image` | `babiddy755/xenium_nb:latest` | Container reference pulled by the `local` and `oscer` profiles; may be a registry tag or a local `.sif` path |
 | `cell_ids_registry` | built-in map | Named cell ID files available to `build.nf` |
 | `radius` | `250` | Default bounding box radius (µm) |
 | `run_subset_follicle` | `true` | Whether `build.nf` should run `subset_follicle.qmd` after building sample-level zarrs |
@@ -182,9 +182,8 @@ The built-in analysis registry currently defines:
 
 | Profile | Description |
 |---------|-------------|
-| (default) | Local execution, no container |
-| `local_docker` | Local execution with Docker using `--container_image` as a registry tag or local image name. |
-| `local_apptainer` | Local execution with Apptainer. Override `--container_image` with a local `.sif` path after building `container/Apptainer.def`. |
+| (default) | Local execution, no container (use an activated conda env that provides the notebook kernel). |
+| `local` | Local execution with Apptainer, sized for a laptop / WSL2 box (16 GB per process). Override `--container_image` with a local `.sif` path after building `container/Apptainer.def`. |
 | `oscer` | SLURM executor on OSCER HPC, Apptainer container, scratch-based work directory and image cache. Memory scales 32→64→96 GB across retries. |
 
 Activate with `-profile oscer`:
@@ -199,7 +198,7 @@ For local Apptainer validation:
 
 ```bash
 nextflow run analyze.nf \
-    -profile local_apptainer \
+    -profile local \
     --samplesheet /tmp/xenium_nb_test/follicle_analysis_inputs.csv \
     --notebooks plot_follicle \
     --outdir /home/babiddy/xenium_nb_results_fresh \

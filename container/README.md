@@ -4,7 +4,7 @@ This directory captures the runtime used by the Xenium notebooks.
 The primary local workflow is:
 
 1. build a local `.sif` with Apptainer
-2. validate the pipeline locally with `-profile local_apptainer`
+2. validate the pipeline locally with `-profile local`
 3. build and push the matching Docker image to a registry for OSCER
 
 ## Files
@@ -41,7 +41,7 @@ Use the SIF directly with local Apptainer-backed Nextflow runs:
 
 ```bash
 nextflow run analyze.nf \
-  -profile local_apptainer \
+  -profile local \
   --container_image /absolute/path/to/container/xenium_tools_squidpy_local.sif \
   --samplesheet /tmp/xenium_nb_test/follicle_analysis_inputs.csv \
   --notebooks plot_follicle \
