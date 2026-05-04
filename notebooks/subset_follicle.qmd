@@ -83,20 +83,32 @@ print(cells[["cell_id", "radius"]].to_string(index=False))
 
 ## Subset FOV around each cell
 
-For each cell, the centroid is read directly from the `cell_circles` element of the
-`SpatialData` object. A square bounding box of ± radius µm is then used to spatially
-query the full-sample `SpatialData` object, and the resulting subset is written to
-its own zarr store.
+For each cell, the centroid is read from the `cell_circles` element and transformed
+into the `global` coordinate system. A square bounding box of ± radius (in global
+units) is then used to spatially query the full-sample `SpatialData` object, and the
+resulting subset is written to its own zarr store.
 
 ```{python}
+import numpy as np
+from spatialdata import transform
+from spatialdata.transformations import get_transformation
+
 with timer("Load cell circles"):
-    circles = sdata["cell_circles"]
+    # Transform circles into the global coordinate system so centroids and the
+    # query bbox share units with the image element (pixel space for Xenium).
+    circles = transform(sdata["cell_circles"], to_coordinate_system="global")
+    # Map µm radius into global units using the same scale.
+    affine = (
+        get_transformation(sdata["cell_circles"], "global")
+        .to_affine_matrix(input_axes=("x", "y"), output_axes=("x", "y"))
+    )
+    radius_scale = float(np.mean(np.abs([affine[0, 0], affine[1, 1]])))
 
 os.makedirs("output", exist_ok=True)
 
 for _, row in cells.iterrows():
     cell_id = row["cell_id"]
-    radius  = float(row["radius"])
+    radius  = float(row["radius"]) * radius_scale
 
     with timer(f"Subset {cell_id}"):
         # cell_circles stores pre-computed centroids as Point geometries
