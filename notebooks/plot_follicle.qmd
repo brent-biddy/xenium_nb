@@ -4,15 +4,16 @@ params:
   sample: "default"
   path: "."
 format:
-  html:
-    embed-resources: true
-    toc: true
+  pptx: default
 execute:
+  echo: false
+  output: false
   warning: false
 ---
 
 ```{python}
 import json
+import os
 from pathlib import Path
 import spatialdata
 import spatialdata_plot
@@ -31,19 +32,11 @@ with timer("Setup"):
     zarr_path = params["path"]
 ```
 
-## Load follicle SpatialData
-
-Reads the follicle-level zarr store created by notebook 02 for this cell.
-
 ```{python}
 with timer("Read zarr"):
     sdata = spatialdata.read_zarr(zarr_path)
 sdata
 ```
-
-## Locate subset-defining cell
-
-Reads the target cell centroid from `cell_circles` so it can be highlighted in each plot.
 
 ```{python}
 with timer("Locate target cell"):
@@ -68,30 +61,30 @@ else:
     print(f"Target cell '{cell_id}' centroid: ({target_cell.x:.1f}, {target_cell.y:.1f})")
 ```
 
-## Available images
-
-Lists all image elements present in the follicle zarr store. Xenium data typically
-includes a morphology focus image and a maximum intensity projection.
-
 ```{python}
 with timer("List images"):
     image_keys = list(sdata.images.keys())
 print(f"Images: {image_keys}")
 ```
 
-## Plot each channel
-
-Renders every channel of every image element on its own with `spatialdata-plot`.
-
 ```{python}
 import numpy as np
 from matplotlib.colors import Normalize
+import matplotlib.pyplot as plt
+
+figure_specs = []
+figure_dir = Path("plot_follicle_figures")
+figure_dir.mkdir(exist_ok=True)
 
 for img_key in image_keys:
     img = sdata.images[img_key]
     arr = next(iter(img.children.values())).image if hasattr(img, "children") else img
     for ch in arr.coords["c"].values:
-        with timer(f"Plot {img_key}[{ch}]"):
+        channel_name = str(ch)
+        safe_channel = channel_name.replace("/", "_").replace(" ", "_")
+        figure_path = figure_dir / f"{img_key}_{safe_channel}.png"
+
+        with timer(f"Plot {img_key}[{channel_name}]"):
             vmin, vmax = np.percentile(np.asarray(arr.sel(c=ch)), [1, 99.5])
             plot = sdata.pl.render_images(
                 element=img_key,
@@ -107,20 +100,37 @@ for img_key in image_keys:
                     outline_color="red",
                     outline_width=2.0,
                 )
-            plot.pl.show(
-                title=f"{sample} — {img_key} — {ch}",
+
+            ax = plot.pl.show(
+                title=f"{sample} — {img_key} — {channel_name}",
                 figsize=(6, 6),
+                return_ax=True,
             )
+            ax.figure.savefig(figure_path, dpi=200, bbox_inches="tight")
+            plt.close(ax.figure)
+
+        figure_specs.append(
+            {
+                "image_key": img_key,
+                "channel": channel_name,
+                "path": str(figure_path),
+            }
+        )
 ```
 
-## Timings
+```{python}
+#| output: asis
+
+for spec in figure_specs:
+    print(f"## {spec['image_key']} - {spec['channel']}\n")
+    print(
+        f"The grayscale panel shows the `{spec['channel']}` channel from `{spec['image_key']}` "
+        "for this follicle subset. The red outline marks the cell boundary used to define "
+        "the subset window.\n"
+    )
+    print(f"![]({spec['path']})\n")
+```
 
 ```{python}
 timing_summary()
-```
-
-## Session Info
-
-```{python}
-# session_info.show()  # not in current container
 ```

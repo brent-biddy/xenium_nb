@@ -1,10 +1,10 @@
 process RUN_NOTEBOOK {
     tag "${sample}:${notebook.baseName}"
 
-    // Publish HTML under the sample-scoped analysis directory.
+    // Publish the rendered notebook under the sample-scoped analysis directory.
     // Other outputs (zarr stores etc.) are published under output/ as written.
     publishDir({ publish_dir }), mode: 'copy', saveAs: { fn ->
-        fn.endsWith('.html') ? output_name : fn
+        fn.startsWith("${notebook.baseName}.") ? "${sample}_${fn}" : fn
     }
 
     input:
@@ -13,11 +13,10 @@ process RUN_NOTEBOOK {
           path(artifact_path),    // upstream artifact staged so notebooks read it from CWD
           val(sample),
           val(publish_dir),       // resolved by the caller: <outdir>/<sample>/<notebook_basename>
-          val(output_name),       // resolved by the caller: <sample>_<notebook_basename>.html
           val(row_params)         // row params map; path is rewritten to the staged artifact basename
 
     output:
-    path "*.html"
+    path "${notebook.baseName}.*"
     // hidden: true is required so dotfiles inside zarr stores (.zgroup,
     // .zattrs, .zmetadata) are collected — without it the published zarr
     // is missing root metadata and downstream readers fail.

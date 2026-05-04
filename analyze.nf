@@ -46,7 +46,11 @@ workflow {
 
     def timerScript = file("${projectDir}/bin/timer.py")
     def notebookSpecs = notebookIds.collect { id ->
-        [id: id, scope: registry[id].scope, path: file(registry[id].path)]
+        [
+            id   : id,
+            scope: registry[id].scope,
+            path : file(registry[id].path),
+        ]
     }
     def notebookChannel = Channel.fromList(notebookSpecs)
 
@@ -55,8 +59,7 @@ workflow {
         .map { sample, artifactPath, rowParams, spec ->
             def parentSample = artifactPath.parent.parent.parent.name
             def publishDir = "${params.outdir}/${parentSample}/${spec.path.baseName}"
-            def outputName = "${sample}_${spec.path.baseName}.html"
-            tuple(spec.path, timerScript, artifactPath, sample, publishDir, outputName, rowParams)
+            tuple(spec.path, timerScript, artifactPath, sample, publishDir, rowParams)
         }
         | RUN_NOTEBOOK
 }
