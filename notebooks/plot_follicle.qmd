@@ -14,13 +14,15 @@ execute:
 
 ```{python}
 import json
-import os
 from pathlib import Path
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
 import spatialdata
 import spatialdata_plot
-from spatialdata import transform
-# import session_info  # not in current container
-from timer import timer, timing_summary
+
+from timer import timer, write_timings_tsv
 
 with timer("Setup"):
     with open("params.json") as f:
@@ -42,33 +44,31 @@ sdata
 ```
 
 ```{python}
-with timer("Locate target cell"):
-    target_cell = None
-    highlight_element = None
+with timer("Locate oocyte"):
+    oocyte_element = None
     outline_element = None
-    highlight_column = "_plot_follicle_highlight"
+    oocyte_column = "_plot_follicle_oocyte"
     if "cell_boundaries" in sdata.shapes:
         outline_element = "cell_boundaries"
         boundaries = sdata["cell_boundaries"]
         if cell_id in boundaries.index:
-            highlight_element = "cell_boundaries"
-            boundaries[highlight_column] = "other"
-            boundaries.loc[cell_id, highlight_column] = "target"
-            target_cell = transform(boundaries.loc[[cell_id]], to_coordinate_system="global").iloc[0].geometry.centroid
-    if highlight_element is None and "cell_circles" in sdata.shapes:
+            oocyte_element = "cell_boundaries"
+            boundaries[oocyte_column] = "other"
+            boundaries.loc[cell_id, oocyte_column] = "oocyte"
+    if oocyte_element is None and "cell_circles" in sdata.shapes:
         if outline_element is None:
             outline_element = "cell_circles"
         circles = sdata["cell_circles"]
         if cell_id in circles.index:
-            highlight_element = "cell_circles"
-            circles[highlight_column] = "other"
-            circles.loc[cell_id, highlight_column] = "target"
-            target_cell = transform(circles.loc[[cell_id]], to_coordinate_system="global").iloc[0].geometry
+            oocyte_element = "cell_circles"
+            circles[oocyte_column] = "other"
+            circles.loc[cell_id, oocyte_column] = "oocyte"
 
-if target_cell is None:
-    print(f"Target cell '{cell_id}' not found in cell_boundaries or cell_circles; plots will be rendered without a highlight.")
+oocyte_found = oocyte_element is not None
+if oocyte_found:
+    print(f"Oocyte cell '{cell_id}' located in '{oocyte_element}'.")
 else:
-    print(f"Target cell '{cell_id}' centroid: ({target_cell.x:.1f}, {target_cell.y:.1f})")
+    print(f"Oocyte cell '{cell_id}' not found in cell_boundaries or cell_circles; plots will be rendered without a red outline.")
 ```
 
 ```{python}
@@ -78,10 +78,6 @@ print(f"Images: {image_keys}")
 ```
 
 ```{python}
-import numpy as np
-from matplotlib.colors import Normalize
-import matplotlib.pyplot as plt
-
 figure_specs = []
 figure_dir = Path("plot_follicle_figures")
 figure_dir.mkdir(exist_ok=True)
@@ -101,11 +97,11 @@ def _render_panel(img_key, ch, vmin, vmax, draw_all_cells, title, figure_path):
             outline_color="yellow",
             outline_width=0.3,
         )
-    if highlight_element is not None:
+    if oocyte_element is not None:
         plot = plot.pl.render_shapes(
-            element=highlight_element,
-            color=highlight_column,
-            groups=["target"],
+            element=oocyte_element,
+            color=oocyte_column,
+            groups=["oocyte"],
             palette=["red"],
             fill_alpha=0.0,
             outline_color="red",
@@ -132,9 +128,11 @@ for img_key in image_keys:
 
         with timer(f"Plot {img_key}[{channel_name}]"):
             vmin, vmax = np.percentile(np.asarray(arr.sel(c=ch)), [1, 99.5])
-            title = f"{roi} / {cell_id} — {img_key} — {channel_name}"
-            _render_panel(img_key, ch, vmin, vmax, False, title, plain_path)
-            _render_panel(img_key, ch, vmin, vmax, True, title, outlined_path)
+            base_title = f"{roi} / {cell_id} — {img_key} — {channel_name}"
+            _render_panel(img_key, ch, vmin, vmax, False,
+                          f"{base_title} (oocyte)", plain_path)
+            _render_panel(img_key, ch, vmin, vmax, True,
+                          f"{base_title} (oocyte + neighbors)", outlined_path)
 
         figure_specs.append(
             {
@@ -150,31 +148,46 @@ for img_key in image_keys:
 #| output: asis
 
 for spec in figure_specs:
-    print(f"## {spec['image_key']} - {spec['channel']} (oocyte)\n")
-    print(
+    intro = (
         f"The image shows a cropped view of `{roi}` centered on the oocyte "
         f"(cell ID `{cell_id}`), drawn from the `{spec['image_key']}` morphology image. "
-        f"The `{spec['channel']}` channel is shown in "
-        "grayscale, with intensities scaled to the 1st–99.5th percentile and the colorbar "
-        "reporting the underlying fluorescence values. Shown in red is the default Xenium "
-        f"cell segmentation for the oocyte (`{cell_id}`) the crop is centered on. Axis units "
-        "are global microns in the slide coordinate system.\n"
+    )
+    plain_segmentation = (
+        f"Shown in red is the default Xenium cell segmentation for the oocyte "
+        f"(`{cell_id}`) the crop is centered on."
+        if oocyte_found
+        else f"The oocyte (`{cell_id}`) could not be located in the segmentation "
+        "shapes, so no red outline is shown."
+    )
+    outlined_segmentation = (
+        "Shown in red and yellow are the default Xenium cell segmentations: yellow "
+        "outlines mark every neighboring cell in the crop, and red marks the oocyte "
+        f"(`{cell_id}`) the crop is centered on."
+        if oocyte_found
+        else "Shown in yellow are the default Xenium cell segmentations marking every "
+        f"cell in the crop. The oocyte (`{cell_id}`) could not be located in the "
+        "segmentation shapes, so no red outline is shown."
+    )
+
+    print(f"## {spec['image_key']} - {spec['channel']} (oocyte)\n")
+    print(
+        intro
+        + f"The `{spec['channel']}` channel is shown in grayscale, with intensities "
+        "scaled to the 1st–99.5th percentile and the colorbar reporting the underlying "
+        f"fluorescence values. {plain_segmentation} Axis units are global microns in "
+        "the slide coordinate system.\n"
     )
     print(f"![]({spec['plain_path']})\n")
 
     print(f"## {spec['image_key']} - {spec['channel']} (oocyte + neighbors)\n")
     print(
-        f"The image shows a cropped view of `{roi}` centered on the oocyte "
-        f"(cell ID `{cell_id}`), drawn from the `{spec['image_key']}` morphology image. "
-        f"The `{spec['channel']}` channel is shown in "
-        "grayscale, with intensities scaled to the 1st–99.5th percentile. Shown in red and "
-        "yellow are the default Xenium cell segmentations: yellow outlines mark every "
-        f"neighboring cell in the crop, and red marks the oocyte (`{cell_id}`) "
-        "the crop is centered on.\n"
+        intro
+        + f"The `{spec['channel']}` channel is shown in grayscale, with intensities "
+        f"scaled to the 1st–99.5th percentile. {outlined_segmentation}\n"
     )
     print(f"![]({spec['outlined_path']})\n")
 ```
 
 ```{python}
-timing_summary()
+write_timings_tsv("plot_follicle.timing.tsv")
 ```

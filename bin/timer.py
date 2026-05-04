@@ -20,6 +20,20 @@ def timer(label):
         print(f"[{label}] {seconds:.2f}s")
 
 
+def write_timings_tsv(path):
+    """Write recorded timings to a TSV file with columns: step, seconds.
+
+    Appends a final 'Total' row summing all recorded elapsed times.
+    """
+    with open(path, "w") as f:
+        f.write("step\tseconds\n")
+        total = 0.0
+        for label, elapsed in _timings:
+            f.write(f"{label}\t{elapsed:.4f}\n")
+            total += elapsed
+        f.write(f"Total\t{total:.4f}\n")
+
+
 def timing_summary():
     """Print a formatted table of all recorded timings and a total."""
     if not _timings:
