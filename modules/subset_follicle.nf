@@ -2,7 +2,7 @@ process SUBSET_FOLLICLE {
     tag "${sample}:${notebook.baseName}"
 
     publishDir({ publish_dir }), mode: 'copy', saveAs: { fn ->
-        fn.endsWith('.html') ? output_name : fn
+        fn.endsWith('.html') ? "${sample}_${notebook.baseName}.html" : fn
     }
 
     input:
@@ -12,8 +12,7 @@ process SUBSET_FOLLICLE {
           path(cell_ids_file),
           path(notebook),
           path('timer.py'),
-          val(publish_dir),
-          val(output_name)
+          val(publish_dir)
 
     output:
     tuple val(sample),

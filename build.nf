@@ -38,8 +38,7 @@ workflow {
 
     def createInputs = sampleRows.map { sample, inputPath, rowParams ->
         def publishDir = "${params.outdir}/${sample}/${createNotebook.baseName}"
-        def outputName = "${sample}_${createNotebook.baseName}.html"
-        tuple(createNotebook, timerScript, inputPath, sample, publishDir, outputName, rowParams)
+        tuple(createNotebook, timerScript, inputPath, sample, publishDir, rowParams)
     }
 
     def createSpatialdata = CREATE_SPATIALDATA(createInputs)
@@ -58,8 +57,7 @@ workflow {
     if (runSubsetFollicle) {
         def subsetInputs = sampleArtifacts.map { sample, sampleZarr, rowParams ->
             def publishDir = "${params.outdir}/${sample}/${subsetNotebook.baseName}"
-            def outputName = "${sample}_${subsetNotebook.baseName}.html"
-            tuple(sample, sampleZarr, rowParams, cellIdsFilePath, subsetNotebook, timerScript, publishDir, outputName)
+            tuple(sample, sampleZarr, rowParams, cellIdsFilePath, subsetNotebook, timerScript, publishDir)
         }
 
         def subsetFollicle = SUBSET_FOLLICLE(subsetInputs)

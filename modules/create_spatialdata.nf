@@ -2,7 +2,7 @@ process CREATE_SPATIALDATA {
     tag "${sample}:${notebook.baseName}"
 
     publishDir({ publish_dir }), mode: 'copy', saveAs: { fn ->
-        fn.endsWith('.html') ? output_name : fn
+        fn.endsWith('.html') ? "${sample}_${notebook.baseName}.html" : fn
     }
 
     input:
@@ -11,7 +11,6 @@ process CREATE_SPATIALDATA {
           path(input_path),
           val(sample),
           val(publish_dir),
-          val(output_name),
           val(row_params)
 
     output:
