@@ -16,6 +16,8 @@ import json
 from pathlib import Path
 import spatialdata
 import spatialdata_plot
+from spatialdata import transform
+from spatialdata.models import ShapesModel
 # import session_info  # not in current container
 from timer import timer, timing_summary
 
@@ -37,6 +39,33 @@ Reads the follicle-level zarr store created by notebook 02 for this cell.
 with timer("Read zarr"):
     sdata = spatialdata.read_zarr(zarr_path)
 sdata
+```
+
+## Locate subset-defining cell
+
+Reads the target cell centroid from `cell_circles` so it can be highlighted in each plot.
+
+```{python}
+with timer("Locate target cell"):
+    target_cell = None
+    target_circle_key = None
+    if "cell_boundaries" in sdata.shapes:
+        boundaries = sdata["cell_boundaries"]
+        if cell_id in boundaries.index:
+            target_circle_key = "target_cell_boundary"
+            sdata[target_circle_key] = ShapesModel.parse(boundaries.loc[[cell_id]].copy())
+            target_cell = transform(sdata[target_circle_key], to_coordinate_system="global").iloc[0].geometry.centroid
+    if target_circle_key is None and "cell_circles" in sdata.shapes:
+        circles = sdata["cell_circles"]
+        if cell_id in circles.index:
+            target_circle_key = "target_cell_circle"
+            sdata[target_circle_key] = ShapesModel.parse(circles.loc[[cell_id]].copy())
+            target_cell = transform(sdata[target_circle_key], to_coordinate_system="global").iloc[0].geometry
+
+if target_cell is None:
+    print(f"Target cell '{cell_id}' not found in cell_boundaries or cell_circles; plots will be rendered without a highlight.")
+else:
+    print(f"Target cell '{cell_id}' centroid: ({target_cell.x:.1f}, {target_cell.y:.1f})")
 ```
 
 ## Available images
@@ -64,13 +93,23 @@ for img_key in image_keys:
     for ch in arr.coords["c"].values:
         with timer(f"Plot {img_key}[{ch}]"):
             vmin, vmax = np.percentile(np.asarray(arr.sel(c=ch)), [1, 99.5])
-            (
-                sdata.pl
-                .render_images(
-                    element=img_key, channel=ch, cmap="gray",
-                    norm=Normalize(vmin=vmin, vmax=vmax),
+            plot = sdata.pl.render_images(
+                element=img_key,
+                channel=ch,
+                cmap="gray",
+                norm=Normalize(vmin=vmin, vmax=vmax),
+            )
+            if target_circle_key is not None:
+                plot = plot.pl.render_shapes(
+                    element=target_circle_key,
+                    color="red",
+                    fill_alpha=0.0,
+                    outline_color="red",
+                    outline_width=2.0,
                 )
-                .pl.show(title=f"{sample} — {img_key} — {ch}", figsize=(6, 6))
+            plot.pl.show(
+                title=f"{sample} — {img_key} — {ch}",
+                figsize=(6, 6),
             )
 ```
 
