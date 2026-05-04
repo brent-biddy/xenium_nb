@@ -8,21 +8,13 @@ workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"
     def expectedColumns = ['sample', 'path'] as Set
 
-    def normalizeNotebookSelection = { value ->
-        if (value == null) {
-            return []
-        }
-        if (value instanceof List) {
-            return value.collect { it.toString().trim() }.findAll { it }
-        }
-        value
-            .toString()
-            .split(',')
-            .collect { it.trim() }
-            .findAll { it }
-    }
-
-    def notebookIds = normalizeNotebookSelection(params.notebooks)
+    def notebookIds = (
+        params.notebooks == null
+            ? []
+            : params.notebooks instanceof List
+                ? params.notebooks.collect { it.toString().trim() }.findAll { it }
+                : params.notebooks.toString().split(',').collect { it.trim() }.findAll { it }
+    )
     if (!notebookIds) {
         error "Please provide at least one notebook ID via --notebooks"
     }
@@ -56,7 +48,7 @@ workflow {
     def notebookSpecs = notebookIds.collect { id ->
         [id: id, scope: registry[id].scope, path: file(registry[id].path)]
     }
-    def notebookChannel = Channel.of(*notebookSpecs)
+    def notebookChannel = Channel.fromList(notebookSpecs)
 
     rows
         .combine(notebookChannel)

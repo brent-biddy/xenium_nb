@@ -3,7 +3,7 @@ process RUN_NOTEBOOK {
 
     // Publish HTML under the sample-scoped analysis directory.
     // Other outputs (zarr stores etc.) are published under output/ as written.
-    publishDir "${publish_dir}", mode: 'copy', saveAs: { fn ->
+    publishDir({ publish_dir }), mode: 'copy', saveAs: { fn ->
         fn.endsWith('.html') ? output_name : fn
     }
 

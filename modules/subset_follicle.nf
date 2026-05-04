@@ -1,7 +1,7 @@
 process SUBSET_FOLLICLE {
     tag "${sample}:${notebook.baseName}"
 
-    publishDir "${publish_dir}", mode: 'copy', saveAs: { fn ->
+    publishDir({ publish_dir }), mode: 'copy', saveAs: { fn ->
         fn.endsWith('.html') ? output_name : fn
     }
 
