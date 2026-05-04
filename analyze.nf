@@ -57,8 +57,12 @@ workflow {
     rows
         .combine(notebookChannel)
         .map { sample, artifactPath, rowParams, spec ->
-            def parentSample = artifactPath.parent.parent.parent.name
-            def publishDir = "${params.outdir}/${parentSample}/${spec.path.baseName}"
+            // Sample is built as "<roi>_<cellId>"; strip the cellId suffix to
+            // recover the ROI directory the artifact belongs to.
+            def cellId = artifactPath.baseName
+            def suffix = "_${cellId}"
+            def roi = sample.endsWith(suffix) ? sample[0..<(sample.length() - suffix.length())] : sample
+            def publishDir = "${params.outdir}/${roi}/${spec.path.baseName}"
             tuple(spec.path, timerScript, artifactPath, sample, publishDir, rowParams)
         }
         | RUN_NOTEBOOK
