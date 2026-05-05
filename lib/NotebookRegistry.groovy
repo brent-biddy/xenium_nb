@@ -1,5 +1,5 @@
 class NotebookRegistry {
-    static Map producer(String projectDir) {
+    static Map create(String projectDir) {
         [
             create_sdata: [
                 path  : "${projectDir}/notebooks/create_sdata.qmd",

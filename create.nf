@@ -10,8 +10,8 @@ nextflow.enable.dsl = 2
 
 include { RUN_CREATE_NOTEBOOK as CREATE_SDATA } from './modules/run_create_notebook'
 include { RUN_CREATE_NOTEBOOK as CREATE_FOLLICLE_SDATA } from './modules/run_create_notebook'
-include { WRITE_SAMPLESHEET as WRITE_SAMPLE_ANALYSIS_INPUTS } from './modules/write_samplesheet'
-include { WRITE_SAMPLESHEET as WRITE_FOLLICLE_ANALYSIS_INPUTS } from './modules/write_samplesheet'
+include { WRITE_SAMPLESHEET as WRITE_SDATA_SAMPLESHEET } from './modules/write_samplesheet'
+include { WRITE_SAMPLESHEET as WRITE_FOLLICLE_SAMPLESHEET } from './modules/write_samplesheet'
 
 // Reads a (sample, path, ...) CSV and emits (sample, file, rowMap) per row.
 // Extra columns are preserved in rowMap so notebooks can read per-sample params.
@@ -37,8 +37,8 @@ def buildSamplesheetInput(rowsChannel, outputName, publishDir) {
 
 workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"
-    def producerRegistry = NotebookRegistry.producer(projectDir.toString())
-    def cellIdsFilePath = file(params.cell_ids_file)
+    def createRegistry = NotebookRegistry.create(projectDir.toString())
+    def cellIdsFile = file(params.cell_ids_file)
     def timerScript = file("${projectDir}/bin/timer.py")
     def createMode = params.create.toLowerCase()
     if (!(createMode in ['sdata', 'follicle_sdata', 'all'])) {
@@ -51,10 +51,10 @@ workflow {
     if (createMode in ['sdata', 'all']) {
         def sampleRows = parseSamplesheet(params.samplesheet, 'Create samplesheet')
 
-        def createNotebook = file(producerRegistry.create_sdata.path)
+        def createNotebook = file(createRegistry.create_sdata.path)
         def createInputs = sampleRows.map { sample, inputPath, rowParams ->
             def publishDir = "${params.outdir}/${sample}/${createNotebook.baseName}"
-            tuple(createNotebook, timerScript, inputPath, cellIdsFilePath, sample, publishDir, rowParams, producerRegistry.create_sdata.params)
+            tuple(createNotebook, timerScript, inputPath, cellIdsFile, sample, publishDir, rowParams, createRegistry.create_sdata.params)
         }
 
         sampleArtifacts = CREATE_SDATA(createInputs).artifacts
@@ -66,7 +66,7 @@ workflow {
             ]
         }
 
-        WRITE_SAMPLE_ANALYSIS_INPUTS(buildSamplesheetInput(
+        WRITE_SDATA_SAMPLESHEET(buildSamplesheetInput(
             sampleArtifactRows,
             'sample_sdata_samplesheet.csv',
             "${params.outdir}/${createNotebook.baseName}",
@@ -80,13 +80,13 @@ workflow {
 
     // ---- follicle_sdata: per-sample SpatialData -> per-cell-ID subset zarrs ----
     if (createMode in ['follicle_sdata', 'all']) {
-        def subsetNotebook = file(producerRegistry.create_follicle_sdata.path)
-        def subsetInputs = sampleArtifacts.map { sample, sampleZarr, rowParams ->
-            def publishDir = "${params.outdir}/${sample}/${subsetNotebook.baseName}"
-            tuple(subsetNotebook, timerScript, sampleZarr, cellIdsFilePath, sample, publishDir, rowParams, producerRegistry.create_follicle_sdata.params)
+        def follicleNotebook = file(createRegistry.create_follicle_sdata.path)
+        def follicleInputs = sampleArtifacts.map { sample, sampleZarr, rowParams ->
+            def publishDir = "${params.outdir}/${sample}/${follicleNotebook.baseName}"
+            tuple(follicleNotebook, timerScript, sampleZarr, cellIdsFile, sample, publishDir, rowParams, createRegistry.create_follicle_sdata.params)
         }
 
-        def follicleArtifacts = CREATE_FOLLICLE_SDATA(subsetInputs).artifacts
+        def follicleArtifacts = CREATE_FOLLICLE_SDATA(follicleInputs).artifacts
 
         def follicleArtifactRows = follicleArtifacts.flatMap { sample, zarrPaths, _rowParams ->
             // Nextflow emits a single Path for one match and a List<Path> for many; normalize.
@@ -95,15 +95,15 @@ workflow {
                 [
                     sample: sample,
                     cell  : zarr.baseName,
-                    path  : "${params.outdir}/${sample}/${subsetNotebook.baseName}/output/${zarr.baseName}.zarr",
+                    path  : "${params.outdir}/${sample}/${follicleNotebook.baseName}/output/${zarr.baseName}.zarr",
                 ]
             }
         }
 
-        WRITE_FOLLICLE_ANALYSIS_INPUTS(buildSamplesheetInput(
+        WRITE_FOLLICLE_SAMPLESHEET(buildSamplesheetInput(
             follicleArtifactRows,
             'follicle_sdata_samplesheet.csv',
-            "${params.outdir}/${subsetNotebook.baseName}",
+            "${params.outdir}/${follicleNotebook.baseName}",
         ))
     }
 }
