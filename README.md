@@ -42,10 +42,11 @@ xenium_nb/
 ├── conf/
 │   └── base.config            # Resource defaults
 ├── modules/
-│   ├── create_spatialdata.nf  # Sample-level artifact producer
-│   ├── subset_follicle.nf     # Follicle-level artifact producer
-│   ├── run_notebook.nf        # Generic analysis notebook runner
-│   └── write_samplesheet.nf   # Writes artifact samplesheets
+│   ├── create_spatialdata.nf      # Sample-level artifact producer
+│   ├── subset_follicle.nf         # Follicle-level artifact producer
+│   ├── run_notebook.nf            # Shared notebook runner
+│   ├── write_quarto_params.nf     # Renders params.yml for notebooks
+│   └── write_samplesheet.nf       # Writes artifact samplesheets
 ├── notebooks/
 │   ├── create_sdata.qmd
 │   ├── create_follicle_sdata.qmd

@@ -9,11 +9,8 @@
 
 nextflow.enable.dsl = 2
 
-include { RUN_ANALYZE_NOTEBOOK } from './modules/run_analyze_notebook'
-
-// Params that RUN_ANALYZE_NOTEBOOK injects from pipeline config rather than the
-// samplesheet, so they don't need to appear as samplesheet columns.
-def PIPELINE_PARAM_KEYS = ['cell_ids_file', 'radius', 'n_jobs'] as Set
+include { WRITE_QUARTO_PARAMS } from './modules/write_quarto_params'
+include { RUN_NOTEBOOK } from './modules/run_notebook'
 
 // Resolves --analyze input ('all' / comma-separated / List) into a list of
 // known notebook IDs, validated against the registry.
@@ -39,6 +36,10 @@ workflow {
     def registry = NotebookRegistry.analysis(projectDir.toString())
     def notebookIds = resolveNotebookIds(params.analyze, registry)
     log.info "Running analysis notebooks: ${notebookIds.join(', ')}"
+
+    // Params that RUN_NOTEBOOK injects from pipeline config rather than the
+    // samplesheet, so they don't need to appear as samplesheet columns.
+    def PIPELINE_PARAM_KEYS = ['cell_ids_file', 'radius', 'n_jobs'] as Set
 
     // Union of declared notebook params, minus those Nextflow injects, becomes
     // the set of samplesheet columns each row must populate.
@@ -76,7 +77,18 @@ workflow {
                 ? "${sample}_${rowParams.cell}"
                 : sample
             def publishDir = "${params.outdir}/${sample}/${spec.path.baseName}"
-            tuple(spec.path, timerScript, artifactPath, publishSample, publishDir, rowParams, spec.params)
+            tuple(
+                spec.path.toString(),
+                spec.path.baseName,
+                timerScript.toString(),
+                artifactPath.toString(),
+                sample,
+                publishDir,
+                publishSample,
+                rowParams,
+                spec.params
+            )
         }
-        | RUN_ANALYZE_NOTEBOOK
+        | WRITE_QUARTO_PARAMS
+        | RUN_NOTEBOOK
 }

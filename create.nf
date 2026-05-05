@@ -8,8 +8,9 @@
 
 nextflow.enable.dsl = 2
 
-include { RUN_CREATE_NOTEBOOK as CREATE_SDATA } from './modules/run_create_notebook'
-include { RUN_CREATE_NOTEBOOK as CREATE_FOLLICLE_SDATA } from './modules/run_create_notebook'
+include { WRITE_QUARTO_PARAMS } from './modules/write_quarto_params'
+include { RUN_NOTEBOOK as CREATE_SDATA } from './modules/run_notebook'
+include { RUN_NOTEBOOK as CREATE_FOLLICLE_SDATA } from './modules/run_notebook'
 include { WRITE_SAMPLESHEET as WRITE_SDATA_SAMPLESHEET } from './modules/write_samplesheet'
 include { WRITE_SAMPLESHEET as WRITE_FOLLICLE_SAMPLESHEET } from './modules/write_samplesheet'
 
@@ -38,9 +39,7 @@ def buildSamplesheetInput(rowsChannel, outputName, publishDir) {
 workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"
     def createRegistry = NotebookRegistry.create(projectDir.toString())
-    def cellIdsFile = file(params.cell_ids_file)
     def timerScript = file("${projectDir}/bin/timer.py")
-    def publishDirFor = { sample, notebook -> "${params.outdir}/${sample}/${notebook.baseName}" }
     def createMode = params.create.toLowerCase()
     if (!(createMode in ['sdata', 'follicle_sdata', 'all'])) {
         error "Invalid create '${createMode}'. Valid values are: sdata, follicle_sdata, all"
@@ -54,15 +53,25 @@ workflow {
 
         def createNotebook = file(createRegistry.create_sdata.path)
         def createInputs = sampleRows.map { sample, inputPath, rowParams ->
-            tuple(createNotebook, timerScript, inputPath, cellIdsFile, sample, publishDirFor(sample, createNotebook), rowParams, createRegistry.create_sdata.params)
+            tuple(
+                createNotebook.toString(),
+                createNotebook.baseName,
+                timerScript.toString(),
+                inputPath.toString(),
+                sample,
+                "${params.outdir}/${sample}/${createNotebook.baseName}",
+                sample,
+                rowParams,
+                createRegistry.create_sdata.params
+            )
         }
 
-        sampleArtifacts = CREATE_SDATA(createInputs).artifacts
+        sampleArtifacts = CREATE_SDATA(WRITE_QUARTO_PARAMS(createInputs).notebook_inputs).artifacts
 
         def sampleArtifactRows = sampleArtifacts.map { sample, sampleZarr, _rowParams ->
             [
                 sample: sample,
-                path  : "${publishDirFor(sample, createNotebook)}/output/${sampleZarr.name}",
+                path  : "${params.outdir}/${sample}/${createNotebook.baseName}/output/${sampleZarr.name}",
             ]
         }
 
@@ -82,21 +91,31 @@ workflow {
     if (createMode in ['follicle_sdata', 'all']) {
         def follicleNotebook = file(createRegistry.create_follicle_sdata.path)
         def follicleInputs = sampleArtifacts.map { sample, sampleZarr, rowParams ->
-            tuple(follicleNotebook, timerScript, sampleZarr, cellIdsFile, sample, publishDirFor(sample, follicleNotebook), rowParams, createRegistry.create_follicle_sdata.params)
+            tuple(
+                follicleNotebook.toString(),
+                follicleNotebook.baseName,
+                timerScript.toString(),
+                sampleZarr.toString(),
+                sample,
+                "${params.outdir}/${sample}/${follicleNotebook.baseName}",
+                sample,
+                rowParams,
+                createRegistry.create_follicle_sdata.params
+            )
         }
 
-        def follicleArtifacts = CREATE_FOLLICLE_SDATA(follicleInputs).artifacts
+        def follicleArtifacts = CREATE_FOLLICLE_SDATA(WRITE_QUARTO_PARAMS(follicleInputs).notebook_inputs).artifacts
 
         def follicleArtifactRows = follicleArtifacts.flatMap { sample, zarrPaths, _rowParams ->
             // Nextflow emits a single Path for one match and a List<Path> for many; normalize.
             def zarrs = zarrPaths instanceof List ? zarrPaths : [zarrPaths]
-            zarrs.collect { zarr ->
-                [
-                    sample: sample,
-                    cell  : zarr.baseName,
-                    path  : "${publishDirFor(sample, follicleNotebook)}/output/${zarr.name}",
-                ]
-            }
+                zarrs.collect { zarr ->
+                    [
+                        sample: sample,
+                        cell  : zarr.baseName,
+                        path  : "${params.outdir}/${sample}/${follicleNotebook.baseName}/output/${zarr.name}",
+                    ]
+                }
         }
 
         WRITE_FOLLICLE_SAMPLESHEET(buildSamplesheetInput(
