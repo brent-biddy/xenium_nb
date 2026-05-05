@@ -1,5 +1,5 @@
 ---
-title: "Subset Follicle"
+title: "Create Follicle SData"
 jupyter: xenium
 params:
   sample: "default"
@@ -31,7 +31,7 @@ with timer("Setup"):
         params = json.load(f)
 
     sample = params["sample"]
-    # 'path' is the staged sample-level zarr produced by create_spatialdata.
+    # 'path' is the staged sample-level zarr produced by create_sdata.
     zarr_path = params["path"]
     cell_ids_file = params["cell_ids_file"]
     radius = float(params["radius"])
@@ -40,7 +40,7 @@ with timer("Setup"):
 
 ## Load SpatialData
 
-Reads the full-sample zarr store created by notebook 01.
+Reads the full-sample zarr store created by `create_sdata`.
 
 ```{python}
 with timer("Read zarr"):

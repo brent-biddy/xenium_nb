@@ -40,12 +40,10 @@ You can also pass an explicit output path:
 Use the SIF directly with local Apptainer-backed Nextflow runs:
 
 ```bash
-nextflow run analyze.nf \
+nextflow run create.nf \
   -profile local \
   --container_image /absolute/path/to/container/xenium_tools_squidpy_local.sif \
-  --samplesheet /tmp/xenium_nb_test/follicle_analysis_inputs.csv \
-  --notebooks plot_follicle \
-  --outdir /home/babiddy/xenium_nb_results_fresh
+  --samplesheet assets/samplesheet.csv
 ```
 
 Validate the SIF directly:

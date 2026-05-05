@@ -30,8 +30,8 @@ workflow {
         }
 
     def timerScript = file("${projectDir}/bin/timer.py")
-    def createNotebook = file(params.producer_registry.create_spatialdata.path)
-    def subsetNotebook = file(params.producer_registry.subset_follicle.path)
+    def createNotebook = file(params.producer_registry.create_sdata.path)
+    def subsetNotebook = file(params.producer_registry.create_follicle_sdata.path)
     def runSubsetFollicle = params.run_subset_follicle as boolean
 
     def createInputs = sampleRows.map { sample, inputPath, rowParams ->

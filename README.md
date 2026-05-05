@@ -44,8 +44,8 @@ xenium_nb/
 │   ├── run_notebook.nf        # Generic analysis notebook runner
 │   └── write_samplesheet.nf   # Writes artifact samplesheets
 ├── notebooks/
-│   ├── create_spatialdata.qmd
-│   ├── subset_follicle.qmd
+│   ├── create_sdata.qmd
+│   ├── create_follicle_sdata.qmd
 │   └── plot_follicle.qmd
 ├── bin/
 │   ├── timer.py               # Timing utilities for notebooks
@@ -78,16 +78,16 @@ Sample artifact sheet:
 
 ```csv
 sample,path
-ROI1,results/ROI1/create_spatialdata/output/ROI1.zarr
-ROI2,results/ROI2/create_spatialdata/output/ROI2.zarr
+ROI1,results/ROI1/create_sdata/output/ROI1.zarr
+ROI2,results/ROI2/create_sdata/output/ROI2.zarr
 ```
 
 Follicle artifact sheet:
 
 ```csv
 sample,cell,path
-ROI1,aaaaimck-1,results/ROI1/subset_follicle/output/aaaaimck-1.zarr
-ROI1,aaaalpdj-1,results/ROI1/subset_follicle/output/aaaalpdj-1.zarr
+ROI1,aaaaimck-1,results/ROI1/create_follicle_sdata/output/aaaaimck-1.zarr
+ROI1,aaaalpdj-1,results/ROI1/create_follicle_sdata/output/aaaalpdj-1.zarr
 ```
 
 ### Cell ID reference file
@@ -130,13 +130,13 @@ nextflow run create.nf \
 
 By default this runs both producer notebooks:
 
-- `create_spatialdata.qmd`
-- `subset_follicle.qmd`
+- `create_sdata.qmd`
+- `create_follicle_sdata.qmd`
 
 and writes:
 
-- sample zarrs under `results/<sample>/create_spatialdata/output/`
-- follicle zarrs under `results/<sample>/subset_follicle/output/`
+- sample zarrs under `results/<sample>/create_sdata/output/`
+- follicle zarrs under `results/<sample>/create_follicle_sdata/output/`
 - `results/pipeline_info/sample_analysis_inputs.csv`
 - `results/pipeline_info/follicle_analysis_inputs.csv`
 
@@ -148,7 +148,7 @@ nextflow run create.nf \
     --run_subset_follicle false
 ```
 
-This runs only `create_spatialdata.qmd` and writes `results/pipeline_info/sample_analysis_inputs.csv`.
+This runs only `create_sdata.qmd` and writes `results/pipeline_info/sample_analysis_inputs.csv`.
 
 ### Create with the small test follicle file
 
@@ -190,7 +190,7 @@ Key parameters (set in `nextflow.config` or passed via `--param value`):
 | `container_image` | `babiddy755/xenium_nb:latest` | Container reference pulled by the `local` and `oscer` profiles; may be a registry tag or a local `.sif` path |
 | `cell_ids_registry` | built-in map | Named cell ID files available to `create.nf` |
 | `radius` | `250` | Default bounding box radius (µm) |
-| `run_subset_follicle` | `true` | Whether `create.nf` should run `subset_follicle.qmd` after building sample-level zarrs |
+| `run_subset_follicle` | `true` | Whether `create.nf` should run `create_follicle_sdata.qmd` after building sample-level zarrs |
 | `producer_registry` | built-in map | The two producer notebooks used by `create.nf` |
 | `analysis_notebook_registry` | built-in map | Notebook IDs, paths, and scopes used by `analyze.nf` |
 | `notebooks` | `[]` | Analysis notebook IDs to run in `analyze.nf` |
@@ -251,12 +251,12 @@ results/
 │   ├── sample_analysis_inputs.csv
 │   └── follicle_analysis_inputs.csv
 ├── ROI1/
-│   ├── create_spatialdata/
-│   │   ├── ROI1_create_spatialdata.html
+│   ├── create_sdata/
+│   │   ├── ROI1_create_sdata.html
 │   │   └── output/
 │   │       └── ROI1.zarr/
-│   ├── subset_follicle/
-│   │   ├── ROI1_subset_follicle.html
+│   ├── create_follicle_sdata/
+│   │   ├── ROI1_create_follicle_sdata.html
 │   │   └── output/
 │   │       ├── aaaaimck-1.zarr/
 │   │       └── aaaalpdj-1.zarr/
@@ -272,7 +272,7 @@ results/
 Analysis outputs also publish under the parent sample directory, so follicle reports for cells like `aaaaimck-1` and `aaaalpdj-1` both land under `results/ROI1/plot_follicle/`.
 For `plot_follicle`, the primary rendered artifact is a `.pptx` deck, with a companion timing TSV.
 
-If `--run_subset_follicle false` is used, `subset_follicle/` outputs and `follicle_analysis_inputs.csv` are not created.
+If `--run_subset_follicle false` is used, `create_follicle_sdata/` outputs and `follicle_analysis_inputs.csv` are not created.
 
 ---
 
