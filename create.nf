@@ -39,6 +39,7 @@ workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"
     def producerRegistry = NotebookRegistry.producer(projectDir.toString())
     def cellIdsFilePath = file(params.cell_ids_file)
+    def timerScript = file("${projectDir}/bin/timer.py")
     def createMode = params.create.toLowerCase()
     if (!(createMode in ['sdata', 'follicle_sdata', 'all'])) {
         error "Invalid create '${createMode}'. Valid values are: sdata, follicle_sdata, all"
@@ -50,16 +51,13 @@ workflow {
     if (createMode in ['sdata', 'all']) {
         def sampleRows = parseSamplesheet(params.samplesheet, 'Create samplesheet')
 
-        def timerScript = file("${projectDir}/bin/timer.py")
         def createNotebook = file(producerRegistry.create_sdata.path)
-        def createNotebookParams = producerRegistry.create_sdata.params
         def createInputs = sampleRows.map { sample, inputPath, rowParams ->
             def publishDir = "${params.outdir}/${sample}/${createNotebook.baseName}"
-            tuple(createNotebook, timerScript, inputPath, cellIdsFilePath, sample, publishDir, rowParams, createNotebookParams)
+            tuple(createNotebook, timerScript, inputPath, cellIdsFilePath, sample, publishDir, rowParams, producerRegistry.create_sdata.params)
         }
 
-        def createSdata = CREATE_SDATA(createInputs)
-        sampleArtifacts = createSdata.artifacts
+        sampleArtifacts = CREATE_SDATA(createInputs).artifacts
 
         def sampleArtifactRows = sampleArtifacts.map { sample, sampleZarr, rowParams ->
             [
@@ -82,16 +80,13 @@ workflow {
 
     // ---- follicle_sdata: per-sample SpatialData -> per-cell-ID subset zarrs ----
     if (createMode in ['follicle_sdata', 'all']) {
-        def timerScript = file("${projectDir}/bin/timer.py")
         def subsetNotebook = file(producerRegistry.create_follicle_sdata.path)
-        def subsetNotebookParams = producerRegistry.create_follicle_sdata.params
         def subsetInputs = sampleArtifacts.map { sample, sampleZarr, rowParams ->
             def publishDir = "${params.outdir}/${sample}/${subsetNotebook.baseName}"
-            tuple(subsetNotebook, timerScript, sampleZarr, cellIdsFilePath, sample, publishDir, rowParams, subsetNotebookParams)
+            tuple(subsetNotebook, timerScript, sampleZarr, cellIdsFilePath, sample, publishDir, rowParams, producerRegistry.create_follicle_sdata.params)
         }
 
-        def createFollicleSdata = CREATE_FOLLICLE_SDATA(subsetInputs)
-        def follicleArtifacts = createFollicleSdata.artifacts
+        def follicleArtifacts = CREATE_FOLLICLE_SDATA(subsetInputs).artifacts
 
         def follicleArtifactRows = follicleArtifacts.flatMap { sample, zarrPaths, _rowParams ->
             // Nextflow emits a single Path for one match and a List<Path> for many; normalize.
