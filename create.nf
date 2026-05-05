@@ -8,8 +8,8 @@
 
 nextflow.enable.dsl = 2
 
-include { CREATE_SPATIALDATA } from './modules/create_spatialdata'
-include { SUBSET_FOLLICLE } from './modules/subset_follicle'
+include { RUN_PRODUCER_NOTEBOOK as CREATE_SPATIALDATA } from './modules/run_producer_notebook'
+include { RUN_PRODUCER_NOTEBOOK as SUBSET_FOLLICLE } from './modules/run_producer_notebook'
 include { WRITE_SAMPLESHEET as WRITE_SAMPLE_ANALYSIS_INPUTS } from './modules/write_samplesheet'
 include { WRITE_SAMPLESHEET as WRITE_FOLLICLE_ANALYSIS_INPUTS } from './modules/write_samplesheet'
 
@@ -55,7 +55,7 @@ workflow {
         def createNotebookParams = producerRegistry.create_sdata.params
         def createInputs = sampleRows.map { sample, inputPath, rowParams ->
             def publishDir = "${params.outdir}/${sample}/${createNotebook.baseName}"
-            tuple(createNotebook, timerScript, inputPath, sample, publishDir, rowParams, createNotebookParams)
+            tuple(createNotebook, timerScript, inputPath, cellIdsFilePath, sample, publishDir, rowParams, createNotebookParams)
         }
 
         def createSpatialdata = CREATE_SPATIALDATA(createInputs)
@@ -87,13 +87,13 @@ workflow {
         def subsetNotebookParams = producerRegistry.create_follicle_sdata.params
         def subsetInputs = sampleArtifacts.map { sample, sampleZarr, rowParams ->
             def publishDir = "${params.outdir}/${sample}/${subsetNotebook.baseName}"
-            tuple(sample, sampleZarr, rowParams, cellIdsFilePath, subsetNotebook, timerScript, publishDir, subsetNotebookParams)
+            tuple(subsetNotebook, timerScript, sampleZarr, cellIdsFilePath, sample, publishDir, rowParams, subsetNotebookParams)
         }
 
         def subsetFollicle = SUBSET_FOLLICLE(subsetInputs)
         def follicleArtifacts = subsetFollicle.artifacts
 
-        def follicleArtifactRows = follicleArtifacts.flatMap { sample, zarrPaths ->
+        def follicleArtifactRows = follicleArtifacts.flatMap { sample, zarrPaths, _rowParams ->
             // Nextflow emits a single Path for one match and a List<Path> for many; normalize.
             def zarrs = zarrPaths instanceof List ? zarrPaths : [zarrPaths]
             zarrs.collect { zarr ->
