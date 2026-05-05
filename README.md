@@ -111,6 +111,12 @@ conda run -n squidpy python bin/downsample_xenium.py /path/to/xenium_output --pr
 
 The output directory is written alongside the input as `<input_dir>_downsampled_<pct>pct`.
 
+Current follow-up items for `bin/downsample_xenium.py`:
+
+- The script still emits many duplicate-entry warnings while writing zipped zarr outputs.
+- The script currently relies on zarr compatibility helpers added for the local environment; this should be revisited and simplified later.
+- It would be useful to add a deterministic option to force retention of specific cell IDs for workflow tests.
+
 ---
 
 ## Usage
