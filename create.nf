@@ -26,6 +26,7 @@ def parseSamplesheet(sheetPath, label, requiredColumns) {
 
 workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"
+    def producerRegistry = NotebookRegistry.producer(projectDir.toString())
     def requiredColumns = ['sample', 'path'] as Set
     def cellIdsRegistry = params.cell_ids_registry ?: [:]
     def cellIdsFileValue = params.cell_ids_file?.toString()
@@ -40,8 +41,8 @@ workflow {
         def sampleRows = parseSamplesheet(params.samplesheet, 'Create samplesheet', requiredColumns)
 
         def timerScript = file("${projectDir}/bin/timer.py")
-        def createNotebook = file(params.producer_registry.create_sdata.path)
-        def createNotebookParams = params.producer_registry.create_sdata.params
+        def createNotebook = file(producerRegistry.create_sdata.path)
+        def createNotebookParams = producerRegistry.create_sdata.params
         def createInputs = sampleRows.map { sample, inputPath, rowParams ->
             def publishDir = "${params.outdir}/${sample}/${createNotebook.baseName}"
             tuple(createNotebook, timerScript, inputPath, sample, publishDir, rowParams, createNotebookParams)
@@ -73,8 +74,8 @@ workflow {
 
     if (createMode in ['follicle_sdata', 'all']) {
         def timerScript = file("${projectDir}/bin/timer.py")
-        def subsetNotebook = file(params.producer_registry.create_follicle_sdata.path)
-        def subsetNotebookParams = params.producer_registry.create_follicle_sdata.params
+        def subsetNotebook = file(producerRegistry.create_follicle_sdata.path)
+        def subsetNotebookParams = producerRegistry.create_follicle_sdata.params
         def subsetInputs = sampleArtifacts.map { sample, sampleZarr, rowParams ->
             def publishDir = "${params.outdir}/${sample}/${subsetNotebook.baseName}"
             tuple(sample, sampleZarr, rowParams, cellIdsFilePath, subsetNotebook, timerScript, publishDir, subsetNotebookParams)

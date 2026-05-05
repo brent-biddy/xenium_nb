@@ -5,13 +5,13 @@ A Nextflow pipeline for Xenium spatial transcriptomics data with two separate en
 - `create.nf` builds reusable data artifacts
 - `analyze.nf` runs analysis notebooks against artifact samplesheets
 
-The create workflow and sample-scoped analysis notebooks use a two-column samplesheet contract:
+The create workflow and sample-level analysis runs use a two-column samplesheet contract:
 
 ```csv
 sample,path
 ```
 
-Follicle-scoped analysis notebooks use an explicit three-column contract:
+Analysis notebooks that declare a `cell` param use an explicit three-column contract:
 
 ```csv
 sample,cell,path
@@ -35,6 +35,9 @@ Notebook parameters are filtered to the keys declared in the workflow registry a
 xenium_nb/
 ├── create.nf                  # Create workflow: raw Xenium -> sample and follicle artifacts
 ├── analyze.nf                 # Analysis workflow: artifact samplesheet -> notebook reports
+├── lib/
+│   ├── NotebookRegistry.groovy # Pipeline-internal notebook metadata catalog
+│   └── QuartoParams.groovy    # Shared Quarto parameter filtering/merge helper
 ├── nextflow.config            # Parameters and profiles
 ├── conf/
 │   └── base.config            # Resource defaults
@@ -72,7 +75,7 @@ ROI2,/path/to/ROI2/xenium_output
 
 ### Analysis workflow input
 
-Used by `analyze.nf`. `path` points to an already-built artifact, either sample-level or follicle-level depending on the notebook scope.
+Used by `analyze.nf`. `path` points to an already-built artifact. If the selected notebook declares `cell` in its registered params, the samplesheet must include the `cell` column.
 
 Sample artifact sheet:
 
@@ -181,7 +184,7 @@ nextflow run analyze.nf \
 
 ### Analyze sample artifacts
 
-When you add sample-scoped analysis notebooks to the registry, point `analyze.nf` at the sample artifact sheet:
+When you add analysis notebooks that only require sample-level artifacts, point `analyze.nf` at the sample artifact sheet:
 
 ```bash
 nextflow run analyze.nf \
@@ -204,17 +207,17 @@ Key parameters (set in `nextflow.config` or passed via `--param value`):
 | `cell_ids_registry` | built-in map | Named cell ID files available to `create.nf` |
 | `radius` | `250` | Default bounding box radius (µm) |
 | `create` | `all` | Create workflow mode: `sdata`, `follicle_sdata`, or `all` |
-| `producer_registry` | built-in map | The two producer notebooks used by `create.nf` |
-| `analysis_notebook_registry` | built-in map | Notebook IDs, paths, and scopes used by `analyze.nf` |
 | `notebooks` | `[]` | Analysis notebook IDs to run in `analyze.nf` |
 
 ### Analysis notebook IDs
 
 The built-in analysis registry currently defines:
 
-| ID | Scope | Notebook |
-|----|-------|----------|
-| `plot_follicle` | `follicle` | `notebooks/plot_follicle.qmd` |
+| ID | Notebook | Registered params |
+|----|----------|-------------------|
+| `plot_follicle` | `notebooks/plot_follicle.qmd` | `sample`, `cell`, `path` |
+
+Notebook metadata is defined in [`lib/NotebookRegistry.groovy`](lib/NotebookRegistry.groovy), not under `params`.
 
 ### Profiles
 
@@ -296,7 +299,7 @@ The sample-stage sheet is the handoff input for `--create follicle_sdata`.
 ## Adding notebooks
 
 1. Create a new `.qmd` file in `notebooks/` with a Jupyter `parameters` cell declaring the notebook inputs it expects.
-2. Register the notebook in `params.producer_registry` or `params.analysis_notebook_registry` with a unique ID, a path, and an explicit `params` list naming the keys to pass through.
+2. Register the notebook in `lib/NotebookRegistry.groovy` with a unique ID, a path, and an explicit `params` list naming the keys to pass through.
 3. If it is a create-stage producer, wire it into `create.nf`.
-4. If it is an analysis notebook, set the scope to `sample` or `follicle`.
+4. For analysis notebooks, include every required row-level key in the registered `params` list (for example, include `cell` for follicle-level runs).
 5. Run analysis notebooks with `nextflow run analyze.nf --samplesheet <artifact_sheet.csv> --notebooks <id1,id2>`.
