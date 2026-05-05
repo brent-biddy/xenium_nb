@@ -1,35 +1,51 @@
 #!/usr/bin/env nextflow
 
+// Renders analysis Quarto notebooks against pre-built artifacts (typically
+// produced by create.nf). The samplesheet must carry whatever per-row params
+// the selected notebooks declare (e.g. `cell` for plot_follicle).
+//
+// --analyze accepts 'all', a comma-separated list of notebook IDs, or a
+// Groovy list. IDs are resolved against NotebookRegistry.analysis().
+
 nextflow.enable.dsl = 2
 
 include { RUN_NOTEBOOK } from './modules/run_notebook'
 
+// Params that RUN_NOTEBOOK injects from pipeline config rather than the
+// samplesheet, so they don't need to appear as samplesheet columns.
+def PIPELINE_PARAM_KEYS = ['cell_ids_file', 'radius', 'n_jobs'] as Set
+
+// Resolves --analyze input ('all' / comma-separated / List) into a list of
+// known notebook IDs, validated against the registry.
+def resolveNotebookIds(selection, registry) {
+    def raw = selection == null ? 'all' : selection
+    def ids = raw instanceof List
+        ? raw.collect { it.toString().trim() }.findAll { it }
+        : raw.toString().trim().equalsIgnoreCase('all')
+            ? (registry.keySet() as List).sort()
+            : raw.toString().split(',').collect { it.trim() }.findAll { it }
+    if (!ids) {
+        error "Please provide at least one analysis notebook ID via --analyze, or use 'all'"
+    }
+    def unknown = ids.findAll { !registry.containsKey(it) }.unique()
+    if (unknown) {
+        error "Unknown analysis notebook IDs: ${unknown.join(', ')}. Known IDs: ${registry.keySet().sort().join(', ')}"
+    }
+    ids
+}
+
 workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"
     def registry = NotebookRegistry.analysis(projectDir.toString())
-    def pipelineParamKeys = ['cell_ids_file', 'radius', 'n_jobs'] as Set
-
-    def analyzeSelection = params.analyze == null ? 'all' : params.analyze
-    def notebookIds = (
-        analyzeSelection instanceof List
-            ? analyzeSelection.collect { it.toString().trim() }.findAll { it }
-            : analyzeSelection.toString().trim().equalsIgnoreCase('all')
-                ? (registry.keySet() as List).sort()
-                : analyzeSelection.toString().split(',').collect { it.trim() }.findAll { it }
-    )
-    if (!notebookIds) {
-        error "Please provide at least one analysis notebook ID via --analyze, or use 'all'"
-    }
-    def unknownNotebookIds = notebookIds.findAll { !registry.containsKey(it) }.unique()
-    if (unknownNotebookIds) {
-        error "Unknown analysis notebook IDs: ${unknownNotebookIds.join(', ')}. Known IDs: ${registry.keySet().sort().join(', ')}"
-    }
+    def notebookIds = resolveNotebookIds(params.analyze, registry)
     log.info "Running analysis notebooks: ${notebookIds.join(', ')}"
 
+    // Union of declared notebook params, minus those Nextflow injects, becomes
+    // the set of samplesheet columns each row must populate.
     def notebookParamKeys = notebookIds
         .collectMany { registry[it].params ?: [] }
         .collect { it.toString() } as Set
-    def requiredColumns = ((['sample', 'path'] as Set) + (notebookParamKeys - pipelineParamKeys)) as Set
+    def requiredColumns = ((['sample', 'path'] as Set) + (notebookParamKeys - PIPELINE_PARAM_KEYS)) as Set
 
     def rows = Channel
         .fromPath(params.samplesheet)
@@ -39,31 +55,23 @@ workflow {
             if (!columns.containsAll(requiredColumns)) {
                 error "Analysis samplesheet must contain at least these columns: ${requiredColumns.join(',')}. Found: ${columns.join(',')}"
             }
-            if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
-            if (!row.path)   error "Samplesheet row missing 'path': ${row}"
             requiredColumns.each { col ->
-                if (!row[col]) {
-                    error "Samplesheet row missing '${col}': ${row}"
-                }
+                if (!row[col]) error "Samplesheet row missing '${col}': ${row}"
             }
-            def rowMap = new LinkedHashMap(row)
-            def sample = rowMap.sample.toString()
-            tuple(sample, file(rowMap.path), rowMap)
+            tuple(row.sample.toString(), file(row.path), row)
         }
 
     def timerScript = file("${projectDir}/bin/timer.py")
     def notebookSpecs = notebookIds.collect { id ->
-        [
-            id    : id,
-            path  : file(registry[id].path),
-            params: registry[id].params ?: [],
-        ]
+        [path: file(registry[id].path), params: registry[id].params ?: []]
     }
     def notebookChannel = Channel.fromList(notebookSpecs)
 
     rows
         .combine(notebookChannel)
         .map { sample, artifactPath, rowParams, spec ->
+            // Notebooks with a 'cell' param fan out per-cell, so disambiguate
+            // their published filenames with the cell ID.
             def publishSample = spec.params.contains('cell')
                 ? "${sample}_${rowParams.cell}"
                 : sample
