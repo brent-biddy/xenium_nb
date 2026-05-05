@@ -1,5 +1,11 @@
 #!/usr/bin/env nextflow
 
+// Builds Xenium SpatialData artifacts and the samplesheets that downstream
+// workflows (analyze.nf) consume. Modes:
+//   sdata           - render create_sdata.qmd per ROI from raw Xenium output
+//   follicle_sdata  - render create_follicle_sdata.qmd per cell ID from existing sample zarrs
+//   all             - run both, chaining sdata outputs into the follicle step
+
 nextflow.enable.dsl = 2
 
 include { CREATE_SPATIALDATA } from './modules/create_spatialdata'
@@ -7,6 +13,8 @@ include { SUBSET_FOLLICLE } from './modules/subset_follicle'
 include { WRITE_SAMPLESHEET as WRITE_SAMPLE_ANALYSIS_INPUTS } from './modules/write_samplesheet'
 include { WRITE_SAMPLESHEET as WRITE_FOLLICLE_ANALYSIS_INPUTS } from './modules/write_samplesheet'
 
+// Reads a (sample, path, ...) CSV and emits (sample, file, rowMap) per row.
+// Extra columns are preserved in rowMap so notebooks can read per-sample params.
 def parseSamplesheet(sheetPath, label) {
     Channel
         .fromPath(sheetPath)
@@ -18,6 +26,8 @@ def parseSamplesheet(sheetPath, label) {
         }
 }
 
+// Collects per-sample row maps into a single JSON-encoded payload tuple
+// shaped for WRITE_SAMPLESHEET.
 def buildSamplesheetInput(rowsChannel, outputName, publishDir) {
     rowsChannel
         .collect()
@@ -35,6 +45,8 @@ workflow {
     }
 
     def sampleArtifacts = null
+
+    // ---- sdata: raw Xenium -> per-sample SpatialData zarr ----
     if (createMode in ['sdata', 'all']) {
         def sampleRows = parseSamplesheet(params.samplesheet, 'Create samplesheet')
 
@@ -63,10 +75,12 @@ workflow {
         ))
     }
 
+    // Skip CREATE_SPATIALDATA: caller's samplesheet already points at existing sample zarrs.
     if (createMode == 'follicle_sdata') {
         sampleArtifacts = parseSamplesheet(params.samplesheet, 'Create follicle samplesheet')
     }
 
+    // ---- follicle_sdata: per-sample SpatialData -> per-cell-ID subset zarrs ----
     if (createMode in ['follicle_sdata', 'all']) {
         def timerScript = file("${projectDir}/bin/timer.py")
         def subsetNotebook = file(producerRegistry.create_follicle_sdata.path)
@@ -80,6 +94,7 @@ workflow {
         def follicleArtifacts = subsetFollicle.artifacts
 
         def follicleArtifactRows = follicleArtifacts.flatMap { sample, zarrPaths ->
+            // Nextflow emits a single Path for one match and a List<Path> for many; normalize.
             def zarrs = zarrPaths instanceof List ? zarrPaths : [zarrPaths]
             zarrs.collect { zarr ->
                 [
