@@ -140,25 +140,25 @@ and writes:
 - `results/create_sdata/sample_sdata_samplesheet.csv`
 - `results/create_follicle_sdata/follicle_sdata_samplesheet.csv`
 
-### Create sample artifacts only
+### Create sdata only
 
 ```bash
 nextflow run create.nf \
     --samplesheet assets/samplesheet.csv \
-    --create_stage sample
+    --create sdata
 ```
 
 This runs only `create_sdata.qmd` and writes `results/create_sdata/sample_sdata_samplesheet.csv`.
-It also writes `results/create_sdata/sample_sdata_samplesheet.csv`, which can be used as the input to `--create_stage follicle`.
+It also writes `results/create_sdata/sample_sdata_samplesheet.csv`, which can be used as the input to `--create follicle_sdata`.
 
-### Create follicle artifacts only
+### Create follicle sdata only
 
-Run this after `create_stage sample` has produced `results/create_sdata/sample_sdata_samplesheet.csv`:
+Run this after `create sdata` has produced `results/create_sdata/sample_sdata_samplesheet.csv`:
 
 ```bash
 nextflow run create.nf \
     --samplesheet results/create_sdata/sample_sdata_samplesheet.csv \
-    --create_stage follicle
+    --create follicle_sdata
 ```
 
 This runs only `create_follicle_sdata.qmd` and writes `results/create_follicle_sdata/follicle_sdata_samplesheet.csv`.
@@ -203,7 +203,7 @@ Key parameters (set in `nextflow.config` or passed via `--param value`):
 | `container_image` | `babiddy755/xenium_nb:latest` | Container reference pulled by the `test` and `oscer` profiles; may be a registry tag or a local `.sif` path |
 | `cell_ids_registry` | built-in map | Named cell ID files available to `create.nf` |
 | `radius` | `250` | Default bounding box radius (µm) |
-| `create_stage` | `both` | Create workflow mode: `sample`, `follicle`, or `both` |
+| `create` | `all` | Create workflow mode: `sdata`, `follicle_sdata`, or `all` |
 | `producer_registry` | built-in map | The two producer notebooks used by `create.nf` |
 | `analysis_notebook_registry` | built-in map | Notebook IDs, paths, and scopes used by `analyze.nf` |
 | `notebooks` | `[]` | Analysis notebook IDs to run in `analyze.nf` |
@@ -287,9 +287,9 @@ results/
 Analysis outputs also publish under the parent sample directory, so follicle reports for cells like `aaaaimck-1` and `aaaalpdj-1` both land under `results/ROI1/plot_follicle/`.
 For `plot_follicle`, the primary rendered artifact is a `.pptx` deck, with a companion timing TSV.
 
-If `--create_stage sample` is used, `create_follicle_sdata/` outputs and `results/create_follicle_sdata/follicle_sdata_samplesheet.csv` are not created.
+If `--create sdata` is used, `create_follicle_sdata/` outputs and `results/create_follicle_sdata/follicle_sdata_samplesheet.csv` are not created.
 
-The sample-stage sheet is the handoff input for `--create_stage follicle`.
+The sample-stage sheet is the handoff input for `--create follicle_sdata`.
 
 ---
 

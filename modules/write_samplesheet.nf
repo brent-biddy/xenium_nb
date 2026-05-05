@@ -30,7 +30,7 @@ with open('${output_name}', 'w', newline='') as fh:
         writer = csv.writer(fh)
         writer.writerow(['sample', 'path'])
         writer.writerows(rows)
-    PYEOF
+PYEOF
     """
 
     stub:

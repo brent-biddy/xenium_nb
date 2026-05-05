@@ -30,13 +30,13 @@ workflow {
     def cellIdsRegistry = params.cell_ids_registry ?: [:]
     def cellIdsFileValue = params.cell_ids_file?.toString()
     def cellIdsFilePath = file(cellIdsRegistry.get(cellIdsFileValue, cellIdsFileValue))
-    def createStage = params.create_stage?.toString()?.toLowerCase()?.trim() ?: 'both'
-    if (!(createStage in ['sample', 'follicle', 'both'])) {
-        error "Invalid create_stage '${createStage}'. Valid values are: sample, follicle, both"
+    def createMode = params.create?.toString()?.toLowerCase()?.trim() ?: 'all'
+    if (!(createMode in ['sdata', 'follicle_sdata', 'all'])) {
+        error "Invalid create '${createMode}'. Valid values are: sdata, follicle_sdata, all"
     }
 
     def sampleArtifacts = null
-    if (createStage in ['sample', 'both']) {
+    if (createMode in ['sdata', 'all']) {
         def sampleRows = parseSamplesheet(params.samplesheet, 'Create samplesheet', requiredColumns)
 
         def timerScript = file("${projectDir}/bin/timer.py")
@@ -64,11 +64,13 @@ workflow {
             }
 
         WRITE_SAMPLE_ANALYSIS_INPUTS(sampleArtifactRows)
-    } else {
+    }
+
+    if (createMode == 'follicle_sdata') {
         sampleArtifacts = parseSamplesheet(params.samplesheet, 'Create follicle samplesheet', requiredColumns)
     }
 
-    if (createStage in ['follicle', 'both']) {
+    if (createMode in ['follicle_sdata', 'all']) {
         def timerScript = file("${projectDir}/bin/timer.py")
         def subsetNotebook = file(params.producer_registry.create_follicle_sdata.path)
         def subsetInputs = sampleArtifacts.map { sample, sampleZarr, rowParams ->
