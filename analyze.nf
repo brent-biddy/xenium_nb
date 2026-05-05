@@ -9,9 +9,9 @@
 
 nextflow.enable.dsl = 2
 
-include { RUN_NOTEBOOK } from './modules/run_notebook'
+include { RUN_ANALYZE_NOTEBOOK } from './modules/run_analyze_notebook'
 
-// Params that RUN_NOTEBOOK injects from pipeline config rather than the
+// Params that RUN_ANALYZE_NOTEBOOK injects from pipeline config rather than the
 // samplesheet, so they don't need to appear as samplesheet columns.
 def PIPELINE_PARAM_KEYS = ['cell_ids_file', 'radius', 'n_jobs'] as Set
 
@@ -78,5 +78,5 @@ workflow {
             def publishDir = "${params.outdir}/${sample}/${spec.path.baseName}"
             tuple(spec.path, timerScript, artifactPath, publishSample, publishDir, rowParams, spec.params)
         }
-        | RUN_NOTEBOOK
+        | RUN_ANALYZE_NOTEBOOK
 }

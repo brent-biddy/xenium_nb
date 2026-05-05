@@ -24,7 +24,7 @@ process RUN_CREATE_NOTEBOOK {
     path "*.html", emit: reports
 
     script:
-    def paramsYaml = QuartoParams.renderParamsYaml(declared_params, new LinkedHashMap(row_params) + [path: input_path.getName()], [
+    def paramsYaml = QuartoParams.renderParamsYaml(declared_params, row_params + [path: input_path.getName()], [
         cell_ids_file: cell_ids_file.getName(),
         radius       : params.radius,
         n_jobs       : task.cpus,

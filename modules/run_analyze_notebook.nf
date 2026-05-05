@@ -1,8 +1,9 @@
-process RUN_NOTEBOOK {
+// Renders an analysis Quarto notebook against a pre-built artifact (typically
+// a zarr produced by create.nf). Notebook-named outputs are republished with
+// a sample prefix; other outputs (e.g. zarr stores) are passed through as-is.
+process RUN_ANALYZE_NOTEBOOK {
     tag "${sample}:${notebook.baseName}"
 
-    // Publish the rendered notebook under the sample-scoped analysis directory.
-    // Other outputs (zarr stores etc.) are published under output/ as written.
     publishDir({ publish_dir }), mode: 'copy', saveAs: { fn ->
         fn.startsWith("${notebook.baseName}.") ? "${sample}_${fn}" : fn
     }
@@ -24,7 +25,7 @@ process RUN_NOTEBOOK {
     path "output/**", optional: true, hidden: true
 
     script:
-    def paramsYaml = QuartoParams.renderParamsYaml(declared_params, new LinkedHashMap(row_params) + [path: artifact_path.getName()], [
+    def paramsYaml = QuartoParams.renderParamsYaml(declared_params, row_params + [path: artifact_path.getName()], [
         cell_ids_file: params.cell_ids_file,
         radius       : params.radius,
         n_jobs       : task.cpus,
