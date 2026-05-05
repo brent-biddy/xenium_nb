@@ -7,36 +7,29 @@ include { SUBSET_FOLLICLE } from './modules/subset_follicle'
 include { WRITE_SAMPLESHEET as WRITE_SAMPLE_ANALYSIS_INPUTS } from './modules/write_samplesheet'
 include { WRITE_SAMPLESHEET as WRITE_FOLLICLE_ANALYSIS_INPUTS } from './modules/write_samplesheet'
 
-def parseSamplesheet(sheetPath, label, requiredColumns) {
+def parseSamplesheet(sheetPath, label) {
     Channel
         .fromPath(sheetPath)
         .splitCsv(header: true)
         .map { row ->
-            def columns = row.keySet().findAll { it != null && it != '' } as Set
-            if (!columns.containsAll(requiredColumns)) {
-                error "${label} must contain at least these columns: sample,path. Found: ${columns.join(',')}"
-            }
             if (!row.sample) error "${label} row missing 'sample': ${row}"
             if (!row.path)   error "${label} row missing 'path': ${row}"
-            def rowMap = new LinkedHashMap(row)
-            def sample = rowMap.sample.toString()
-            tuple(sample, file(rowMap.path), rowMap)
+            tuple(row.sample.toString(), file(row.path), row)
         }
 }
 
 workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"
     def producerRegistry = NotebookRegistry.producer(projectDir.toString())
-    def requiredColumns = ['sample', 'path'] as Set
     def cellIdsFilePath = file(params.cell_ids_file)
-    def createMode = params.create?.toString()?.toLowerCase()?.trim() ?: 'all'
+    def createMode = params.create.toLowerCase()
     if (!(createMode in ['sdata', 'follicle_sdata', 'all'])) {
         error "Invalid create '${createMode}'. Valid values are: sdata, follicle_sdata, all"
     }
 
     def sampleArtifacts = null
     if (createMode in ['sdata', 'all']) {
-        def sampleRows = parseSamplesheet(params.samplesheet, 'Create samplesheet', requiredColumns)
+        def sampleRows = parseSamplesheet(params.samplesheet, 'Create samplesheet')
 
         def timerScript = file("${projectDir}/bin/timer.py")
         def createNotebook = file(producerRegistry.create_sdata.path)
@@ -51,7 +44,10 @@ workflow {
 
         def sampleArtifactRows = sampleArtifacts
             .map { sample, sampleZarr, rowParams ->
-                [sample, "${params.outdir}/${sample}/${createNotebook.baseName}/output/${sample}.zarr"]
+                [
+                    sample: sample,
+                    path  : "${params.outdir}/${sample}/${createNotebook.baseName}/output/${sample}.zarr",
+                ]
             }
             .collect()
             .map { rows -> groovy.json.JsonOutput.toJson(rows) }
@@ -67,7 +63,7 @@ workflow {
     }
 
     if (createMode == 'follicle_sdata') {
-        sampleArtifacts = parseSamplesheet(params.samplesheet, 'Create follicle samplesheet', requiredColumns)
+        sampleArtifacts = parseSamplesheet(params.samplesheet, 'Create follicle samplesheet')
     }
 
     if (createMode in ['follicle_sdata', 'all']) {
