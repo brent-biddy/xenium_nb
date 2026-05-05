@@ -1,543 +1,543 @@
-sample,roi_id,cell_id,path,Image,User,Stage.Labels,Quality,Notes,Time,cell_area
-ROI1_aaaaimck-1,ROI1,aaaaimck-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaaaimck-1.png,Taylor,early transitioning,good,,22:31.9,669.2156493
-ROI1_aaaalpdj-1,ROI1,aaaalpdj-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaaalpdj-1.png,Taylor,late transitioning,good,,23:55.1,790.2795599
-ROI1_aaabfpcg-1,ROI1,aaabfpcg-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaabfpcg-1.png,Taylor,early transitioning,okay,"less than half the oocyte captured, but still oocyte specific",29:09.4,244.4307901
-ROI1_aaabgdkk-1,ROI1,aaabgdkk-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaabgdkk-1.png,Taylor,secondary;other,okay,this oocyte looks very misshapen so we should watch for abnormal signatures; follicle looks like it is about to create an antrum,29:57.4,1560.329119
-ROI1_aaacbjaf-1,ROI1,aaacbjaf-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaacbjaf-1.png,Taylor,primordial,okay,oocyte specific but pretty much just the nucleus,30:21.3,328.6923557
-ROI1_aaafefio-1,ROI1,aaafefio-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaafefio-1.png,Taylor,primordial,good,,31:02.4,729.3637765
-ROI1_aaafndjb-1,ROI1,aaafndjb-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaafndjb-1.png,Taylor,early transitioning,good,,31:14.3,575.6970521
-ROI1_aaafpofm-1,ROI1,aaafpofm-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaafpofm-1.png,Taylor,primary,good,slight overlap with GCs but not terrible,31:32.6,585.3153337
-ROI1_aaaijgjh-1,ROI1,aaaijgjh-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaaijgjh-1.png,Taylor,late transitioning,good,,31:44.4,501.7762682
-ROI1_aaajhlki-1,ROI1,aaajhlki-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaajhlki-1.png,Taylor,primordial,poor,overlap with GCs,32:01.9,923.5356585
-ROI1_aaajnemh-1,ROI1,aaajnemh-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaajnemh-1.png,Taylor,primordial,good,,33:23.8,509.994706
-ROI1_aaakgcjc-1,ROI1,aaakgcjc-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaakgcjc-1.png,Taylor,primordial,good,,33:33.9,595.4754904
-ROI1_aaalhaaa-1,ROI1,aaalhaaa-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaalhaaa-1.png,Taylor,early transitioning,good,,33:44.9,773.8426843
-ROI1_aaameida-1,ROI1,aaameida-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaameida-1.png,Taylor,late transitioning,good,,33:56.7,780.6161221
-ROI1_aaamelpo-1,ROI1,aaamelpo-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaamelpo-1.png,Taylor,early transitioning,okay,oocyte specific but about half oocyte captured,34:14.5,338.4009498
-ROI1_aaanbjmd-1,ROI1,aaanbjmd-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaanbjmd-1.png,Taylor,primordial,okay,"about half oocyte captured, oocyte doesn't look great",34:39.6,314.8293864
-ROI1_aaanhakn-1,ROI1,aaanhakn-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaanhakn-1.png,Taylor,primary,good,,34:49.4,812.6319045
-ROI1_aaanhmdg-1,ROI1,aaanhmdg-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaanhmdg-1.png,Taylor,late transitioning,good,,35:02.4,611.5962722
-ROI1_aaanihjo-1,ROI1,aaanihjo-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaanihjo-1.png,Taylor,late transitioning,poor,captures GCs,35:17.1,581.6576774
-ROI1_aaaobcfe-1,ROI1,aaaobcfe-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaaobcfe-1.png,Taylor,primary,good,,35:38.0,1290.746297
-ROI1_aaapdang-1,ROI1,aaapdang-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaapdang-1.png,Taylor,early transitioning,good,,35:53.5,475.3147048
-ROI1_aaaphndo-1,ROI1,aaaphndo-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaaphndo-1.png,Taylor,early transitioning,good,,36:09.9,706.7856507
-ROI1_aababmcd-1,ROI1,aababmcd-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aababmcd-1.png,Taylor,early transitioning,good,,36:29.4,644.3797109
-ROI1_aabaebbj-1,ROI1,aabaebbj-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabaebbj-1.png,Taylor,early transitioning,good,,36:37.6,992.3989423
-ROI1_aabakjnc-1,ROI1,aabakjnc-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabakjnc-1.png,Taylor,primordial,good,"mostly nucleus, not a ton of cytoplasm",36:53.6,394.9365768
-ROI1_aabbcjjm-1,ROI1,aabbcjjm-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabbcjjm-1.png,Taylor,primordial,good,,37:12.6,506.5628309
-ROI1_aabbhpdh-1,ROI1,aabbhpdh-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabbhpdh-1.png,Taylor,late transitioning,okay,about 1/2 oocyte captured,37:35.6,327.4731369
-ROI1_aabcfgel-1,ROI1,aabcfgel-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabcfgel-1.png,Taylor,primordial,good,,37:59.6,391.369233
-ROI1_aabdefka-1,ROI1,aabdefka-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabdefka-1.png,Taylor,early transitioning,good,,38:09.5,419.185484
-ROI1_aabdmgko-1,ROI1,aabdmgko-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabdmgko-1.png,Taylor,transitioning,good,,38:29.7,1154.103479
-ROI1_aabdnkmi-1,ROI1,aabdnkmi-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabdnkmi-1.png,Taylor,primordial,poor,reaches into GCs,39:04.7,1176.546136
-ROI1_aabdocbo-1,ROI1,aabdocbo-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabdocbo-1.png,Taylor,primordial,good,,39:13.9,574.6133021
-ROI1_aabdphmd-1,ROI1,aabdphmd-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabdphmd-1.png,Taylor,transitioning,good,,39:36.2,575.4261146
-ROI1_aabfioge-1,ROI1,aabfioge-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabfioge-1.png,Taylor,transitioning,poor,goes into GCs,39:52.8,615.2539286
-ROI1_aabfjijn-1,ROI1,aabfjijn-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabfjijn-1.png,Taylor,primordial,good,,40:02.8,718.2101823
-ROI1_aabfnnmf-1,ROI1,aabfnnmf-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabfnnmf-1.png,Taylor,primordial,good,,40:15.7,637.1547106
-ROI1_aabgcmdg-1,ROI1,aabgcmdg-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabgcmdg-1.png,Taylor,primordial,good,,40:25.1,751.174246
-ROI1_aabgimlf-1,ROI1,aabgimlf-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabgimlf-1.png,Taylor,early transitioning,poor,goes out into GCs,40:42.4,728.6412764
-ROI1_aabgnnjn-1,ROI1,aabgnnjn-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabgnnjn-1.png,Taylor,transitioning,poor,goes into GCs,41:01.8,308.7332925
-ROI1_aabhamhb-1,ROI1,aabhamhb-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabhamhb-1.png,Taylor,primordial,okay,a little bit of overlap into GCs but not too bad,41:21.4,960.9701911
-ROI1_aabhbidk-1,ROI1,aabhbidk-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabhbidk-1.png,Taylor,late transitioning,okay,,41:38.3,445.2406412
-ROI1_aabhdbci-1,ROI1,aabhdbci-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabhdbci-1.png,Taylor,primordial,good,,41:51.1,865.8711252
-ROI1_aabhfgfp-1,ROI1,aabhfgfp-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabhfgfp-1.png,Taylor,primordial,good,,41:57.9,884.8819071
-ROI1_aabhpgid-1,ROI1,aabhpgid-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabhpgid-1.png,Taylor,early transitioning,good,,42:07.9,753.2514336
-ROI1_aabialgo-1,ROI1,aabialgo-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabialgo-1.png,Taylor,primary,poor,"goes into GCs, hard to tell stage I think this is the end of a follicle",42:41.9,367.7073571
-ROI1_aabicijk-1,ROI1,aabicijk-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabicijk-1.png,Taylor,primordial,good,1/2 oocyte,42:55.0,443.2989223
-ROI1_aabiikod-1,ROI1,aabiikod-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabiikod-1.png,Taylor,late transitioning,poor,"goes into GCs, hard to tell stage I think it's the end of the folllicle",44:03.4,481.8623612
-ROI1_aabijbjj-1,ROI1,aabijbjj-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabijbjj-1.png,Taylor,primordial,good,,44:30.4,367.4364196
-ROI1_aabjknje-1,ROI1,aabjknje-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabjknje-1.png,Taylor,early transitioning,good,,44:39.8,507.6917372
-ROI1_aabjloam-1,ROI1,aabjloam-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabjloam-1.png,Taylor,early transitioning,good,,44:55.8,959.7058161
-ROI1_aabjmjcb-1,ROI1,aabjmjcb-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabjmjcb-1.png,Taylor,late transitioning,poor,"really hard to tell b/c end of follicle, probably exclude",45:27.8,495.6801742
-ROI1_aabjmmfg-1,ROI1,aabjmmfg-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabjmmfg-1.png,Taylor,primordial,good,,45:36.7,423.8365779
-ROI1_aabjnjpf-1,ROI1,aabjnjpf-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabjnjpf-1.png,Taylor,early transitioning,good,,45:49.9,772.7589343
-ROI1_aabjolfh-1,ROI1,aabjolfh-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabjolfh-1.png,Taylor,transitioning,good,,46:01.5,682.9431498
-ROI1_aabkdjij-1,ROI1,aabkdjij-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabkdjij-1.png,Taylor,primary,poor,hard to tell stage b/c end of follicle,46:26.0,462.264548
-ROI1_aabkefho-1,ROI1,aabkefho-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabkefho-1.png,Taylor,transitioning,good,,46:35.6,398.5039207
-ROI1_aablalhf-1,ROI1,aablalhf-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aablalhf-1.png,Taylor,primordial,good,,46:48.7,563.5500205
-ROI1_aablcloe-1,ROI1,aablcloe-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aablcloe-1.png,Taylor,primordial,good,,47:51.9,360.6629818
-ROI1_aabldddb-1,ROI1,aabldddb-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabldddb-1.png,Taylor,transitioning,good,,48:14.3,412.9990775
-ROI1_aablfpfn-1,ROI1,aablfpfn-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aablfpfn-1.png,Taylor,primordial,good,about half oocyte captured,48:28.3,384.8667327
-ROI1_aablidlg-1,ROI1,aablidlg-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aablidlg-1.png,Taylor,primary,okay,little bit of GCs captured,49:25.4,670.1639306
-ROI1_aabljphh-1,ROI1,aabljphh-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabljphh-1.png,Taylor,primordial,good,,49:54.2,397.2395457
-ROI1_aablmlmn-1,ROI1,aablmlmn-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aablmlmn-1.png,Taylor,early transitioning,good,,50:34.0,372.5842323
-ROI1_aabmbnen-1,ROI1,aabmbnen-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabmbnen-1.png,Taylor,primordial,poor,overlapping with GCs,50:55.8,704.3472131
-ROI1_aabmjgfk-1,ROI1,aabmjgfk-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabmjgfk-1.png,Taylor,early transitioning,okay,"about half oocyte, mostly nucleus",51:16.7,471.9279859
-ROI1_aabmocgc-1,ROI1,aabmocgc-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabmocgc-1.png,Taylor,early transitioning,good,,51:25.7,385.1376702
-ROI1_aabmopkh-1,ROI1,aabmopkh-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabmopkh-1.png,Taylor,secondary,good,,52:01.4,734.6922142
-ROI1_aabncnje-1,ROI1,aabncnje-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabncnje-1.png,Taylor,primordial,good,,52:09.6,446.8662662
-ROI1_aabnefgj-1,ROI1,aabnefgj-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabnefgj-1.png,Taylor,primordial,good,,52:18.6,774.5651844
-ROI1_aabnlcni-1,ROI1,aabnlcni-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabnlcni-1.png,Taylor,primordial,good,,52:26.2,527.7862692
-ROI1_aabnnjkl-1,ROI1,aabnnjkl-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabnnjkl-1.png,Taylor,primordial,good,,52:33.0,445.2406412
-ROI1_aaboancn-1,ROI1,aaboancn-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaboancn-1.png,Taylor,early transitioning,good,,52:45.1,628.3040853
-ROI1_aabocefp-1,ROI1,aabocefp-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabocefp-1.png,Taylor,secondary,good,"follicle is pretty misshappen in the tissue, looks like it's about to start forming an antrum? ROI just capturing nucleus",54:06.4,430.2939219
-ROI1_aabodlnh-1,ROI1,aabodlnh-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabodlnh-1.png,Taylor,primordial,good,,54:14.6,404.6000147
-ROI1_aaboechg-1,ROI1,aaboechg-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaboechg-1.png,Taylor,primary,poor,"end of follicle, goes into GCs",54:37.5,479.6045487
-ROI1_aabojccd-1,ROI1,aabojccd-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabojccd-1.png,Taylor,primary,good,,54:47.5,1352.068487
-ROI1_aabojnlg-1,ROI1,aabojnlg-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabojnlg-1.png,Taylor,primary,good,,55:00.2,1230.462701
-ROI1_aaboljda-1,ROI1,aaboljda-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aaboljda-1.png,Taylor,primordial,good,,55:12.7,935.8633152
-ROI1_aabonbjp-1,ROI1,aabonbjp-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabonbjp-1.png,Taylor,transitioning,poor,goes into GCs,55:43.2,588.8375214
-ROI1_aabooafo-1,ROI1,aabooafo-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabooafo-1.png,Taylor,primordial,good,,55:51.6,650.3403361
-ROI1_aabooemh-1,ROI1,aabooemh-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabooemh-1.png,Taylor,primordial,good,,56:47.2,407.0384523
-ROI1_aabpbmel-1,ROI1,aabpbmel-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabpbmel-1.png,Taylor,primordial,good,,56:55.1,1142.543479
-ROI1_aabpdddg-1,ROI1,aabpdddg-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabpdddg-1.png,Taylor,primordial,good,,57:01.6,1047.895976
-ROI1_aabpdmcl-1,ROI1,aabpdmcl-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabpdmcl-1.png,Taylor,transitioning,okay,end of follicle,57:17.9,514.9618937
-ROI1_aabpfcik-1,ROI1,aabpfcik-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabpfcik-1.png,Taylor,transitioning,okay,goes into GCs a little bit,57:39.2,618.6858037
-ROI1_aabpigli-1,ROI1,aabpigli-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabpigli-1.png,Taylor,transitioning,good,,57:49.8,817.9151859
-ROI1_aabpjhmk-1,ROI1,aabpjhmk-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabpjhmk-1.png,Taylor,primordial,good,,58:04.5,448.1306413
-ROI1_aabplfgh-1,ROI1,aabplfgh-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabplfgh-1.png,Taylor,transitioning,good,end of follicle,58:34.6,721.4614324
-ROI1_aabpnkii-1,ROI1,aabpnkii-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aabpnkii-1.png,Taylor,transitioning,good,,58:47.6,833.4489365
-ROI1_aepceacn-1,ROI1,aepceacn-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aepceacn-1.png,Taylor,primordial,good,follicle might not be super healthy,59:00.0,325.1250118
-ROI1_afcggpnj-1,ROI1,afcggpnj-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_afcggpnj-1.png,Taylor,primordial,good,,59:07.0,440.4540785
-ROI1_afhakmdc-1,ROI1,afhakmdc-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_afhakmdc-1.png,Taylor,primary,good,pretty much just nucleus in ROI,59:21.1,361.7467319
-ROI1_afhhcjop-1,ROI1,afhhcjop-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_afhhcjop-1.png,Taylor,transitioning,good,,59:41.2,381.8864201
-ROI1_afijbjpb-1,ROI1,afijbjpb-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_afijbjpb-1.png,Taylor,primordial,okay,less than half oocyte,00:03.9,333.4789184
-ROI1_afpehldn-1,ROI1,afpehldn-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_afpehldn-1.png,Taylor,early transitioning,good,,00:14.1,350.5931377
-ROI1_ahnhimln-1,ROI1,ahnhimln-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_ahnhimln-1.png,Taylor,transitioning,poor,boundaries not clear,00:28.6,440.725016
-ROI1_aifkfgaf-1,ROI1,aifkfgaf-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aifkfgaf-1.png,Taylor,primordial,okay,just nucleus,00:38.6,216.7048516
-ROI1_aphkmplb-1,ROI1,aphkmplb-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_aphkmplb-1.png,Taylor,transitioning,poor,goes into GCs,00:48.8,620.356585
-ROI1_bfhmjckb-1,ROI1,bfhmjckb-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_bfhmjckb-1.png,Taylor,primordial,terrible,"goes into GCs, less than half oocyte captured",01:13.0,287.0582917
-ROI1_bijmdool-1,ROI1,bijmdool-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_bijmdool-1.png,Taylor,transitioning,terrible,"GCs captured, less than half oocyte captured",01:33.8,310.8556363
-ROI1_ccdehkmh-1,ROI1,ccdehkmh-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_ccdehkmh-1.png,Taylor,transitioning,poor,captured GCs,01:50.2,264.8865721
-ROI1_cfabnpic-1,ROI1,cfabnpic-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_cfabnpic-1.png,Taylor,primordial,poor,captured GCs,02:04.5,784.905966
-ROI1_chgjkbjn-1,ROI1,chgjkbjn-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_chgjkbjn-1.png,Taylor,primordial,okay,just nucleus,02:15.4,174.0321938
-ROI1_chgnkefb-1,ROI1,chgnkefb-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_chgnkefb-1.png,Taylor,late transitioning,poor,"goes into GCs, hard to tell stage at end of follicle",02:42.4,300.2890734
-ROI1_chkocgid-1,ROI1,chkocgid-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_chkocgid-1.png,Taylor,early transitioning,terrible,"captured GCs, less than half oocyte",03:01.4,327.5182931
-ROI1_dofiecgb-1,ROI1,dofiecgb-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_dofiecgb-1.png,Taylor,transitioning,good,,03:11.3,357.7729817
-ROI1_fgapocgh-1,ROI1,fgapocgh-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_fgapocgh-1.png,Taylor,transitioning,terrible,GC overlap,03:26.9,488.1842365
-ROI1_fnbdgfbd-1,ROI1,fnbdgfbd-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_fnbdgfbd-1.png,Taylor,primordial,poor,GC overlap,03:38.0,383.9636077
-ROI1_fnhbibdg-1,ROI1,fnhbibdg-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_fnhbibdg-1.png,Taylor,transitioning,terrible,GC overlap,03:50.1,291.2578231
-ROI1_gbcoplin-1,ROI1,gbcoplin-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_gbcoplin-1.png,Taylor,primary,terrible,"GCs, end of follicle",04:18.0,318.4870428
-ROI1_geaimfea-1,ROI1,geaimfea-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_geaimfea-1.png,Taylor,primordial,okay,end of follicle difficult to stage,04:41.4,348.1547001
-ROI1_kmeoinci-1,ROI1,kmeoinci-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_kmeoinci-1.png,Taylor,primordial,good,,04:50.2,377.732045
-ROI1_monlmgcc-1,ROI1,monlmgcc-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_monlmgcc-1.png,Taylor,transitioning,poor,captures GCs,05:02.0,248.720634
-ROI1_nflabcno-1,ROI1,nflabcno-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_nflabcno-1.png,Taylor,primordial,okay,goes into GCs a little,05:19.1,708.2306507
-ROI1_ngpolkkd-1,ROI1,ngpolkkd-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_ngpolkkd-1.png,Taylor,primordial,good,,05:26.1,509.8592373
-ROI1_oebenbgk-1,ROI1,oebenbgk-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_oebenbgk-1.png,Taylor,late transitioning,good,,05:34.0,985.2642545
-ROI1_ohbegbge-1,ROI1,ohbegbge-1,results/ROI1/01_create_spatialdata/output/ROI1.zarr,ROI1_ohbegbge-1.png,Taylor,late transitioning,good,,05:41.0,355.3797004
-ROI2_aaaacpld-1,ROI2,aaaacpld-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaacpld-1.png,Taylor,transitioning,poor,GCs,05:51.6,499.7893931
-ROI2_aaaadmip-1,ROI2,aaaadmip-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaadmip-1.png,Taylor,transitioning,good,,06:02.3,423.6559529
-ROI2_aaaaemgi-1,ROI2,aaaaemgi-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaaemgi-1.png,Taylor,primordial,good,,06:08.7,
-ROI2_aaaaeokl-1,ROI2,aaaaeokl-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaaeokl-1.png,Taylor,transitioning,okay,end of follicle difficult to stage,06:38.4,
-ROI2_aaaaepgf-1,ROI2,aaaaepgf-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaaepgf-1.png,Taylor,primordial,good,,06:44.8,
-ROI2_aaaafplh-1,ROI2,aaaafplh-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaafplh-1.png,Taylor,primordial,good,,06:52.0,390.0145454
-ROI2_aaaaiilm-1,ROI2,aaaaiilm-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaaiilm-1.png,Taylor,primary,good,end of follicle,07:02.6,390.3757954
-ROI2_aaaajbge-1,ROI2,aaaajbge-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaajbge-1.png,Taylor,primordial,good,,07:18.7,548.6033012
-ROI2_aaabclgn-1,ROI2,aaabclgn-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaabclgn-1.png,Taylor,primordial,good,,07:26.4,643.3411171
-ROI2_aaabnnen-1,ROI2,aaabnnen-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaabnnen-1.png,Taylor,primary,good,,08:05.6,638.2384607
-ROI2_aaacbpck-1,ROI2,aaacbpck-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaacbpck-1.png,Taylor,primary,good,,08:15.0,428.0361093
-ROI2_aaacilnf-1,ROI2,aaacilnf-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaacilnf-1.png,Taylor,primordial,good,,08:22.8,508.8657997
-ROI2_aaackene-1,ROI2,aaackene-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaackene-1.png,Taylor,primary,poor,hard to tell end of follicle,08:47.5,257.3906343
-ROI2_aaaclgnj-1,ROI2,aaaclgnj-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaclgnj-1.png,Taylor,late transitioning,good,,11:49.8,648.1276798
-ROI2_aaacmbkh-1,ROI2,aaacmbkh-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaacmbkh-1.png,Taylor,early transitioning,good,,11:59.3,394.8462643
-ROI2_aaadbcin-1,ROI2,aaadbcin-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaadbcin-1.png,Taylor,primordial,okay,little bit of GCs,12:14.2,787.8862786
-ROI2_aaadbdjj-1,ROI2,aaadbdjj-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaadbdjj-1.png,Taylor,primordial,good,,12:27.8,562.3759579
-ROI2_aaadniip-1,ROI2,aaadniip-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaadniip-1.png,Taylor,early transitioning,good,,12:37.3,628.7556478
-ROI2_aaadojhj-1,ROI2,aaadojhj-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaadojhj-1.png,Taylor,primary,poor,"end of follicle at very edge of H&E section, hard to tell",14:08.2,349.6448564
-ROI2_aaaeakjp-1,ROI2,aaaeakjp-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaeakjp-1.png,Taylor,early transitioning,good,,14:20.7,638.6448669
-ROI2_aaaeanlh-1,ROI2,aaaeanlh-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaeanlh-1.png,Taylor,early transitioning,good,,14:30.3,731.3506515
-ROI2_aaaecdhf-1,ROI2,aaaecdhf-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaecdhf-1.png,Taylor,primary,okay,end of follicle,14:41.5,434.8547033
-ROI2_aaaedbdc-1,ROI2,aaaedbdc-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaedbdc-1.png,Taylor,primordial,good,,14:48.5,480.6431424
-ROI2_aaaejdbm-1,ROI2,aaaejdbm-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaejdbm-1.png,Taylor,transitioning,good,,15:09.4,521.9159564
-ROI2_aaaelpha-1,ROI2,aaaelpha-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaelpha-1.png,Taylor,primary,okay,end of follicle with a little GC overlap,15:24.3,630.9231479
-ROI2_aaaeofbj-1,ROI2,aaaeofbj-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaeofbj-1.png,Taylor,primary,okay,"end of follcile, little bit of GC overlap",15:39.1,367.7976696
-ROI2_aaaeohbc-1,ROI2,aaaeohbc-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaeohbc-1.png,Taylor,primordial,poor,hard to distinguish,15:59.3,535.4176757
-ROI2_aaaeomno-1,ROI2,aaaeomno-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaeomno-1.png,Taylor,primary,good,,16:13.0,850.0664371
-ROI2_aaaepekf-1,ROI2,aaaepekf-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaepekf-1.png,Taylor,transitioning,poor,"end of follicle, GC overlap",16:28.8,547.8356449
-ROI2_aaafafmm-1,ROI2,aaafafmm-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaafafmm-1.png,Taylor,primordial,good,,16:42.7,629.2523666
-ROI2_aaafcfde-1,ROI2,aaafcfde-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaafcfde-1.png,Taylor,transitioning,okay,end of follicle,17:00.4,459.8261104
-ROI2_aaafchbg-1,ROI2,aaafchbg-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaafchbg-1.png,Taylor,transitioning,good,,17:13.1,477.9789236
-ROI2_aaafdpho-1,ROI2,aaafdpho-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaafdpho-1.png,Taylor,transitioning,terrible,"end, overlap GC",17:28.9,276.5820413
-ROI2_aaafgdfl-1,ROI2,aaafgdfl-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaafgdfl-1.png,Taylor,early transitioning,good,,17:44.1,839.0483117
-ROI2_aaafgpnd-1,ROI2,aaafgpnd-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaafgpnd-1.png,Taylor,primary,good,end of follicle,18:02.1,339.1686061
-ROI2_aaafibed-1,ROI2,aaafibed-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaafibed-1.png,Taylor,primary,good,,18:11.1,850.9695621
-ROI2_aaagadij-1,ROI2,aaagadij-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaagadij-1.png,Taylor,early transitioning,good,,18:25.9,857.2462811
-ROI2_aaaghgpd-1,ROI2,aaaghgpd-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaghgpd-1.png,Taylor,primordial,good,,18:31.9,790.9117475
-ROI2_aaagiijl-1,ROI2,aaagiijl-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaagiijl-1.png,Taylor,transitioning,good,,18:40.6,477.1209548
-ROI2_aaaglhbn-1,ROI2,aaaglhbn-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaglhbn-1.png,Taylor,early transitioning,good,,18:52.1,1043.244882
-ROI2_aaagonap-1,ROI2,aaagonap-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaagonap-1.png,Taylor,transitioning,good,,19:06.6,730.9894015
-ROI2_aaagpjme-1,ROI2,aaagpjme-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaagpjme-1.png,Taylor,transitioning,good,,19:20.6,638.8254919
-ROI2_aaahaajn-1,ROI2,aaahaajn-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaahaajn-1.png,Taylor,primordial,good,,19:26.3,277.3045413
-ROI2_aaahhdad-1,ROI2,aaahhdad-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaahhdad-1.png,Taylor,primordial,good,,19:34.7,506.6079871
-ROI2_aaahladg-1,ROI2,aaahladg-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaahladg-1.png,Taylor,primordial,good,,20:13.1,877.6117506
-ROI2_aaahnjik-1,ROI2,aaahnjik-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaahnjik-1.png,Taylor,early transitioning,good,,20:21.5,551.1772075
-ROI2_aaahopii-1,ROI2,aaahopii-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaahopii-1.png,Taylor,primordial,good,,20:27.9,491.8418929
-ROI2_aaaiabhg-1,ROI2,aaaiabhg-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaiabhg-1.png,Taylor,late transitioning,good,,20:37.3,830.017061378807
-ROI2_aaaibcbm-1,ROI2,aaaibcbm-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaibcbm-1.png,Taylor,early transitioning,poor,GCs,20:58.0,636.2064293
-ROI2_aaaicfbc-1,ROI2,aaaicfbc-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaicfbc-1.png,Taylor,primary,good,,21:11.1,860.7684687
-ROI2_aaaienfj-1,ROI2,aaaienfj-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaienfj-1.png,Taylor,primordial,good,,21:19.0,372.5842323
-ROI2_aaaifkdc-1,ROI2,aaaifkdc-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aaaifkdc-1.png,Taylor,transitioning;primary,good,hard to tell end of follicle,21:46.8,746.7489334
-ROI2_aabfbclp-1,ROI2,aabfbclp-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aabfbclp-1.png,Taylor,primordial,poor,GCs,21:56.7,448.3112663
-ROI2_aagnnenb-1,ROI2,aagnnenb-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aagnnenb-1.png,Taylor,primordial,good,,22:04.4,345.5356375
-ROI2_aahnbbee-1,ROI2,aahnbbee-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aahnbbee-1.png,Taylor,primordial,poor,overreaching,22:13.2,399.5425145
-ROI2_abdiboad-1,ROI2,abdiboad-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_abdiboad-1.png,Taylor,primordial,poor,contains GCs,22:21.1,505.7048621
-ROI2_abnifnce-1,ROI2,abnifnce-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_abnifnce-1.png,Taylor,transitioning,good,end of follicle,22:31.9,411.9153275
-ROI2_acedlonn-1,ROI2,acedlonn-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_acedlonn-1.png,Taylor,transitioning,good,,22:42.4,472.5150172
-ROI2_acfchlmo-1,ROI2,acfchlmo-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_acfchlmo-1.png,Taylor,primary,good,,22:55.1,298.9795421
-ROI2_aciggedl-1,ROI2,aciggedl-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aciggedl-1.png,Taylor,primordial,good,,23:07.2,570.4137707
-ROI2_aknplbpf-1,ROI2,aknplbpf-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_aknplbpf-1.png,Taylor,primordial,good,,23:20.5,343.7293875
-ROI2_iaojoafp-1,ROI2,iaojoafp-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_iaojoafp-1.png,Taylor,primordial,okay,"might contain a little bit of GCs, hard to tell",24:06.5,375.8354824
-ROI2_ogeljedc-1,ROI2,ogeljedc-1,results/ROI2/01_create_spatialdata/output/ROI2.zarr,ROI2_ogeljedc-1.png,Taylor,primordial,okay,oocyte specific but less than half,24:22.1,137.7717238
-ROI3_aaaagmki-1,ROI3,aaaagmki-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_aaaagmki-1.png,Taylor,primordial,good,,52:05.1,184.4181317
-ROI3_aaaamabg-1,ROI3,aaaamabg-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_aaaamabg-1.png,Taylor,early transitioning,good,,52:49.1,583.3284587
-ROI3_aaabgmdj-1,ROI3,aaabgmdj-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_aaabgmdj-1.png,Taylor,early transitioning,good,"same oocyte as last, different ROI",53:11.6,480.3722049
-ROI3_aaabmbmd-1,ROI3,aaabmbmd-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_aaabmbmd-1.png,Taylor,transitioning,good,,53:34.4,388.2986078
-ROI3_aaadcgjp-1,ROI3,aaadcgjp-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_aaadcgjp-1.png,Taylor,primordial,good,,53:43.5,620.2662725
-ROI3_abfgjojp-1,ROI3,abfgjojp-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_abfgjojp-1.png,Taylor,primordial,good,,53:49.8,222.9364143
-ROI3_abfgnkab-1,ROI3,abfgnkab-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_abfgnkab-1.png,Taylor,primordial,good,,54:13.5,250.9332904
-ROI3_abfnlgje-1,ROI3,abfnlgje-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_abfnlgje-1.png,Taylor,early transitioning,good,,54:32.2,311.0362613
-ROI3_fgjocgmf-1,ROI3,fgjocgmf-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_fgjocgmf-1.png,Taylor,other,terrible,mostly. GC,54:42.2,110.542504
-ROI3_fgkakdfp-1,ROI3,fgkakdfp-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_fgkakdfp-1.png,Taylor,other,terrible,mostly GC,54:49.1,125.7150046
-ROI3_giaaoock-1,ROI3,giaaoock-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_giaaoock-1.png,Taylor,primordial,poor,about half oocyte half GC,54:59.8,392.272358
-ROI3_giadggha-1,ROI3,giadggha-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_giadggha-1.png,Taylor,primordial,terrible,edge of oocyte and GC,55:23.6,126.2568796
-ROI3_giahbjko-1,ROI3,giahbjko-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_giahbjko-1.png,Taylor,other,terrible,mostly GC,55:31.0,120.8832856
-ROI3_gigjbkog-1,ROI3,gigjbkog-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_gigjbkog-1.png,Taylor,other,terrible,this is a GC,55:43.7,126.6632858
-ROI3_gigjpcle-1,ROI3,gigjpcle-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_gigjpcle-1.png,Taylor,other,terrible,this is a GC,57:03.6,84.39703431
-ROI3_gigkdcda-1,ROI3,gigkdcda-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_gigkdcda-1.png,Taylor,primordial,terrible,"mostly GC, some oocyte",57:15.2,178.4123502
-ROI3_giobliba-1,ROI3,giobliba-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_giobliba-1.png,Taylor,other,terrible,this is a GC,57:21.1,79.11375287
-ROI3_gjapaoof-1,ROI3,gjapaoof-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_gjapaoof-1.png,Taylor,other,terrible,this is a GC,57:27.0,111.7165666
-ROI3_gjbalicb-1,ROI3,gjbalicb-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_gjbalicb-1.png,Taylor,other,terrible,this is a GC,57:32.4,82.90687801
-ROI3_gjfgolhp-1,ROI3,gjfgolhp-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_gjfgolhp-1.png,Taylor,other,terrible,this is a GC,57:40.3,161.1175058
-ROI3_gjfibllp-1,ROI3,gjfibllp-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_gjfibllp-1.png,Taylor,other,terrible,small bit of oocyte with GC,57:51.3,165.8589123
-ROI3_gjflibkc-1,ROI3,gjflibkc-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_gjflibkc-1.png,Taylor,primordial,terrible,small bit of oocyte with GC,58:08.6,163.6914122
-ROI3_gmhlbkhi-1,ROI3,gmhlbkhi-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_gmhlbkhi-1.png,Taylor,other,terrible,this is a GC,58:14.4,91.48656582
-ROI3_hbpnjbep-1,ROI3,hbpnjbep-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_hbpnjbep-1.png,Taylor,other,terrible,this is a GC,58:19.9,106.2526601
-ROI3_hbpommgm-1,ROI3,hbpommgm-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_hbpommgm-1.png,Taylor,other,terrible,this is a GC,58:25.6,130.3209422
-ROI3_hcalofed-1,ROI3,hcalofed-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_hcalofed-1.png,Taylor,other,terrible,this is a GC,58:31.1,41.453439
-ROI3_hcbjammm-1,ROI3,hcbjammm-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_hcbjammm-1.png,Taylor,other,terrible,this is a GC,58:39.5,87.19672192
-ROI3_hccbanpd-1,ROI3,hccbanpd-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_hccbanpd-1.png,Taylor,other,terrible,this is a GC,58:45.1,95.64094097
-ROI3_hccbhfdf-1,ROI3,hccbhfdf-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_hccbhfdf-1.png,Taylor,other,terrible,this is a GC,58:50.7,35.80890755
-ROI3_lppfojfn-1,ROI3,lppfojfn-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_lppfojfn-1.png,Taylor,other,terrible,this is a GC,58:56.7,174.1676626
-ROI3_maapfhbc-1,ROI3,maapfhbc-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_maapfhbc-1.png,Taylor,transitioning,terrible,small bit of oocyte with GC,59:12.5,166.9426623
-ROI3_maoajmhj-1,ROI3,maoajmhj-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_maoajmhj-1.png,Taylor,transitioning,terrible,small portion of oocyte with GC,59:24.9,171.6389125
-ROI3_mbkemeeh-1,ROI3,mbkemeeh-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_mbkemeeh-1.png,Taylor,other,terrible,this is a GC,59:31.3,111.1746915
-ROI3_mbkfeojk-1,ROI3,mbkfeojk-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_mbkfeojk-1.png,Taylor,other,terrible,this is a GC,59:37.3,159.4467245
-ROI3_mnaflohh-1,ROI3,mnaflohh-1,results/ROI3/01_create_spatialdata/output/ROI3.zarr,ROI3_mnaflohh-1.png,Taylor,primordial,good,,59:44.0,189.6111006
-ROI4_aaaaemgi-1,ROI4,aaaaemgi-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aaaaemgi-1.png,Taylor,primordial,good,,24:29.9,234.3157898
-ROI4_aaaaeokl-1,ROI4,aaaaeokl-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aaaaeokl-1.png,Taylor,late transitioning,poor,"not sure about staging, end of follicle",24:57.2,282.813604
-ROI4_aaaaepgf-1,ROI4,aaaaepgf-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aaaaepgf-1.png,Taylor,primordial,good,,25:03.4,243.8889151
-ROI4_aaaagdim-1,ROI4,aaaagdim-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aaaagdim-1.png,Taylor,primordial,good,just nucleus,37:30.0,159.8079746
-ROI4_aaaagilm-1,ROI4,aaaagilm-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aaaagilm-1.png,Taylor,early transitioning,good,,37:39.3,353.1670441
-ROI4_aaaaiail-1,ROI4,aaaaiail-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aaaaiail-1.png,Taylor,primordial,good,looks like two follicles merged,37:55.2,383.5572014
-ROI4_aaaajofk-1,ROI4,aaaajofk-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aaaajofk-1.png,Taylor,primordial,good,,38:03.2,306.1142299
-ROI4_aaaaocbk-1,ROI4,aaaaocbk-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aaaaocbk-1.png,Taylor,primordial,good,end of follicle,38:23.0,364.817357
-ROI4_aaaaoeba-1,ROI4,aaaaoeba-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aaaaoeba-1.png,Taylor,primary,poor,"very end of follicle, hard to discern",38:37.9,229.2131333
-ROI4_aaabaadk-1,ROI4,aaabaadk-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aaabaadk-1.png,Taylor,primary,good,,38:46.3,794.2081538
-ROI4_aaaekmgf-1,ROI4,aaaekmgf-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aaaekmgf-1.png,Taylor,other,poor,"very end of follicle, hard to discern",39:03.0,130.998286
-ROI4_aaahbjbc-1,ROI4,aaahbjbc-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aaahbjbc-1.png,Taylor,primordial,okay,"mostly just nucleus, parts of oocyte missing",39:37.2,204.3320387
-ROI4_aaahhagi-1,ROI4,aaahhagi-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aaahhagi-1.png,Taylor,primordial,good,,39:53.3,222.1687581
-ROI4_aaakelge-1,ROI4,aaakelge-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aaakelge-1.png,Taylor,primordial,poor,exclude - not healthy,40:10.4,223.9298519
-ROI4_aaaldphk-1,ROI4,aaaldphk-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aaaldphk-1.png,Taylor,primordial,good,,40:19.6,306.9270424
-ROI4_aabbemka-1,ROI4,aabbemka-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aabbemka-1.png,Taylor,primordial,good,,40:28.1,274.5951662
-ROI4_aaefnilo-1,ROI4,aaefnilo-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aaefnilo-1.png,Taylor,other,okay,hard to tell end of follicle,40:46.9,275.5434475
-ROI4_aafeehcm-1,ROI4,aafeehcm-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aafeehcm-1.png,Taylor,early transitioning,good,,40:59.3,427.7200155
-ROI4_aafigkfh-1,ROI4,aafigkfh-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aafigkfh-1.png,Taylor,primordial,good,,41:06.2,362.7853257
-ROI4_aaggoplc-1,ROI4,aaggoplc-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aaggoplc-1.png,Taylor,late transitioning,good,,41:17.4,419.5918902
-ROI4_aagjfagh-1,ROI4,aagjfagh-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aagjfagh-1.png,Taylor,primordial,good,,41:24.5,342.1489187
-ROI4_aajliibo-1,ROI4,aajliibo-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aajliibo-1.png,Taylor,other,terrible,"hardly any oocyte, mostly GC",41:34.6,218.5111017
-ROI4_abaeodmh-1,ROI4,abaeodmh-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_abaeodmh-1.png,Taylor,early transitioning,good,less than half oocyte captured,41:52.2,163.1043809
-ROI4_abijfgeo-1,ROI4,abijfgeo-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_abijfgeo-1.png,Taylor,late transitioning,good,mostly just nucleus,42:11.6,155.7890682
-ROI4_acphohhh-1,ROI4,acphohhh-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_acphohhh-1.png,Taylor,other,terrible,mostly GC,42:19.1,160.9368808
-ROI4_aghmjlmg-1,ROI4,aghmjlmg-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_aghmjlmg-1.png,Taylor,other,terrible,"hardly any oocyte, GC",42:34.4,174.1676626
-ROI4_ahigfgfj-1,ROI4,ahigfgfj-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_ahigfgfj-1.png,Taylor,other,terrible,this is a GC,42:42.1,132.3529736
-ROI4_bocakfcm-1,ROI4,bocakfcm-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_bocakfcm-1.png,Taylor,primordial,poor,not a healthy oocyte,42:52.2,360.2114193
-ROI4_cadegdnj-1,ROI4,cadegdnj-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_cadegdnj-1.png,Taylor,primordial,okay,little bit of GC overlap,43:03.2,304.8498548
-ROI4_cailggdo-1,ROI4,cailggdo-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_cailggdo-1.png,Taylor,primordial,good,,43:09.2,322.0995429
-ROI4_chfogfgk-1,ROI4,chfogfgk-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_chfogfgk-1.png,Taylor,early transitioning,good,,43:18.3,380.3962638
-ROI4_chgehhmh-1,ROI4,chgehhmh-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_chgehhmh-1.png,Taylor,early transitioning,poor,1/4 oocyte with a GC,43:36.2,237.8379774
-ROI4_chjcholb-1,ROI4,chjcholb-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_chjcholb-1.png,Taylor,primordial,poor,1/4 oocyte with GC,43:54.7,263.4415721
-ROI4_ckicheod-1,ROI4,ckicheod-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_ckicheod-1.png,Taylor,primordial,poor,1/4 oocyte with GC,44:07.2,240.9086025
-ROI4_cmnegjli-1,ROI4,cmnegjli-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_cmnegjli-1.png,Taylor,other,terrible,poor quality oocyte with GCs,44:17.8,262.719072
-ROI4_cokeodgb-1,ROI4,cokeodgb-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_cokeodgb-1.png,Taylor,primordial,poor,1/4 oocyte with GC,44:29.0,277.4400101
-ROI4_diojcnmb-1,ROI4,diojcnmb-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_diojcnmb-1.png,Taylor,primordial,poor,1/4 oocyte with GC,44:39.8,185.9534442
-ROI4_dipoiblm-1,ROI4,dipoiblm-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_dipoiblm-1.png,Taylor,primordial,good,,45:44.9,397.6007957
-ROI4_djgoahen-1,ROI4,djgoahen-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_djgoahen-1.png,Taylor,primordial,okay,"1/4 oocyte, might be GC too",46:01.4,186.811413
-ROI4_djhdcgmb-1,ROI4,djhdcgmb-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_djhdcgmb-1.png,Taylor,other,okay,several GCs and not much oocyte,46:15.4,214.1761015
-ROI4_djncdjkp-1,ROI4,djncdjkp-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_djncdjkp-1.png,Taylor,other,terrible,mostly not oocyte,46:26.2,263.4415721
-ROI4_djpbapag-1,ROI4,djpbapag-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_djpbapag-1.png,Taylor,other,terrible,poor quality oocyte with GC overlap,46:36.7,182.4764129
-ROI4_dlnjdmao-1,ROI4,dlnjdmao-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_dlnjdmao-1.png,Taylor,primary;secondary,good,,46:51.7,380.6220451
-ROI4_dmejbcfl-1,ROI4,dmejbcfl-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_dmejbcfl-1.png,Taylor,other,terrible,low quality oocyte with GCs,47:07.8,269.176416
-ROI4_fnlakkeh-1,ROI4,fnlakkeh-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_fnlakkeh-1.png,Taylor,other,poor,"edge of tissue that ripped, hard to tell what this really is",49:08.3,342.5101687
-ROI4_gllpbfbh-1,ROI4,gllpbfbh-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_gllpbfbh-1.png,Taylor,primordial,poor,1/4 oocyte with GC,49:21.5,260.7773532
-ROI4_hanmfffh-1,ROI4,hanmfffh-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_hanmfffh-1.png,Taylor,primordial,good,,49:30.7,289.4064168
-ROI4_hbndmafc-1,ROI4,hbndmafc-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_hbndmafc-1.png,Taylor,primordial,poor,1/4 oocyte with GC,49:40.9,233.8642272
-ROI4_hlljhmel-1,ROI4,hlljhmel-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_hlljhmel-1.png,Taylor,primordial,good,,49:49.3,391.0982954
-ROI4_joihaddo-1,ROI4,joihaddo-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_joihaddo-1.png,Taylor,primordial,poor,GC overlap,50:07.0,316.003449
-ROI4_jonhmemo-1,ROI4,jonhmemo-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_jonhmemo-1.png,Taylor,other,terrible,not much oocyte,50:14.6,158.7693808
-ROI4_jonhnamg-1,ROI4,jonhnamg-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_jonhnamg-1.png,Taylor,other,terrible,this is a GC,50:22.2,101.6467224
-ROI4_jonifgek-1,ROI4,jonifgek-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_jonifgek-1.png,Taylor,early transitioning,terrible,oocyte + GCs,50:44.0,152.0410993
-ROI4_kkhhcoda-1,ROI4,kkhhcoda-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_kkhhcoda-1.png,Taylor,other,terrible,overreaching,51:00.6,245.2887589
-ROI4_lelcoaom-1,ROI4,lelcoaom-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_lelcoaom-1.png,Taylor,primary,okay,"hardly captured oocyte, just nucleus, but oocyte specific",51:18.2,132.8948486
-ROI4_lfldclpp-1,ROI4,lfldclpp-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_lfldclpp-1.png,Taylor,primordial,good,,51:25.0,430.9261094
-ROI4_lihghiak-1,ROI4,lihghiak-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_lihghiak-1.png,Taylor,primordial,terrible,mostly GC,51:35.5,151.5443805
-ROI4_lihgndbi-1,ROI4,lihgndbi-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_lihgndbi-1.png,Taylor,primordial,terrible,mostly GC and into stroma,51:55.4,297.8957921
-ROI4_lkahkaec-1,ROI4,lkahkaec-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_lkahkaec-1.png,Taylor,primordial,okay,might have a little bit of GC,52:09.9,380.08017
-ROI4_lpgjbcni-1,ROI4,lpgjbcni-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_lpgjbcni-1.png,Taylor,primordial,poor,has some GC,52:19.3,186.7662568
-ROI4_mbbjcecm-1,ROI4,mbbjcecm-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_mbbjcecm-1.png,Taylor,primordial,poor,1/4 oocyte with GC,52:34.3,224.5168831
-ROI4_meojhapn-1,ROI4,meojhapn-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_meojhapn-1.png,Taylor,other,terrible,poor quality oocyte,52:43.7,240.2312587
-ROI4_mpfgdnkp-1,ROI4,mpfgdnkp-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_mpfgdnkp-1.png,Taylor,primordial,good,,52:51.4,560.9761141
-ROI4_naaogmpa-1,ROI4,naaogmpa-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_naaogmpa-1.png,Taylor,primordial,okay,just nucleus,53:00.3,87.96437819
-ROI4_nadlnnif-1,ROI4,nadlnnif-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_nadlnnif-1.png,Taylor,primordial,good,,53:06.1,527.7411129
-ROI4_nadnibme-1,ROI4,nadnibme-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_nadnibme-1.png,Taylor,other,terrible,not much oocyte,53:18.5,220.001258
-ROI4_nagdabfd-1,ROI4,nagdabfd-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_nagdabfd-1.png,Taylor,primordial,okay,1/3 oocyte with a little bit of GC,53:33.5,229.4840708
-ROI4_nagenohk-1,ROI4,nagenohk-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_nagenohk-1.png,Taylor,primordial,good,,53:40.3,236.9800086
-ROI4_najhobff-1,ROI4,najhobff-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_najhobff-1.png,Taylor,primordial,poor,has a GC in it,53:50.6,248.6303215
-ROI4_nakmkblj-1,ROI4,nakmkblj-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_nakmkblj-1.png,Taylor,primordial,okay,just nucleus,54:02.8,108.7362539
-ROI4_naknnajk-1,ROI4,naknnajk-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_naknnajk-1.png,Taylor,other,terrible,lots of GC,54:22.4,244.6565714
-ROI4_ncngmfha-1,ROI4,ncngmfha-1,results/ROI4/01_create_spatialdata/output/ROI4.zarr,ROI4_ncngmfha-1.png,Taylor,early transitioning,good,mostly nucleus,54:32.0,165.091256
-ROI5_aaaagckl-1,ROI5,aaaagckl-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_aaaagckl-1.png,Taylor,primary;secondary,good,,54:43.1,336.6850122
-ROI5_aaaaplbh-1,ROI5,aaaaplbh-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_aaaaplbh-1.png,Taylor,primordial,good,,54:50.9,1114.907853
-ROI5_aaabgcdk-1,ROI5,aaabgcdk-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_aaabgcdk-1.png,Taylor,primordial,good,,57:22.1,745.8909646
-ROI5_aaabhgnn-1,ROI5,aaabhgnn-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_aaabhgnn-1.png,Taylor,other,okay,end of follicle hard to tell,57:56.2,222.9815706
-ROI5_aaadbkgb-1,ROI5,aaadbkgb-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_aaadbkgb-1.png,Taylor,early transitioning,good,,58:06.1,719.6100261
-ROI5_aaadmekh-1,ROI5,aaadmekh-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_aaadmekh-1.png,Taylor,transitioning,good,,58:24.3,1023.240662
-ROI5_aaadmknn-1,ROI5,aaadmknn-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_aaadmknn-1.png,Taylor,primordial,poor,overreaching,58:41.8,648.714711
-ROI5_aaaeboib-1,ROI5,aaaeboib-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_aaaeboib-1.png,Taylor,primordial,good,,58:47.8,397.1492332
-ROI5_aaaeclee-1,ROI5,aaaeclee-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_aaaeclee-1.png,Taylor,primordial,good,,58:54.2,311.6232926
-ROI5_aaaeflmd-1,ROI5,aaaeflmd-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_aaaeflmd-1.png,Taylor,primordial,good,,59:02.9,382.9701702
-ROI5_aaaegblk-1,ROI5,aaaegblk-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_aaaegblk-1.png,Taylor,primordial,good,,59:10.7,691.0261188
-ROI5_abodalld-1,ROI5,abodalld-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_abodalld-1.png,Taylor,other,terrible,this is a GC,59:24.1,44.11765785
-ROI5_abojcnlc-1,ROI5,abojcnlc-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_abojcnlc-1.png,Taylor,other,terrible,this is a GC,59:35.4,32.60281368
-ROI5_abojecfb-1,ROI5,abojecfb-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_abojecfb-1.png,Taylor,other,terrible,this is a GC,59:43.4,34.86062627
-ROI5_abojmgpi-1,ROI5,abojmgpi-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_abojmgpi-1.png,Taylor,other,terrible,this is a GC,59:50.7,38.92468891
-ROI5_abojompb-1,ROI5,abojompb-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_abojompb-1.png,Taylor,other,terrible,this is a GC,00:34.2,35.04125127
-ROI5_abokekgk-1,ROI5,abokekgk-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_abokekgk-1.png,Taylor,other,terrible,this is a GC,00:44.9,40.55031397
-ROI5_abomfghg-1,ROI5,abomfghg-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_abomfghg-1.png,Taylor,other,terrible,this is a GC,00:51.0,33.91234498
-ROI5_abomofgc-1,ROI5,abomofgc-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_abomofgc-1.png,Taylor,other,terrible,this is a GC,00:57.6,22.39750081
-ROI5_abopbopk-1,ROI5,abopbopk-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_abopbopk-1.png,Taylor,other,terrible,this is a GC,01:04.7,50.12343932
-ROI5_abopmbld-1,ROI5,abopmbld-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_abopmbld-1.png,Taylor,other,terrible,this is a GC,01:11.0,48.85906427
-ROI5_abpafmfn-1,ROI5,abpafmfn-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_abpafmfn-1.png,Taylor,other,terrible,this is a GC,01:16.9,57.61937709
-ROI5_abpahmad-1,ROI5,abpahmad-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_abpahmad-1.png,Taylor,other,terrible,this is a GC,01:22.6,39.42140768
-ROI5_acanemle-1,ROI5,acanemle-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_acanemle-1.png,Taylor,other,terrible,this is a GC,01:28.6,29.89343859
-ROI5_acankgdb-1,ROI5,acankgdb-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_acankgdb-1.png,Taylor,other,terrible,this is a GC,01:34.5,42.26625153
-ROI5_acaoknja-1,ROI5,acaoknja-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_acaoknja-1.png,Taylor,other,terrible,this is a GC,01:40.4,44.02734535
-ROI5_acapdnfl-1,ROI5,acapdnfl-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_acapdnfl-1.png,Taylor,other,terrible,this is a GC,01:46.0,51.56843937
-ROI5_acbadjoc-1,ROI5,acbadjoc-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_acbadjoc-1.png,Taylor,other,terrible,this is a GC,01:51.5,54.91000199
-ROI5_acbakkeh-1,ROI5,acbakkeh-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_acbakkeh-1.png,Taylor,other,terrible,this is a GC,01:57.3,27.59046975
-ROI5_acbbikcg-1,ROI5,acbbikcg-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_acbbikcg-1.png,Taylor,other,terrible,this is a GC,02:02.5,25.73906343
-ROI5_acbcbjig-1,ROI5,acbcbjig-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_acbcbjig-1.png,Taylor,other,terrible,this is a GC,02:08.6,44.88531413
-ROI5_acbcfndg-1,ROI5,acbcfndg-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_acbcfndg-1.png,Taylor,other,terrible,this is a GC,02:13.9,48.45265801
-ROI5_acbdmchn-1,ROI5,acbdmchn-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_acbdmchn-1.png,Taylor,other,terrible,this is a GC,02:19.8,27.86140726
-ROI5_acbjmoop-1,ROI5,acbjmoop-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_acbjmoop-1.png,Taylor,other,terrible,this is a GC,02:25.9,30.02890734
-ROI5_acbkhgkg-1,ROI5,acbkhgkg-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_acbkhgkg-1.png,Taylor,other,terrible,this is a GC,02:31.4,28.76453229
-ROI5_acbknpml-1,ROI5,acbknpml-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_acbknpml-1.png,Taylor,other,terrible,this is a GC,02:37.1,34.81547001
-ROI5_achehlni-1,ROI5,achehlni-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_achehlni-1.png,Taylor,other,terrible,this is a GC,02:42.5,47.00765796
-ROI5_akdofjhl-1,ROI5,akdofjhl-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_akdofjhl-1.png,Taylor,other,terrible,this is a GC,02:50.7,38.5634389
-ROI5_akekljmf-1,ROI5,akekljmf-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_akekljmf-1.png,Taylor,other,terrible,this is a GC,02:56.4,41.58890776
-ROI5_akemgick-1,ROI5,akemgick-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_akemgick-1.png,Taylor,other,terrible,this is a GC,03:01.5,48.272033
-ROI5_alidnaeh-1,ROI5,alidnaeh-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_alidnaeh-1.png,Taylor,other,terrible,this is a GC,03:07.1,132.4432861
-ROI5_alifmcdc-1,ROI5,alifmcdc-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_alifmcdc-1.png,Taylor,other,terrible,this is a GC,03:12.7,19.3268757
-ROI5_aligcloo-1,ROI5,aligcloo-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_aligcloo-1.png,Taylor,other,terrible,this is a GC,03:17.9,35.44765754
-ROI5_aliggail-1,ROI5,aliggail-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_aliggail-1.png,Taylor,other,terrible,this is a GC,03:23.4,55.04547075
-ROI5_alij-1,ROI5,alij-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_alijipng-1.png,Taylor,other,terrible,this is a GC,03:28.8,
-ROI5_alimemoe-1,ROI5,alimemoe-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_alimemoe-1.png,Taylor,other,terrible,this is a GC,03:34.9,74.77875271
-ROI5_amcdnhca-1,ROI5,amcdnhca-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_amcdnhca-1.png,Taylor,other,terrible,this is a GC,03:40.4,92.11875334
-ROI5_amcjllji-1,ROI5,amcjllji-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_amcjllji-1.png,Taylor,other,terrible,this is a GC,03:45.9,128.6953172
-ROI5_amecigea-1,ROI5,amecigea-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_amecigea-1.png,Taylor,other,terrible,this is a GC,03:51.6,102.0079725
-ROI5_amecmlle-1,ROI5,amecmlle-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_amecmlle-1.png,Taylor,other,terrible,this is a GC,03:57.1,124.9925045
-ROI5_amedbebk-1,ROI5,amedbebk-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_amedbebk-1.png,Taylor,other,terrible,this is a GC,04:01.9,83.76484679
-ROI5_amfipkjj-1,ROI5,amfipkjj-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_amfipkjj-1.png,Taylor,other,terrible,this is a GC,04:06.9,84.98406558
-ROI5_amfmpdfh-1,ROI5,amfmpdfh-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_amfmpdfh-1.png,Taylor,other,terrible,this is a GC,04:12.6,57.16781458
-ROI5_ancbepdo-1,ROI5,ancbepdo-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_ancbepdo-1.png,Taylor,other,terrible,this is a GC,04:18.1,43.16937657
-ROI5_apkkchon-1,ROI5,apkkchon-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_apkkchon-1.png,Taylor,other,terrible,this is a GC,04:23.6,47.95593924
-ROI5_apkkgmnm-1,ROI5,apkkgmnm-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_apkkgmnm-1.png,Taylor,other,terrible,this is a GC,04:29.8,42.85328281
-ROI5_apkkkijk-1,ROI5,apkkkijk-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_apkkkijk-1.png,Taylor,other,terrible,this is a GC,04:35.2,37.88609513
-ROI5_aplbfbno-1,ROI5,aplbfbno-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_aplbfbno-1.png,Taylor,other,terrible,this is a GC,04:40.4,63.12843979
-ROI5_bnlbdomj-1,ROI5,bnlbdomj-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bnlbdomj-1.png,Taylor,other,terrible,this is a GC,04:45.8,76.81078404
-ROI5_bnlejboa-1,ROI5,bnlejboa-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bnlejboa-1.png,Taylor,other,terrible,this is a GC,04:51.3,56.44531455
-ROI5_bnmlceke-1,ROI5,bnmlceke-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bnmlceke-1.png,Taylor,other,terrible,this is a GC,04:56.9,34.58968876
-ROI5_bnmlgkhp-1,ROI5,bnmlgkhp-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bnmlgkhp-1.png,Taylor,other,terrible,this is a GC,05:02.8,30.79656362
-ROI5_bnmligkb-1,ROI5,bnmligkb-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bnmligkb-1.png,Taylor,other,terrible,this is a GC,05:09.4,46.05937667
-ROI5_bnmmelcp-1,ROI5,bnmmelcp-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bnmmelcp-1.png,Taylor,other,terrible,this is a GC,05:15.8,55.99375203
-ROI5_bnmncflg-1,ROI5,bnmncflg-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bnmncflg-1.png,Taylor,other,terrible,this is a GC,05:21.8,37.2539076
-ROI5_bnmogakc-1,ROI5,bnmogakc-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bnmogakc-1.png,Taylor,other,terrible,this is a GC,05:28.7,39.91812645
-ROI5_bnohpddb-1,ROI5,bnohpddb-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bnohpddb-1.png,Taylor,other,terrible,this is a GC,05:34.7,88.59656572
-ROI5_bnoikidn-1,ROI5,bnoikidn-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bnoikidn-1.png,Taylor,other,terrible,this is a GC,05:41.7,33.73171997
-ROI5_bnpbfkej-1,ROI5,bnpbfkej-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bnpbfkej-1.png,Taylor,other,terrible,this is a GC,05:48.1,41.99531402
-ROI5_bnpfeein-1,ROI5,bnpfeein-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bnpfeein-1.png,Taylor,other,terrible,this is a GC,05:54.7,31.33843864
-ROI5_bnpfpjon-1,ROI5,bnpfpjon-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bnpfpjon-1.png,Taylor,other,terrible,this is a GC,06:01.3,44.70468912
-ROI5_bodehecd-1,ROI5,bodehecd-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bodehecd-1.png,Taylor,other,terrible,this is a GC,06:07.8,77.0365653
-ROI5_bodenmjp-1,ROI5,bodenmjp-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bodenmjp-1.png,Taylor,other,terrible,this is a GC,06:14.0,146.6675053
-ROI5_bodfkiia-1,ROI5,bodfkiia-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bodfkiia-1.png,Taylor,other,terrible,this is a GC,06:22.0,65.65718988
-ROI5_bodgiohg-1,ROI5,bodgiohg-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bodgiohg-1.png,Taylor,other,terrible,this is a GC,06:29.7,38.6537514
-ROI5_boiekfoa-1,ROI5,boiekfoa-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_boiekfoa-1.png,Taylor,other,terrible,this is a GC,06:36.5,49.31062679
-ROI5_boielboi-1,ROI5,boielboi-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_boielboi-1.png,Taylor,other,terrible,this is a GC,06:42.8,107.6073477
-ROI5_boihlccl-1,ROI5,boihlccl-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_boihlccl-1.png,Taylor,other,terrible,this is a GC,06:49.4,64.93468986
-ROI5_boihobpb-1,ROI5,boihobpb-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_boihobpb-1.png,Taylor,other,terrible,this is a GC,06:56.5,35.9443763
-ROI5_bojdjblh-1,ROI5,bojdjblh-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bojdjblh-1.png,Taylor,other,terrible,this is a GC,07:02.3,53.64562695
-ROI5_bojecgab-1,ROI5,bojecgab-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bojecgab-1.png,Taylor,other,terrible,this is a GC,07:08.8,44.56922037
-ROI5_bojejgio-1,ROI5,bojejgio-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bojejgio-1.png,Taylor,other,terrible,this is a GC,07:15.3,23.93281337
-ROI5_bojeocll-1,ROI5,bojeocll-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bojeocll-1.png,Taylor,other,terrible,this is a GC,07:22.9,60.87062721
-ROI5_bojfkokp-1,ROI5,bojfkokp-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bojfkokp-1.png,Taylor,other,terrible,this is a GC,07:29.5,20.636407
-ROI5_bojfoeoe-1,ROI5,bojfoeoe-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bojfoeoe-1.png,Taylor,other,terrible,this is a GC,07:35.5,87.55797193
-ROI5_bokijgej-1,ROI5,bokijgej-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bokijgej-1.png,Taylor,other,terrible,this is a GC,07:42.8,44.38859536
-ROI5_bokiopkn-1,ROI5,bokiopkn-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bokiopkn-1.png,Taylor,other,terrible,this is a GC,07:48.5,71.6178151
-ROI5_bokkglbb-1,ROI5,bokkglbb-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bokkglbb-1.png,Taylor,other,terrible,this is a GC,07:56.0,42.71781405
-ROI5_boklacll-1,ROI5,boklacll-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_boklacll-1.png,Taylor,other,terrible,this is a GC,33:52.5,48.45265801
-ROI5_boklnmfj-1,ROI5,boklnmfj-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_boklnmfj-1.png,Taylor,primary;secondary,poor,"very small ROI, might have a little bit of GC",34:19.7,103.9948475
-ROI5_bolceind-1,ROI5,bolceind-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bolceind-1.png,Taylor,primary;secondary,poor,"very small ROI, might have some GC",34:38.8,79.11375287
-ROI5_boldhcac-1,ROI5,boldhcac-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_boldhcac-1.png,Taylor,other,terrible,this is a GC,34:45.6,64.52828359
-ROI5_bolffgje-1,ROI5,bolffgje-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bolffgje-1.png,Taylor,other,terrible,this is a GC,35:10.7,66.0184399
-ROI5_bomckkpo-1,ROI5,bomckkpo-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_bomckkpo-1.png,Taylor,other,terrible,this is a GC,35:16.8,139.1264113
-ROI5_cajfleke-1,ROI5,cajfleke-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cajfleke-1.png,Taylor,other,terrible,this is a GC,35:22.8,59.51593966
-ROI5_cajfljho-1,ROI5,cajfljho-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cajfljho-1.png,Taylor,other,terrible,this is a GC,35:29.8,29.39671982
-ROI5_cajgbokh-1,ROI5,cajgbokh-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cajgbokh-1.png,Taylor,other,terrible,this is a GC,35:35.0,31.5642199
-ROI5_cajgcjbl-1,ROI5,cajgcjbl-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cajgcjbl-1.png,Taylor,other,terrible,this is a GC,35:40.3,35.58312629
-ROI5_cajginge-1,ROI5,cajginge-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cajginge-1.png,Taylor,other,terrible,this is a GC,35:45.2,31.29328239
-ROI5_cakgdlkh-1,ROI5,cakgdlkh-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cakgdlkh-1.png,Taylor,other,terrible,this is a GC,35:50.0,49.98797056
-ROI5_cakhcaem-1,ROI5,cakhcaem-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cakhcaem-1.png,Taylor,other,terrible,this is a GC,35:55.6,50.48468933
-ROI5_cakhefig-1,ROI5,cakhefig-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cakhefig-1.png,Taylor,other,terrible,this is a GC,36:00.9,76.22375277
-ROI5_cakhpiil-1,ROI5,cakhpiil-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cakhpiil-1.png,Taylor,other,terrible,this is a GC,36:06.0,70.98562758
-ROI5_cbapjkgd-1,ROI5,cbapjkgd-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbapjkgd-1.png,Taylor,primordial,poor,small ROI of oocyte with GC overlap,36:21.0,128.3792234
-ROI5_cbbabold-1,ROI5,cbbabold-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbbabold-1.png,Taylor,other,terrible,this is a GC,36:26.6,54.05203321
-ROI5_cbbcbbkd-1,ROI5,cbbcbbkd-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbbcbbkd-1.png,Taylor,other,terrible,this is a GC,36:33.7,45.20140789
-ROI5_cbbccajh-1,ROI5,cbbccajh-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbbccajh-1.png,Taylor,other,terrible,this is a GC,36:39.3,36.07984506
-ROI5_cbbdfcad-1,ROI5,cbbdfcad-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbbdfcad-1.png,Taylor,early transitioning,okay,1/4 oocyte,36:56.3,109.7296915
-ROI5_cbbdpeok-1,ROI5,cbbdpeok-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbbdpeok-1.png,Taylor,primordial,poor,1/4 oocyte with GC,37:08.2,86.02265937
-ROI5_cbbfipch-1,ROI5,cbbfipch-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbbfipch-1.png,Taylor,early transitioning,poor,1/4 oocyte with GC,37:23.4,116.6837542
-ROI5_cbbjdolo-1,ROI5,cbbjdolo-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbbjdolo-1.png,Taylor,other,terrible,this is mostly GC,37:35.9,59.1095334
-ROI5_cbbjehco-1,ROI5,cbbjehco-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbbjehco-1.png,Taylor,other,terrible,this is a GC,37:41.6,100.1114099
-ROI5_cbchminh-1,ROI5,cbchminh-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbchminh-1.png,Taylor,other,terrible,this is a GC,37:47.0,48.58812676
-ROI5_cbchojcf-1,ROI5,cbchojcf-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbchojcf-1.png,Taylor,other,terrible,this is a GC,37:52.5,70.35344005
-ROI5_cbcmnhfo-1,ROI5,cbcmnhfo-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbcmnhfo-1.png,Taylor,other,terrible,this is a GC,37:59.5,122.4185982
-ROI5_cbcnaddj-1,ROI5,cbcnaddj-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbcnaddj-1.png,Taylor,other,terrible,this is a GC,38:05.7,50.9814081
-ROI5_cbcnjpki-1,ROI5,cbcnjpki-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbcnjpki-1.png,Taylor,other,terrible,this is a GC,38:11.1,46.82703295
-ROI5_cbedigob-1,ROI5,cbedigob-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbedigob-1.png,Taylor,other,terrible,this is a GC,38:16.5,68.50203374
-ROI5_cbehhnae-1,ROI5,cbehhnae-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbehhnae-1.png,Taylor,other,terrible,this is a GC,38:21.8,55.90343953
-ROI5_cbeiojeh-1,ROI5,cbeiojeh-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbeiojeh-1.png,Taylor,other,terrible,this is a GC,38:27.2,65.70234613
-ROI5_cbggnjif-1,ROI5,cbggnjif-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbggnjif-1.png,Taylor,primordial,poor,1/4 oocyte with GC,38:40.3,133.527036096901
-ROI5_cbgngigl-1,ROI5,cbgngigl-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbgngigl-1.png,Taylor,other,terrible,this is a GC,38:45.6,69.04390876
-ROI5_cbhmchhe-1,ROI5,cbhmchhe-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbhmchhe-1.png,Taylor,other,terrible,this is a GC,38:50.9,101.0145349
-ROI5_cbhoamml-1,ROI5,cbhoamml-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbhoamml-1.png,Taylor,other,terrible,this is a GC,38:56.3,94.60234718
-ROI5_cbhplpge-1,ROI5,cbhplpge-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbhplpge-1.png,Taylor,other,terrible,this is a GC,39:02.0,70.85015882
-ROI5_cbibphmj-1,ROI5,cbibphmj-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_cbibphmj-1.png,Taylor,other,terrible,this is a GC,39:07.1,49.98797056
-ROI5_jmihpedl-1,ROI5,jmihpedl-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_jmihpedl-1.png,Taylor,other,terrible,this is a GC,39:15.9,28.49359478
-ROI5_jmjcmfie-1,ROI5,jmjcmfie-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_jmjcmfie-1.png,Taylor,other,terrible,this is a GC,39:21.0,52.87797067
-ROI5_jmlpmdck-1,ROI5,jmlpmdck-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_jmlpmdck-1.png,Taylor,other,terrible,this is a GC,39:26.2,42.98875156
-ROI5_jmoajhhj-1,ROI5,jmoajhhj-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_jmoajhhj-1.png,Taylor,other,terrible,this is a GC,39:31.6,39.64718894
-ROI5_jmpbepip-1,ROI5,jmpbepip-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_jmpbepip-1.png,Taylor,other,terrible,this is a GC,39:36.9,31.29328239
-ROI5_jmpcnnpp-1,ROI5,jmpcnnpp-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_jmpcnnpp-1.png,Taylor,other,terrible,this is a GC,39:42.3,60.10297093
-ROI5_jnhllefa-1,ROI5,jnhllefa-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_jnhllefa-1.png,Taylor,other,terrible,this is a GC,39:49.2,57.9806271
-ROI5_jnhlmoan-1,ROI5,jnhlmoan-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_jnhlmoan-1.png,Taylor,other,terrible,this is a GC,39:54.1,37.43453261
-ROI5_jnhnpohb-1,ROI5,jnhnpohb-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_jnhnpohb-1.png,Taylor,other,terrible,this is a GC,39:59.6,55.94859578
-ROI5_jnihcafh-1,ROI5,jnihcafh-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_jnihcafh-1.png,Taylor,other,terrible,this is a GC,40:06.5,115.2387542
-ROI5_mjfogcmb-1,ROI5,mjfogcmb-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_mjfogcmb-1.png,Taylor,other,terrible,this is a GC,40:11.7,32.87375119
-ROI5_mjfpplhh-1,ROI5,mjfpplhh-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_mjfpplhh-1.png,Taylor,other,terrible,this is a GC,40:17.4,36.98297009
-ROI5_mjgadefi-1,ROI5,mjgadefi-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_mjgadefi-1.png,Taylor,other,terrible,this is a GC,40:22.9,32.73828244
-ROI5_mjnjagkn-1,ROI5,mjnjagkn-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_mjnjagkn-1.png,Taylor,other,terrible,this is a GC,40:28.1,30.52562611
-ROI5_mjnjblha-1,ROI5,mjnjblha-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_mjnjblha-1.png,Taylor,other,terrible,this is a GC,40:33.5,32.60281368
-ROI5_mkblgbnh-1,ROI5,mkblgbnh-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_mkblgbnh-1.png,Taylor,other,terrible,this is a GC,40:39.1,36.44109507
-ROI5_mkhdlill-1,ROI5,mkhdlill-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_mkhdlill-1.png,Taylor,other,terrible,this is a GC,40:44.6,39.60203269
-ROI5_mkhfgfpa-1,ROI5,mkhfgfpa-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_mkhfgfpa-1.png,Taylor,other,terrible,this is a GC,40:49.9,42.17593903
-ROI5_mkhgdaak-1,ROI5,mkhgdaak-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_mkhgdaak-1.png,Taylor,other,terrible,this is a GC,40:55.3,25.24234467
-ROI5_mkhgkbkj-1,ROI5,mkhgkbkj-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_mkhgkbkj-1.png,Taylor,other,terrible,this is a GC,41:01.1,63.71547106
-ROI5_mllmljhb-1,ROI5,mllmljhb-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_mllmljhb-1.png,Taylor,other,terrible,not capturing the oocyte correctly,41:17.2,59.2901584
-ROI5_mlmhakon-1,ROI5,mlmhakon-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_mlmhakon-1.png,Taylor,other,terrible,not an oocyte,41:26.5,86.8354719
-ROI5_mlmhalni-1,ROI5,mlmhalni-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_mlmhalni-1.png,Taylor,other,terrible,not an oocyte,41:36.9,35.71859505
-ROI5_moggjcnj-1,ROI5,moggjcnj-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_moggjcnj-1.png,Taylor,other,terrible,these are cells,41:44.9,101.5564099
-ROI5_mpchpidk-1,ROI5,mpchpidk-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_mpchpidk-1.png,Taylor,other,terrible,this is a GC,41:51.6,48.1817205
-ROI5_mpcmhkao-1,ROI5,mpcmhkao-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_mpcmhkao-1.png,Taylor,late transitioning,poor,small oocyte ROI with GC overlap,42:12.0,103.1368787
-ROI5_mpcnbdei-1,ROI5,mpcnbdei-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_mpcnbdei-1.png,Taylor,other,terrible,mostly GC,42:19.8,63.26390855
-ROI5_mpoeepim-1,ROI5,mpoeepim-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_mpoeepim-1.png,Taylor,other,terrible,not oocyte,42:26.6,52.83281442
-ROI5_naabhgbh-1,ROI5,naabhgbh-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_naabhgbh-1.png,Taylor,other,terrible,this is a GC,42:31.9,30.93203237
-ROI5_naaefhha-1,ROI5,naaefhha-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_naaefhha-1.png,Taylor,other,terrible,this is a GC,42:37.8,39.46656393
-ROI5_nabhdlji-1,ROI5,nabhdlji-1,results/ROI5/01_create_spatialdata/output/ROI5.zarr,ROI5_nabhdlji-1.png,Taylor,other,terrible,this is a GC,42:47.8,59.42562716
-ROI6_aaaabpba-1,ROI6,aaaabpba-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaaabpba-1.png,Taylor,early transitioning,good,,00:49.3,280.4654789
-ROI6_aaaaeaam-1,ROI6,aaaaeaam-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaaaeaam-1.png,Taylor,primordial,good,,03:03.8,209.7507889
-ROI6_aaaafica-1,ROI6,aaaafica-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaaafica-1.png,Taylor,transitioning,poor,"end of follicle hard to tell stage, with GC overlap",03:26.3,232.5095397
-ROI6_aaaagdha-1,ROI6,aaaagdha-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaaagdha-1.png,Taylor,early transitioning,okay,little bit of GC,05:09.7,565.8529893
-ROI6_aaaahbop-1,ROI6,aaaahbop-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaaahbop-1.png,Taylor,primordial,good,,05:19.4,468.2703295
-ROI6_aaaaimef-1,ROI6,aaaaimef-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaaaimef-1.png,Taylor,other,okay,"ROI itself is fine but it's hard to stage, end of follicle",05:44.9,172.8581313
-ROI6_aaaajeoi-1,ROI6,aaaajeoi-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaaajeoi-1.png,Taylor,early transitioning,good,,05:55.0,192.4107882
-ROI6_aaaaoifm-1,ROI6,aaaaoifm-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaaaoifm-1.png,Taylor,late transitioning,good,,06:04.2,316.4550115
-ROI6_aaaaomfa-1,ROI6,aaaaomfa-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaaaomfa-1.png,Taylor,primordial,good,,06:11.1,499.0217369
-ROI6_aaabdadi-1,ROI6,aaabdadi-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaabdadi-1.png,Taylor,early transitioning,good,,07:00.2,612.9058035
-ROI6_aaabefef-1,ROI6,aaabefef-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaabefef-1.png,Taylor,primordial,good,,07:10.8,653.5915862
-ROI6_aaabgegl-1,ROI6,aaabgegl-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaabgegl-1.png,Taylor,transitioning,okay,ROI is fine but hard to stage,07:27.6,277.7109476
-ROI6_aaabhldm-1,ROI6,aaabhldm-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaabhldm-1.png,Taylor,primordial,good,,07:38.3,571.362052
-ROI6_aaabiifc-1,ROI6,aaabiifc-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaabiifc-1.png,Taylor,early transitioning,good,,07:48.2,463.8450168
-ROI6_aaabiljo-1,ROI6,aaabiljo-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaabiljo-1.png,Taylor,primordial,good,,07:55.2,213.9503203
-ROI6_aaabkbol-1,ROI6,aaabkbol-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaabkbol-1.png,Taylor,primordial,good,,08:03.3,243.7082901
-ROI6_aaacahcj-1,ROI6,aaacahcj-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaacahcj-1.png,Taylor,early transitioning,good,,08:15.9,397.6911082
-ROI6_aaacclaj-1,ROI6,aaacclaj-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaacclaj-1.png,Taylor,early transitioning,good,,08:25.8,727.2414326
-ROI6_aaacfaoe-1,ROI6,aaacfaoe-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaacfaoe-1.png,Taylor,primordial,good,right half of oocyte,08:36.0,595.8818966
-ROI6_aaacflna-1,ROI6,aaacflna-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaacflna-1.png,Taylor,primordial,good,,08:43.2,476.7597048
-ROI6_aaacgnpp-1,ROI6,aaacgnpp-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaacgnpp-1.png,Taylor,primordial,good,,08:48.1,491.3903303
-ROI6_aaacheah-1,ROI6,aaacheah-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaacheah-1.png,Taylor,early transitioning,okay,I think it might have some GC in it,09:01.4,538.1270508
-ROI6_aaachioi-1,ROI6,aaachioi-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaachioi-1.png,Taylor,primordial,good,,09:08.4,418.5532964
-ROI6_aaachnlm-1,ROI6,aaachnlm-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaachnlm-1.png,Taylor,primordial,good,,09:14.6,509.091581
-ROI6_aaaciapo-1,ROI6,aaaciapo-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaaciapo-1.png,Taylor,early transitioning,good,,09:21.4,778.087372
-ROI6_aaacknlo-1,ROI6,aaacknlo-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaacknlo-1.png,Taylor,primordial,good,,09:29.7,661.629399
-ROI6_aaacllom-1,ROI6,aaacllom-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaacllom-1.png,Taylor,early transitioning,good,,09:37.4,348.6514189
-ROI6_aaacmaog-1,ROI6,aaacmaog-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaacmaog-1.png,Taylor,early transitioning,good,,09:44.6,1761.996939
-ROI6_aaacniej-1,ROI6,aaacniej-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaacniej-1.png,Taylor,early transitioning,good,,10:19.8,714.5073697
-ROI6_aaacnoic-1,ROI6,aaacnoic-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaacnoic-1.png,Taylor,early transitioning,good,,10:26.9,864.3809689
-ROI6_aaadbmim-1,ROI6,aaadbmim-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaadbmim-1.png,Taylor,primordial,good,,10:33.6,790.0989349
-ROI6_aaadbnbm-1,ROI6,aaadbnbm-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaadbnbm-1.png,Taylor,late transitioning,okay,ROI is fine but hard to stage,10:47.6,228.264852
-ROI6_aaadckmm-1,ROI6,aaadckmm-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaadckmm-1.png,Taylor,primordial,good,,10:55.6,399.813452
-ROI6_aaadealk-1,ROI6,aaadealk-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaadealk-1.png,Taylor,transitioning,okay,ROI is fine but hard to stage,11:12.6,401.8454833
-ROI6_aaadfdei-1,ROI6,aaadfdei-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaadfdei-1.png,Taylor,early transitioning,okay,overreaching into GCs,11:39.5,448.6725163
-ROI6_aaadflck-1,ROI6,aaadflck-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaadflck-1.png,Taylor,transitioning,good,half oocyte,11:51.9,395.2978268
-ROI6_aaadfokf-1,ROI6,aaadfokf-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaadfokf-1.png,Taylor,transitioning,good,,12:03.9,621.4403351
-ROI6_aaadhkmk-1,ROI6,aaadhkmk-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaadhkmk-1.png,Taylor,transitioning,good,,12:16.3,663.5711178
-ROI6_aaadhmpk-1,ROI6,aaadhmpk-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaadhmpk-1.png,Taylor,primordial,good,,12:23.8,576.6001772
-ROI6_aaadmchd-1,ROI6,aaadmchd-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaadmchd-1.png,Taylor,primary,good,,12:43.9,736.092058
-ROI6_aaadmoig-1,ROI6,aaadmoig-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaadmoig-1.png,Taylor,transitioning,good,,12:51.7,809.7870606
-ROI6_aaadoghl-1,ROI6,aaadoghl-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaadoghl-1.png,Taylor,primordial,good,,12:57.2,707.3726819
-ROI6_aaadombf-1,ROI6,aaadombf-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaadombf-1.png,Taylor,primordial,good,,13:03.3,853.4983122
-ROI6_aaadpaak-1,ROI6,aaadpaak-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaadpaak-1.png,Taylor,primordial,good,,13:09.4,571.316895738244
-ROI6_aaaedemg-1,ROI6,aaaedemg-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaaedemg-1.png,Taylor,primary,okay,follicle not fully in plane and does have GC overlap,13:39.0,598.184865463525
-ROI6_aaaeiabp-1,ROI6,aaaeiabp-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaaeiabp-1.png,Taylor,transitioning,good,,13:45.4,479.6948612
-ROI6_aaaejhgk-1,ROI6,aaaejhgk-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaaejhgk-1.png,Taylor,primordial,okay,a little bit of GC,13:56.8,256.4875093
-ROI6_aaaejieh-1,ROI6,aaaejieh-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaaejieh-1.png,Taylor,primary,good,,14:05.5,1022.879412
-ROI6_aaaelafj-1,ROI6,aaaelafj-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaaelafj-1.png,Taylor,primordial,good,,14:11.8,677.8856496
-ROI6_aaaepbpd-1,ROI6,aaaepbpd-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaaepbpd-1.png,Taylor,primordial,good,,14:18.6,1418.628801
-ROI6_aaafbepe-1,ROI6,aaafbepe-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafbepe-1.png,Taylor,primordial,good,left side / nucleus of oocyte,14:34.2,444.5632974
-ROI6_aaafcalm-1,ROI6,aaafcalm-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafcalm-1.png,Taylor,transitioning,good,,14:43.6,355.5151692
-ROI6_aaafccal-1,ROI6,aaafccal-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafccal-1.png,Taylor,transitioning,poor,GC overlap,14:57.4,470.2572046
-ROI6_aaafcdoh-1,ROI6,aaafcdoh-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafcdoh-1.png,Taylor,primordial,good,,15:06.2,840.5836243
-ROI6_aaafckfc-1,ROI6,aaafckfc-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafckfc-1.png,Taylor,early transitioning,good,,15:14.0,777.364872
-ROI6_aaafdmme-1,ROI6,aaafdmme-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafdmme-1.png,Taylor,early transitioning,good,,15:22.2,751.535496
-ROI6_aaafelhb-1,ROI6,aaafelhb-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafelhb-1.png,Taylor,transitioning,good,,15:31.2,651.5143986
-ROI6_aaafepki-1,ROI6,aaafepki-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafepki-1.png,Taylor,late transitioning,good,,15:40.1,497.1703305
-ROI6_aaafepnp-1,ROI6,aaafepnp-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafepnp-1.png,Taylor,primordial,good,,15:46.1,441.3120473
-ROI6_aaaffoii-1,ROI6,aaaffoii-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaaffoii-1.png,Taylor,other,poor,very edge hard to stage and GC overlap,16:02.1,313.2940739
-ROI6_aaafhiad-1,ROI6,aaafhiad-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafhiad-1.png,Taylor,late transitioning,good,,16:10.8,264.2995408
-ROI6_aaafhjgg-1,ROI6,aaafhjgg-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafhjgg-1.png,Taylor,primordial,good,,16:16.5,457.8843916
-ROI6_aaafiagk-1,ROI6,aaafiagk-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafiagk-1.png,Taylor,transitioning,good,,16:43.7,926.1547211
-ROI6_aaafiglf-1,ROI6,aaafiglf-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafiglf-1.png,Taylor,primordial,good,,16:52.3,518.8453313
-ROI6_aaafiknb-1,ROI6,aaafiknb-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafiknb-1.png,Taylor,primordial,good,pretty good does overlap one GC,17:13.7,708.6822132
-ROI6_aaafjegf-1,ROI6,aaafjegf-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafjegf-1.png,Taylor,primordial,good,,17:20.1,803.3297167
-ROI6_aaafkejg-1,ROI6,aaafkejg-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafkejg-1.png,Taylor,transitioning,good,,17:31.2,402.2518896
-ROI6_aaafkkck-1,ROI6,aaafkkck-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafkkck-1.png,Taylor,early transitioning,good,,17:39.7,696.2190878
-ROI6_aaafmdka-1,ROI6,aaafmdka-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafmdka-1.png,Taylor,primordial,good,,17:46.4,423.2947029
-ROI6_aaafomic-1,ROI6,aaafomic-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafomic-1.png,Taylor,primordial,good,,17:52.3,781.7450284
-ROI6_aaafplgb-1,ROI6,aaafplgb-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaafplgb-1.png,Taylor,primary,good,,18:03.8,836.8356554
-ROI6_aaagbhdk-1,ROI6,aaagbhdk-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaagbhdk-1.png,Taylor,early transitioning,good,,18:10.8,868.8062815
-ROI6_aaagbocm-1,ROI6,aaagbocm-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaagbocm-1.png,Taylor,primary;secondary,good,,19:04.4,1832.350379
-ROI6_aaagdjac-1,ROI6,aaagdjac-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaagdjac-1.png,Taylor,transitioning,good,,19:11.1,561.1567391
-ROI6_aaagibop-1,ROI6,aaagibop-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaagibop-1.png,Taylor,early transitioning,good,,19:19.5,405.2322022
-ROI6_aaagljlc-1,ROI6,aaagljlc-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaagljlc-1.png,Taylor,early transitioning,good,,19:28.5,501.7762682
-ROI6_aaagpejf-1,ROI6,aaagpejf-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaagpejf-1.png,Taylor,primordial,good,,19:37.2,509.452831
-ROI6_aaagphkb-1,ROI6,aaagphkb-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaagphkb-1.png,Taylor,early transitioning,good,,19:46.6,848.3504995
-ROI6_aaaheihg-1,ROI6,aaaheihg-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaaheihg-1.png,Taylor,primordial,good,,19:54.1,773.9781531
-ROI6_aaccmnkf-1,ROI6,aaccmnkf-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaccmnkf-1.png,Taylor,transitioning,good,end of follicle,20:18.7,474.637361
-ROI6_aacgghcm-1,ROI6,aacgghcm-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aacgghcm-1.png,Taylor,transitioning,good,edge of follicle,20:28.3,201.2162573
-ROI6_aajjphef-1,ROI6,aajjphef-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aajjphef-1.png,Taylor,transitioning,good,,20:35.8,374.6614198
-ROI6_aanojfkf-1,ROI6,aanojfkf-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aanojfkf-1.png,Taylor,transitioning,good,,20:42.7,700.7798692
-ROI6_aaokeeoa-1,ROI6,aaokeeoa-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aaokeeoa-1.png,Taylor,primordial,good,,20:50.5,417.3792339
-ROI6_aapckcpj-1,ROI6,aapckcpj-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aapckcpj-1.png,Taylor,transitioning,good,right side oocyte,21:08.8,280.6009477
-ROI6_abafckce-1,ROI6,abafckce-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_abafckce-1.png,Taylor,transitioning,good,,21:16.6,455.807204
-ROI6_abbcalon-1,ROI6,abbcalon-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_abbcalon-1.png,Taylor,transitioning,okay,very edge,21:32.9,321.2867304
-ROI6_abblkcdd-1,ROI6,abblkcdd-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_abblkcdd-1.png,Taylor,primordial,good,,21:43.2,465.3351731
-ROI6_aegniemp-1,ROI6,aegniemp-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_aegniemp-1.png,Taylor,other,poor,50/50 oocyte/GC,21:59.9,294.1929794
-ROI6_bimfdnjj-1,ROI6,bimfdnjj-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_bimfdnjj-1.png,Taylor,other,poor,50/50 oocyte and GC,22:12.3,285.6132916
-ROI6_binnjogh-1,ROI6,binnjogh-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_binnjogh-1.png,Taylor,early transitioning,good,,22:20.2,364.0497007
-ROI6_cbndcgdi-1,ROI6,cbndcgdi-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_cbndcgdi-1.png,Taylor,other,poor,poor quality oocyte,22:33.0,453.278454
-ROI6_cjfpbmfi-1,ROI6,cjfpbmfi-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_cjfpbmfi-1.png,Taylor,other,poor,50/50 oocyte and GC,22:43.2,210.8796952
-ROI6_ddoopkig-1,ROI6,ddoopkig-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_ddoopkig-1.png,Taylor,early transitioning,poor,weird segmentation,23:04.5,325.2604806
-ROI6_eaamjoch-1,ROI6,eaamjoch-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_eaamjoch-1.png,Taylor,other,poor,poor oocyte quality,23:14.4,494.5061117
-ROI6_eiojcpmb-1,ROI6,eiojcpmb-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_eiojcpmb-1.png,Taylor,other,terrible,not great segmentation,23:22.9,239.5539149
-ROI6_eponcojg-1,ROI6,eponcojg-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_eponcojg-1.png,Taylor,other,poor,a lot of GC,23:29.9,410.0187649
-ROI6_jnmpbnpa-1,ROI6,jnmpbnpa-1,results/ROI6/01_create_spatialdata/output/ROI6.zarr,ROI6_jnmpbnpa-1.png,Taylor,primordial,good,overreaching into one GC,24:01.1,737.4919018
+sample,cell,path
+ROI1,aaaaimck-1,results/ROI1/create_follicle_sdata/output/aaaaimck-1.zarr
+ROI1,aaaalpdj-1,results/ROI1/create_follicle_sdata/output/aaaalpdj-1.zarr
+ROI1,aaabfpcg-1,results/ROI1/create_follicle_sdata/output/aaabfpcg-1.zarr
+ROI1,aaabgdkk-1,results/ROI1/create_follicle_sdata/output/aaabgdkk-1.zarr
+ROI1,aaacbjaf-1,results/ROI1/create_follicle_sdata/output/aaacbjaf-1.zarr
+ROI1,aaafefio-1,results/ROI1/create_follicle_sdata/output/aaafefio-1.zarr
+ROI1,aaafndjb-1,results/ROI1/create_follicle_sdata/output/aaafndjb-1.zarr
+ROI1,aaafpofm-1,results/ROI1/create_follicle_sdata/output/aaafpofm-1.zarr
+ROI1,aaaijgjh-1,results/ROI1/create_follicle_sdata/output/aaaijgjh-1.zarr
+ROI1,aaajhlki-1,results/ROI1/create_follicle_sdata/output/aaajhlki-1.zarr
+ROI1,aaajnemh-1,results/ROI1/create_follicle_sdata/output/aaajnemh-1.zarr
+ROI1,aaakgcjc-1,results/ROI1/create_follicle_sdata/output/aaakgcjc-1.zarr
+ROI1,aaalhaaa-1,results/ROI1/create_follicle_sdata/output/aaalhaaa-1.zarr
+ROI1,aaameida-1,results/ROI1/create_follicle_sdata/output/aaameida-1.zarr
+ROI1,aaamelpo-1,results/ROI1/create_follicle_sdata/output/aaamelpo-1.zarr
+ROI1,aaanbjmd-1,results/ROI1/create_follicle_sdata/output/aaanbjmd-1.zarr
+ROI1,aaanhakn-1,results/ROI1/create_follicle_sdata/output/aaanhakn-1.zarr
+ROI1,aaanhmdg-1,results/ROI1/create_follicle_sdata/output/aaanhmdg-1.zarr
+ROI1,aaanihjo-1,results/ROI1/create_follicle_sdata/output/aaanihjo-1.zarr
+ROI1,aaaobcfe-1,results/ROI1/create_follicle_sdata/output/aaaobcfe-1.zarr
+ROI1,aaapdang-1,results/ROI1/create_follicle_sdata/output/aaapdang-1.zarr
+ROI1,aaaphndo-1,results/ROI1/create_follicle_sdata/output/aaaphndo-1.zarr
+ROI1,aababmcd-1,results/ROI1/create_follicle_sdata/output/aababmcd-1.zarr
+ROI1,aabaebbj-1,results/ROI1/create_follicle_sdata/output/aabaebbj-1.zarr
+ROI1,aabakjnc-1,results/ROI1/create_follicle_sdata/output/aabakjnc-1.zarr
+ROI1,aabbcjjm-1,results/ROI1/create_follicle_sdata/output/aabbcjjm-1.zarr
+ROI1,aabbhpdh-1,results/ROI1/create_follicle_sdata/output/aabbhpdh-1.zarr
+ROI1,aabcfgel-1,results/ROI1/create_follicle_sdata/output/aabcfgel-1.zarr
+ROI1,aabdefka-1,results/ROI1/create_follicle_sdata/output/aabdefka-1.zarr
+ROI1,aabdmgko-1,results/ROI1/create_follicle_sdata/output/aabdmgko-1.zarr
+ROI1,aabdnkmi-1,results/ROI1/create_follicle_sdata/output/aabdnkmi-1.zarr
+ROI1,aabdocbo-1,results/ROI1/create_follicle_sdata/output/aabdocbo-1.zarr
+ROI1,aabdphmd-1,results/ROI1/create_follicle_sdata/output/aabdphmd-1.zarr
+ROI1,aabfioge-1,results/ROI1/create_follicle_sdata/output/aabfioge-1.zarr
+ROI1,aabfjijn-1,results/ROI1/create_follicle_sdata/output/aabfjijn-1.zarr
+ROI1,aabfnnmf-1,results/ROI1/create_follicle_sdata/output/aabfnnmf-1.zarr
+ROI1,aabgcmdg-1,results/ROI1/create_follicle_sdata/output/aabgcmdg-1.zarr
+ROI1,aabgimlf-1,results/ROI1/create_follicle_sdata/output/aabgimlf-1.zarr
+ROI1,aabgnnjn-1,results/ROI1/create_follicle_sdata/output/aabgnnjn-1.zarr
+ROI1,aabhamhb-1,results/ROI1/create_follicle_sdata/output/aabhamhb-1.zarr
+ROI1,aabhbidk-1,results/ROI1/create_follicle_sdata/output/aabhbidk-1.zarr
+ROI1,aabhdbci-1,results/ROI1/create_follicle_sdata/output/aabhdbci-1.zarr
+ROI1,aabhfgfp-1,results/ROI1/create_follicle_sdata/output/aabhfgfp-1.zarr
+ROI1,aabhpgid-1,results/ROI1/create_follicle_sdata/output/aabhpgid-1.zarr
+ROI1,aabialgo-1,results/ROI1/create_follicle_sdata/output/aabialgo-1.zarr
+ROI1,aabicijk-1,results/ROI1/create_follicle_sdata/output/aabicijk-1.zarr
+ROI1,aabiikod-1,results/ROI1/create_follicle_sdata/output/aabiikod-1.zarr
+ROI1,aabijbjj-1,results/ROI1/create_follicle_sdata/output/aabijbjj-1.zarr
+ROI1,aabjknje-1,results/ROI1/create_follicle_sdata/output/aabjknje-1.zarr
+ROI1,aabjloam-1,results/ROI1/create_follicle_sdata/output/aabjloam-1.zarr
+ROI1,aabjmjcb-1,results/ROI1/create_follicle_sdata/output/aabjmjcb-1.zarr
+ROI1,aabjmmfg-1,results/ROI1/create_follicle_sdata/output/aabjmmfg-1.zarr
+ROI1,aabjnjpf-1,results/ROI1/create_follicle_sdata/output/aabjnjpf-1.zarr
+ROI1,aabjolfh-1,results/ROI1/create_follicle_sdata/output/aabjolfh-1.zarr
+ROI1,aabkdjij-1,results/ROI1/create_follicle_sdata/output/aabkdjij-1.zarr
+ROI1,aabkefho-1,results/ROI1/create_follicle_sdata/output/aabkefho-1.zarr
+ROI1,aablalhf-1,results/ROI1/create_follicle_sdata/output/aablalhf-1.zarr
+ROI1,aablcloe-1,results/ROI1/create_follicle_sdata/output/aablcloe-1.zarr
+ROI1,aabldddb-1,results/ROI1/create_follicle_sdata/output/aabldddb-1.zarr
+ROI1,aablfpfn-1,results/ROI1/create_follicle_sdata/output/aablfpfn-1.zarr
+ROI1,aablidlg-1,results/ROI1/create_follicle_sdata/output/aablidlg-1.zarr
+ROI1,aabljphh-1,results/ROI1/create_follicle_sdata/output/aabljphh-1.zarr
+ROI1,aablmlmn-1,results/ROI1/create_follicle_sdata/output/aablmlmn-1.zarr
+ROI1,aabmbnen-1,results/ROI1/create_follicle_sdata/output/aabmbnen-1.zarr
+ROI1,aabmjgfk-1,results/ROI1/create_follicle_sdata/output/aabmjgfk-1.zarr
+ROI1,aabmocgc-1,results/ROI1/create_follicle_sdata/output/aabmocgc-1.zarr
+ROI1,aabmopkh-1,results/ROI1/create_follicle_sdata/output/aabmopkh-1.zarr
+ROI1,aabncnje-1,results/ROI1/create_follicle_sdata/output/aabncnje-1.zarr
+ROI1,aabnefgj-1,results/ROI1/create_follicle_sdata/output/aabnefgj-1.zarr
+ROI1,aabnlcni-1,results/ROI1/create_follicle_sdata/output/aabnlcni-1.zarr
+ROI1,aabnnjkl-1,results/ROI1/create_follicle_sdata/output/aabnnjkl-1.zarr
+ROI1,aaboancn-1,results/ROI1/create_follicle_sdata/output/aaboancn-1.zarr
+ROI1,aabocefp-1,results/ROI1/create_follicle_sdata/output/aabocefp-1.zarr
+ROI1,aabodlnh-1,results/ROI1/create_follicle_sdata/output/aabodlnh-1.zarr
+ROI1,aaboechg-1,results/ROI1/create_follicle_sdata/output/aaboechg-1.zarr
+ROI1,aabojccd-1,results/ROI1/create_follicle_sdata/output/aabojccd-1.zarr
+ROI1,aabojnlg-1,results/ROI1/create_follicle_sdata/output/aabojnlg-1.zarr
+ROI1,aaboljda-1,results/ROI1/create_follicle_sdata/output/aaboljda-1.zarr
+ROI1,aabonbjp-1,results/ROI1/create_follicle_sdata/output/aabonbjp-1.zarr
+ROI1,aabooafo-1,results/ROI1/create_follicle_sdata/output/aabooafo-1.zarr
+ROI1,aabooemh-1,results/ROI1/create_follicle_sdata/output/aabooemh-1.zarr
+ROI1,aabpbmel-1,results/ROI1/create_follicle_sdata/output/aabpbmel-1.zarr
+ROI1,aabpdddg-1,results/ROI1/create_follicle_sdata/output/aabpdddg-1.zarr
+ROI1,aabpdmcl-1,results/ROI1/create_follicle_sdata/output/aabpdmcl-1.zarr
+ROI1,aabpfcik-1,results/ROI1/create_follicle_sdata/output/aabpfcik-1.zarr
+ROI1,aabpigli-1,results/ROI1/create_follicle_sdata/output/aabpigli-1.zarr
+ROI1,aabpjhmk-1,results/ROI1/create_follicle_sdata/output/aabpjhmk-1.zarr
+ROI1,aabplfgh-1,results/ROI1/create_follicle_sdata/output/aabplfgh-1.zarr
+ROI1,aabpnkii-1,results/ROI1/create_follicle_sdata/output/aabpnkii-1.zarr
+ROI1,aepceacn-1,results/ROI1/create_follicle_sdata/output/aepceacn-1.zarr
+ROI1,afcggpnj-1,results/ROI1/create_follicle_sdata/output/afcggpnj-1.zarr
+ROI1,afhakmdc-1,results/ROI1/create_follicle_sdata/output/afhakmdc-1.zarr
+ROI1,afhhcjop-1,results/ROI1/create_follicle_sdata/output/afhhcjop-1.zarr
+ROI1,afijbjpb-1,results/ROI1/create_follicle_sdata/output/afijbjpb-1.zarr
+ROI1,afpehldn-1,results/ROI1/create_follicle_sdata/output/afpehldn-1.zarr
+ROI1,ahnhimln-1,results/ROI1/create_follicle_sdata/output/ahnhimln-1.zarr
+ROI1,aifkfgaf-1,results/ROI1/create_follicle_sdata/output/aifkfgaf-1.zarr
+ROI1,aphkmplb-1,results/ROI1/create_follicle_sdata/output/aphkmplb-1.zarr
+ROI1,bfhmjckb-1,results/ROI1/create_follicle_sdata/output/bfhmjckb-1.zarr
+ROI1,bijmdool-1,results/ROI1/create_follicle_sdata/output/bijmdool-1.zarr
+ROI1,ccdehkmh-1,results/ROI1/create_follicle_sdata/output/ccdehkmh-1.zarr
+ROI1,cfabnpic-1,results/ROI1/create_follicle_sdata/output/cfabnpic-1.zarr
+ROI1,chgjkbjn-1,results/ROI1/create_follicle_sdata/output/chgjkbjn-1.zarr
+ROI1,chgnkefb-1,results/ROI1/create_follicle_sdata/output/chgnkefb-1.zarr
+ROI1,chkocgid-1,results/ROI1/create_follicle_sdata/output/chkocgid-1.zarr
+ROI1,dofiecgb-1,results/ROI1/create_follicle_sdata/output/dofiecgb-1.zarr
+ROI1,fgapocgh-1,results/ROI1/create_follicle_sdata/output/fgapocgh-1.zarr
+ROI1,fnbdgfbd-1,results/ROI1/create_follicle_sdata/output/fnbdgfbd-1.zarr
+ROI1,fnhbibdg-1,results/ROI1/create_follicle_sdata/output/fnhbibdg-1.zarr
+ROI1,gbcoplin-1,results/ROI1/create_follicle_sdata/output/gbcoplin-1.zarr
+ROI1,geaimfea-1,results/ROI1/create_follicle_sdata/output/geaimfea-1.zarr
+ROI1,kmeoinci-1,results/ROI1/create_follicle_sdata/output/kmeoinci-1.zarr
+ROI1,monlmgcc-1,results/ROI1/create_follicle_sdata/output/monlmgcc-1.zarr
+ROI1,nflabcno-1,results/ROI1/create_follicle_sdata/output/nflabcno-1.zarr
+ROI1,ngpolkkd-1,results/ROI1/create_follicle_sdata/output/ngpolkkd-1.zarr
+ROI1,oebenbgk-1,results/ROI1/create_follicle_sdata/output/oebenbgk-1.zarr
+ROI1,ohbegbge-1,results/ROI1/create_follicle_sdata/output/ohbegbge-1.zarr
+ROI2,aaaacpld-1,results/ROI2/create_follicle_sdata/output/aaaacpld-1.zarr
+ROI2,aaaadmip-1,results/ROI2/create_follicle_sdata/output/aaaadmip-1.zarr
+ROI2,aaaaemgi-1,results/ROI2/create_follicle_sdata/output/aaaaemgi-1.zarr
+ROI2,aaaaeokl-1,results/ROI2/create_follicle_sdata/output/aaaaeokl-1.zarr
+ROI2,aaaaepgf-1,results/ROI2/create_follicle_sdata/output/aaaaepgf-1.zarr
+ROI2,aaaafplh-1,results/ROI2/create_follicle_sdata/output/aaaafplh-1.zarr
+ROI2,aaaaiilm-1,results/ROI2/create_follicle_sdata/output/aaaaiilm-1.zarr
+ROI2,aaaajbge-1,results/ROI2/create_follicle_sdata/output/aaaajbge-1.zarr
+ROI2,aaabclgn-1,results/ROI2/create_follicle_sdata/output/aaabclgn-1.zarr
+ROI2,aaabnnen-1,results/ROI2/create_follicle_sdata/output/aaabnnen-1.zarr
+ROI2,aaacbpck-1,results/ROI2/create_follicle_sdata/output/aaacbpck-1.zarr
+ROI2,aaacilnf-1,results/ROI2/create_follicle_sdata/output/aaacilnf-1.zarr
+ROI2,aaackene-1,results/ROI2/create_follicle_sdata/output/aaackene-1.zarr
+ROI2,aaaclgnj-1,results/ROI2/create_follicle_sdata/output/aaaclgnj-1.zarr
+ROI2,aaacmbkh-1,results/ROI2/create_follicle_sdata/output/aaacmbkh-1.zarr
+ROI2,aaadbcin-1,results/ROI2/create_follicle_sdata/output/aaadbcin-1.zarr
+ROI2,aaadbdjj-1,results/ROI2/create_follicle_sdata/output/aaadbdjj-1.zarr
+ROI2,aaadniip-1,results/ROI2/create_follicle_sdata/output/aaadniip-1.zarr
+ROI2,aaadojhj-1,results/ROI2/create_follicle_sdata/output/aaadojhj-1.zarr
+ROI2,aaaeakjp-1,results/ROI2/create_follicle_sdata/output/aaaeakjp-1.zarr
+ROI2,aaaeanlh-1,results/ROI2/create_follicle_sdata/output/aaaeanlh-1.zarr
+ROI2,aaaecdhf-1,results/ROI2/create_follicle_sdata/output/aaaecdhf-1.zarr
+ROI2,aaaedbdc-1,results/ROI2/create_follicle_sdata/output/aaaedbdc-1.zarr
+ROI2,aaaejdbm-1,results/ROI2/create_follicle_sdata/output/aaaejdbm-1.zarr
+ROI2,aaaelpha-1,results/ROI2/create_follicle_sdata/output/aaaelpha-1.zarr
+ROI2,aaaeofbj-1,results/ROI2/create_follicle_sdata/output/aaaeofbj-1.zarr
+ROI2,aaaeohbc-1,results/ROI2/create_follicle_sdata/output/aaaeohbc-1.zarr
+ROI2,aaaeomno-1,results/ROI2/create_follicle_sdata/output/aaaeomno-1.zarr
+ROI2,aaaepekf-1,results/ROI2/create_follicle_sdata/output/aaaepekf-1.zarr
+ROI2,aaafafmm-1,results/ROI2/create_follicle_sdata/output/aaafafmm-1.zarr
+ROI2,aaafcfde-1,results/ROI2/create_follicle_sdata/output/aaafcfde-1.zarr
+ROI2,aaafchbg-1,results/ROI2/create_follicle_sdata/output/aaafchbg-1.zarr
+ROI2,aaafdpho-1,results/ROI2/create_follicle_sdata/output/aaafdpho-1.zarr
+ROI2,aaafgdfl-1,results/ROI2/create_follicle_sdata/output/aaafgdfl-1.zarr
+ROI2,aaafgpnd-1,results/ROI2/create_follicle_sdata/output/aaafgpnd-1.zarr
+ROI2,aaafibed-1,results/ROI2/create_follicle_sdata/output/aaafibed-1.zarr
+ROI2,aaagadij-1,results/ROI2/create_follicle_sdata/output/aaagadij-1.zarr
+ROI2,aaaghgpd-1,results/ROI2/create_follicle_sdata/output/aaaghgpd-1.zarr
+ROI2,aaagiijl-1,results/ROI2/create_follicle_sdata/output/aaagiijl-1.zarr
+ROI2,aaaglhbn-1,results/ROI2/create_follicle_sdata/output/aaaglhbn-1.zarr
+ROI2,aaagonap-1,results/ROI2/create_follicle_sdata/output/aaagonap-1.zarr
+ROI2,aaagpjme-1,results/ROI2/create_follicle_sdata/output/aaagpjme-1.zarr
+ROI2,aaahaajn-1,results/ROI2/create_follicle_sdata/output/aaahaajn-1.zarr
+ROI2,aaahhdad-1,results/ROI2/create_follicle_sdata/output/aaahhdad-1.zarr
+ROI2,aaahladg-1,results/ROI2/create_follicle_sdata/output/aaahladg-1.zarr
+ROI2,aaahnjik-1,results/ROI2/create_follicle_sdata/output/aaahnjik-1.zarr
+ROI2,aaahopii-1,results/ROI2/create_follicle_sdata/output/aaahopii-1.zarr
+ROI2,aaaiabhg-1,results/ROI2/create_follicle_sdata/output/aaaiabhg-1.zarr
+ROI2,aaaibcbm-1,results/ROI2/create_follicle_sdata/output/aaaibcbm-1.zarr
+ROI2,aaaicfbc-1,results/ROI2/create_follicle_sdata/output/aaaicfbc-1.zarr
+ROI2,aaaienfj-1,results/ROI2/create_follicle_sdata/output/aaaienfj-1.zarr
+ROI2,aaaifkdc-1,results/ROI2/create_follicle_sdata/output/aaaifkdc-1.zarr
+ROI2,aabfbclp-1,results/ROI2/create_follicle_sdata/output/aabfbclp-1.zarr
+ROI2,aagnnenb-1,results/ROI2/create_follicle_sdata/output/aagnnenb-1.zarr
+ROI2,aahnbbee-1,results/ROI2/create_follicle_sdata/output/aahnbbee-1.zarr
+ROI2,abdiboad-1,results/ROI2/create_follicle_sdata/output/abdiboad-1.zarr
+ROI2,abnifnce-1,results/ROI2/create_follicle_sdata/output/abnifnce-1.zarr
+ROI2,acedlonn-1,results/ROI2/create_follicle_sdata/output/acedlonn-1.zarr
+ROI2,acfchlmo-1,results/ROI2/create_follicle_sdata/output/acfchlmo-1.zarr
+ROI2,aciggedl-1,results/ROI2/create_follicle_sdata/output/aciggedl-1.zarr
+ROI2,aknplbpf-1,results/ROI2/create_follicle_sdata/output/aknplbpf-1.zarr
+ROI2,iaojoafp-1,results/ROI2/create_follicle_sdata/output/iaojoafp-1.zarr
+ROI2,ogeljedc-1,results/ROI2/create_follicle_sdata/output/ogeljedc-1.zarr
+ROI3,aaaagmki-1,results/ROI3/create_follicle_sdata/output/aaaagmki-1.zarr
+ROI3,aaaamabg-1,results/ROI3/create_follicle_sdata/output/aaaamabg-1.zarr
+ROI3,aaabgmdj-1,results/ROI3/create_follicle_sdata/output/aaabgmdj-1.zarr
+ROI3,aaabmbmd-1,results/ROI3/create_follicle_sdata/output/aaabmbmd-1.zarr
+ROI3,aaadcgjp-1,results/ROI3/create_follicle_sdata/output/aaadcgjp-1.zarr
+ROI3,abfgjojp-1,results/ROI3/create_follicle_sdata/output/abfgjojp-1.zarr
+ROI3,abfgnkab-1,results/ROI3/create_follicle_sdata/output/abfgnkab-1.zarr
+ROI3,abfnlgje-1,results/ROI3/create_follicle_sdata/output/abfnlgje-1.zarr
+ROI3,fgjocgmf-1,results/ROI3/create_follicle_sdata/output/fgjocgmf-1.zarr
+ROI3,fgkakdfp-1,results/ROI3/create_follicle_sdata/output/fgkakdfp-1.zarr
+ROI3,giaaoock-1,results/ROI3/create_follicle_sdata/output/giaaoock-1.zarr
+ROI3,giadggha-1,results/ROI3/create_follicle_sdata/output/giadggha-1.zarr
+ROI3,giahbjko-1,results/ROI3/create_follicle_sdata/output/giahbjko-1.zarr
+ROI3,gigjbkog-1,results/ROI3/create_follicle_sdata/output/gigjbkog-1.zarr
+ROI3,gigjpcle-1,results/ROI3/create_follicle_sdata/output/gigjpcle-1.zarr
+ROI3,gigkdcda-1,results/ROI3/create_follicle_sdata/output/gigkdcda-1.zarr
+ROI3,giobliba-1,results/ROI3/create_follicle_sdata/output/giobliba-1.zarr
+ROI3,gjapaoof-1,results/ROI3/create_follicle_sdata/output/gjapaoof-1.zarr
+ROI3,gjbalicb-1,results/ROI3/create_follicle_sdata/output/gjbalicb-1.zarr
+ROI3,gjfgolhp-1,results/ROI3/create_follicle_sdata/output/gjfgolhp-1.zarr
+ROI3,gjfibllp-1,results/ROI3/create_follicle_sdata/output/gjfibllp-1.zarr
+ROI3,gjflibkc-1,results/ROI3/create_follicle_sdata/output/gjflibkc-1.zarr
+ROI3,gmhlbkhi-1,results/ROI3/create_follicle_sdata/output/gmhlbkhi-1.zarr
+ROI3,hbpnjbep-1,results/ROI3/create_follicle_sdata/output/hbpnjbep-1.zarr
+ROI3,hbpommgm-1,results/ROI3/create_follicle_sdata/output/hbpommgm-1.zarr
+ROI3,hcalofed-1,results/ROI3/create_follicle_sdata/output/hcalofed-1.zarr
+ROI3,hcbjammm-1,results/ROI3/create_follicle_sdata/output/hcbjammm-1.zarr
+ROI3,hccbanpd-1,results/ROI3/create_follicle_sdata/output/hccbanpd-1.zarr
+ROI3,hccbhfdf-1,results/ROI3/create_follicle_sdata/output/hccbhfdf-1.zarr
+ROI3,lppfojfn-1,results/ROI3/create_follicle_sdata/output/lppfojfn-1.zarr
+ROI3,maapfhbc-1,results/ROI3/create_follicle_sdata/output/maapfhbc-1.zarr
+ROI3,maoajmhj-1,results/ROI3/create_follicle_sdata/output/maoajmhj-1.zarr
+ROI3,mbkemeeh-1,results/ROI3/create_follicle_sdata/output/mbkemeeh-1.zarr
+ROI3,mbkfeojk-1,results/ROI3/create_follicle_sdata/output/mbkfeojk-1.zarr
+ROI3,mnaflohh-1,results/ROI3/create_follicle_sdata/output/mnaflohh-1.zarr
+ROI4,aaaaemgi-1,results/ROI4/create_follicle_sdata/output/aaaaemgi-1.zarr
+ROI4,aaaaeokl-1,results/ROI4/create_follicle_sdata/output/aaaaeokl-1.zarr
+ROI4,aaaaepgf-1,results/ROI4/create_follicle_sdata/output/aaaaepgf-1.zarr
+ROI4,aaaagdim-1,results/ROI4/create_follicle_sdata/output/aaaagdim-1.zarr
+ROI4,aaaagilm-1,results/ROI4/create_follicle_sdata/output/aaaagilm-1.zarr
+ROI4,aaaaiail-1,results/ROI4/create_follicle_sdata/output/aaaaiail-1.zarr
+ROI4,aaaajofk-1,results/ROI4/create_follicle_sdata/output/aaaajofk-1.zarr
+ROI4,aaaaocbk-1,results/ROI4/create_follicle_sdata/output/aaaaocbk-1.zarr
+ROI4,aaaaoeba-1,results/ROI4/create_follicle_sdata/output/aaaaoeba-1.zarr
+ROI4,aaabaadk-1,results/ROI4/create_follicle_sdata/output/aaabaadk-1.zarr
+ROI4,aaaekmgf-1,results/ROI4/create_follicle_sdata/output/aaaekmgf-1.zarr
+ROI4,aaahbjbc-1,results/ROI4/create_follicle_sdata/output/aaahbjbc-1.zarr
+ROI4,aaahhagi-1,results/ROI4/create_follicle_sdata/output/aaahhagi-1.zarr
+ROI4,aaakelge-1,results/ROI4/create_follicle_sdata/output/aaakelge-1.zarr
+ROI4,aaaldphk-1,results/ROI4/create_follicle_sdata/output/aaaldphk-1.zarr
+ROI4,aabbemka-1,results/ROI4/create_follicle_sdata/output/aabbemka-1.zarr
+ROI4,aaefnilo-1,results/ROI4/create_follicle_sdata/output/aaefnilo-1.zarr
+ROI4,aafeehcm-1,results/ROI4/create_follicle_sdata/output/aafeehcm-1.zarr
+ROI4,aafigkfh-1,results/ROI4/create_follicle_sdata/output/aafigkfh-1.zarr
+ROI4,aaggoplc-1,results/ROI4/create_follicle_sdata/output/aaggoplc-1.zarr
+ROI4,aagjfagh-1,results/ROI4/create_follicle_sdata/output/aagjfagh-1.zarr
+ROI4,aajliibo-1,results/ROI4/create_follicle_sdata/output/aajliibo-1.zarr
+ROI4,abaeodmh-1,results/ROI4/create_follicle_sdata/output/abaeodmh-1.zarr
+ROI4,abijfgeo-1,results/ROI4/create_follicle_sdata/output/abijfgeo-1.zarr
+ROI4,acphohhh-1,results/ROI4/create_follicle_sdata/output/acphohhh-1.zarr
+ROI4,aghmjlmg-1,results/ROI4/create_follicle_sdata/output/aghmjlmg-1.zarr
+ROI4,ahigfgfj-1,results/ROI4/create_follicle_sdata/output/ahigfgfj-1.zarr
+ROI4,bocakfcm-1,results/ROI4/create_follicle_sdata/output/bocakfcm-1.zarr
+ROI4,cadegdnj-1,results/ROI4/create_follicle_sdata/output/cadegdnj-1.zarr
+ROI4,cailggdo-1,results/ROI4/create_follicle_sdata/output/cailggdo-1.zarr
+ROI4,chfogfgk-1,results/ROI4/create_follicle_sdata/output/chfogfgk-1.zarr
+ROI4,chgehhmh-1,results/ROI4/create_follicle_sdata/output/chgehhmh-1.zarr
+ROI4,chjcholb-1,results/ROI4/create_follicle_sdata/output/chjcholb-1.zarr
+ROI4,ckicheod-1,results/ROI4/create_follicle_sdata/output/ckicheod-1.zarr
+ROI4,cmnegjli-1,results/ROI4/create_follicle_sdata/output/cmnegjli-1.zarr
+ROI4,cokeodgb-1,results/ROI4/create_follicle_sdata/output/cokeodgb-1.zarr
+ROI4,diojcnmb-1,results/ROI4/create_follicle_sdata/output/diojcnmb-1.zarr
+ROI4,dipoiblm-1,results/ROI4/create_follicle_sdata/output/dipoiblm-1.zarr
+ROI4,djgoahen-1,results/ROI4/create_follicle_sdata/output/djgoahen-1.zarr
+ROI4,djhdcgmb-1,results/ROI4/create_follicle_sdata/output/djhdcgmb-1.zarr
+ROI4,djncdjkp-1,results/ROI4/create_follicle_sdata/output/djncdjkp-1.zarr
+ROI4,djpbapag-1,results/ROI4/create_follicle_sdata/output/djpbapag-1.zarr
+ROI4,dlnjdmao-1,results/ROI4/create_follicle_sdata/output/dlnjdmao-1.zarr
+ROI4,dmejbcfl-1,results/ROI4/create_follicle_sdata/output/dmejbcfl-1.zarr
+ROI4,fnlakkeh-1,results/ROI4/create_follicle_sdata/output/fnlakkeh-1.zarr
+ROI4,gllpbfbh-1,results/ROI4/create_follicle_sdata/output/gllpbfbh-1.zarr
+ROI4,hanmfffh-1,results/ROI4/create_follicle_sdata/output/hanmfffh-1.zarr
+ROI4,hbndmafc-1,results/ROI4/create_follicle_sdata/output/hbndmafc-1.zarr
+ROI4,hlljhmel-1,results/ROI4/create_follicle_sdata/output/hlljhmel-1.zarr
+ROI4,joihaddo-1,results/ROI4/create_follicle_sdata/output/joihaddo-1.zarr
+ROI4,jonhmemo-1,results/ROI4/create_follicle_sdata/output/jonhmemo-1.zarr
+ROI4,jonhnamg-1,results/ROI4/create_follicle_sdata/output/jonhnamg-1.zarr
+ROI4,jonifgek-1,results/ROI4/create_follicle_sdata/output/jonifgek-1.zarr
+ROI4,kkhhcoda-1,results/ROI4/create_follicle_sdata/output/kkhhcoda-1.zarr
+ROI4,lelcoaom-1,results/ROI4/create_follicle_sdata/output/lelcoaom-1.zarr
+ROI4,lfldclpp-1,results/ROI4/create_follicle_sdata/output/lfldclpp-1.zarr
+ROI4,lihghiak-1,results/ROI4/create_follicle_sdata/output/lihghiak-1.zarr
+ROI4,lihgndbi-1,results/ROI4/create_follicle_sdata/output/lihgndbi-1.zarr
+ROI4,lkahkaec-1,results/ROI4/create_follicle_sdata/output/lkahkaec-1.zarr
+ROI4,lpgjbcni-1,results/ROI4/create_follicle_sdata/output/lpgjbcni-1.zarr
+ROI4,mbbjcecm-1,results/ROI4/create_follicle_sdata/output/mbbjcecm-1.zarr
+ROI4,meojhapn-1,results/ROI4/create_follicle_sdata/output/meojhapn-1.zarr
+ROI4,mpfgdnkp-1,results/ROI4/create_follicle_sdata/output/mpfgdnkp-1.zarr
+ROI4,naaogmpa-1,results/ROI4/create_follicle_sdata/output/naaogmpa-1.zarr
+ROI4,nadlnnif-1,results/ROI4/create_follicle_sdata/output/nadlnnif-1.zarr
+ROI4,nadnibme-1,results/ROI4/create_follicle_sdata/output/nadnibme-1.zarr
+ROI4,nagdabfd-1,results/ROI4/create_follicle_sdata/output/nagdabfd-1.zarr
+ROI4,nagenohk-1,results/ROI4/create_follicle_sdata/output/nagenohk-1.zarr
+ROI4,najhobff-1,results/ROI4/create_follicle_sdata/output/najhobff-1.zarr
+ROI4,nakmkblj-1,results/ROI4/create_follicle_sdata/output/nakmkblj-1.zarr
+ROI4,naknnajk-1,results/ROI4/create_follicle_sdata/output/naknnajk-1.zarr
+ROI4,ncngmfha-1,results/ROI4/create_follicle_sdata/output/ncngmfha-1.zarr
+ROI5,aaaagckl-1,results/ROI5/create_follicle_sdata/output/aaaagckl-1.zarr
+ROI5,aaaaplbh-1,results/ROI5/create_follicle_sdata/output/aaaaplbh-1.zarr
+ROI5,aaabgcdk-1,results/ROI5/create_follicle_sdata/output/aaabgcdk-1.zarr
+ROI5,aaabhgnn-1,results/ROI5/create_follicle_sdata/output/aaabhgnn-1.zarr
+ROI5,aaadbkgb-1,results/ROI5/create_follicle_sdata/output/aaadbkgb-1.zarr
+ROI5,aaadmekh-1,results/ROI5/create_follicle_sdata/output/aaadmekh-1.zarr
+ROI5,aaadmknn-1,results/ROI5/create_follicle_sdata/output/aaadmknn-1.zarr
+ROI5,aaaeboib-1,results/ROI5/create_follicle_sdata/output/aaaeboib-1.zarr
+ROI5,aaaeclee-1,results/ROI5/create_follicle_sdata/output/aaaeclee-1.zarr
+ROI5,aaaeflmd-1,results/ROI5/create_follicle_sdata/output/aaaeflmd-1.zarr
+ROI5,aaaegblk-1,results/ROI5/create_follicle_sdata/output/aaaegblk-1.zarr
+ROI5,abodalld-1,results/ROI5/create_follicle_sdata/output/abodalld-1.zarr
+ROI5,abojcnlc-1,results/ROI5/create_follicle_sdata/output/abojcnlc-1.zarr
+ROI5,abojecfb-1,results/ROI5/create_follicle_sdata/output/abojecfb-1.zarr
+ROI5,abojmgpi-1,results/ROI5/create_follicle_sdata/output/abojmgpi-1.zarr
+ROI5,abojompb-1,results/ROI5/create_follicle_sdata/output/abojompb-1.zarr
+ROI5,abokekgk-1,results/ROI5/create_follicle_sdata/output/abokekgk-1.zarr
+ROI5,abomfghg-1,results/ROI5/create_follicle_sdata/output/abomfghg-1.zarr
+ROI5,abomofgc-1,results/ROI5/create_follicle_sdata/output/abomofgc-1.zarr
+ROI5,abopbopk-1,results/ROI5/create_follicle_sdata/output/abopbopk-1.zarr
+ROI5,abopmbld-1,results/ROI5/create_follicle_sdata/output/abopmbld-1.zarr
+ROI5,abpafmfn-1,results/ROI5/create_follicle_sdata/output/abpafmfn-1.zarr
+ROI5,abpahmad-1,results/ROI5/create_follicle_sdata/output/abpahmad-1.zarr
+ROI5,acanemle-1,results/ROI5/create_follicle_sdata/output/acanemle-1.zarr
+ROI5,acankgdb-1,results/ROI5/create_follicle_sdata/output/acankgdb-1.zarr
+ROI5,acaoknja-1,results/ROI5/create_follicle_sdata/output/acaoknja-1.zarr
+ROI5,acapdnfl-1,results/ROI5/create_follicle_sdata/output/acapdnfl-1.zarr
+ROI5,acbadjoc-1,results/ROI5/create_follicle_sdata/output/acbadjoc-1.zarr
+ROI5,acbakkeh-1,results/ROI5/create_follicle_sdata/output/acbakkeh-1.zarr
+ROI5,acbbikcg-1,results/ROI5/create_follicle_sdata/output/acbbikcg-1.zarr
+ROI5,acbcbjig-1,results/ROI5/create_follicle_sdata/output/acbcbjig-1.zarr
+ROI5,acbcfndg-1,results/ROI5/create_follicle_sdata/output/acbcfndg-1.zarr
+ROI5,acbdmchn-1,results/ROI5/create_follicle_sdata/output/acbdmchn-1.zarr
+ROI5,acbjmoop-1,results/ROI5/create_follicle_sdata/output/acbjmoop-1.zarr
+ROI5,acbkhgkg-1,results/ROI5/create_follicle_sdata/output/acbkhgkg-1.zarr
+ROI5,acbknpml-1,results/ROI5/create_follicle_sdata/output/acbknpml-1.zarr
+ROI5,achehlni-1,results/ROI5/create_follicle_sdata/output/achehlni-1.zarr
+ROI5,akdofjhl-1,results/ROI5/create_follicle_sdata/output/akdofjhl-1.zarr
+ROI5,akekljmf-1,results/ROI5/create_follicle_sdata/output/akekljmf-1.zarr
+ROI5,akemgick-1,results/ROI5/create_follicle_sdata/output/akemgick-1.zarr
+ROI5,alidnaeh-1,results/ROI5/create_follicle_sdata/output/alidnaeh-1.zarr
+ROI5,alifmcdc-1,results/ROI5/create_follicle_sdata/output/alifmcdc-1.zarr
+ROI5,aligcloo-1,results/ROI5/create_follicle_sdata/output/aligcloo-1.zarr
+ROI5,aliggail-1,results/ROI5/create_follicle_sdata/output/aliggail-1.zarr
+ROI5,alij-1,results/ROI5/create_follicle_sdata/output/alij-1.zarr
+ROI5,alimemoe-1,results/ROI5/create_follicle_sdata/output/alimemoe-1.zarr
+ROI5,amcdnhca-1,results/ROI5/create_follicle_sdata/output/amcdnhca-1.zarr
+ROI5,amcjllji-1,results/ROI5/create_follicle_sdata/output/amcjllji-1.zarr
+ROI5,amecigea-1,results/ROI5/create_follicle_sdata/output/amecigea-1.zarr
+ROI5,amecmlle-1,results/ROI5/create_follicle_sdata/output/amecmlle-1.zarr
+ROI5,amedbebk-1,results/ROI5/create_follicle_sdata/output/amedbebk-1.zarr
+ROI5,amfipkjj-1,results/ROI5/create_follicle_sdata/output/amfipkjj-1.zarr
+ROI5,amfmpdfh-1,results/ROI5/create_follicle_sdata/output/amfmpdfh-1.zarr
+ROI5,ancbepdo-1,results/ROI5/create_follicle_sdata/output/ancbepdo-1.zarr
+ROI5,apkkchon-1,results/ROI5/create_follicle_sdata/output/apkkchon-1.zarr
+ROI5,apkkgmnm-1,results/ROI5/create_follicle_sdata/output/apkkgmnm-1.zarr
+ROI5,apkkkijk-1,results/ROI5/create_follicle_sdata/output/apkkkijk-1.zarr
+ROI5,aplbfbno-1,results/ROI5/create_follicle_sdata/output/aplbfbno-1.zarr
+ROI5,bnlbdomj-1,results/ROI5/create_follicle_sdata/output/bnlbdomj-1.zarr
+ROI5,bnlejboa-1,results/ROI5/create_follicle_sdata/output/bnlejboa-1.zarr
+ROI5,bnmlceke-1,results/ROI5/create_follicle_sdata/output/bnmlceke-1.zarr
+ROI5,bnmlgkhp-1,results/ROI5/create_follicle_sdata/output/bnmlgkhp-1.zarr
+ROI5,bnmligkb-1,results/ROI5/create_follicle_sdata/output/bnmligkb-1.zarr
+ROI5,bnmmelcp-1,results/ROI5/create_follicle_sdata/output/bnmmelcp-1.zarr
+ROI5,bnmncflg-1,results/ROI5/create_follicle_sdata/output/bnmncflg-1.zarr
+ROI5,bnmogakc-1,results/ROI5/create_follicle_sdata/output/bnmogakc-1.zarr
+ROI5,bnohpddb-1,results/ROI5/create_follicle_sdata/output/bnohpddb-1.zarr
+ROI5,bnoikidn-1,results/ROI5/create_follicle_sdata/output/bnoikidn-1.zarr
+ROI5,bnpbfkej-1,results/ROI5/create_follicle_sdata/output/bnpbfkej-1.zarr
+ROI5,bnpfeein-1,results/ROI5/create_follicle_sdata/output/bnpfeein-1.zarr
+ROI5,bnpfpjon-1,results/ROI5/create_follicle_sdata/output/bnpfpjon-1.zarr
+ROI5,bodehecd-1,results/ROI5/create_follicle_sdata/output/bodehecd-1.zarr
+ROI5,bodenmjp-1,results/ROI5/create_follicle_sdata/output/bodenmjp-1.zarr
+ROI5,bodfkiia-1,results/ROI5/create_follicle_sdata/output/bodfkiia-1.zarr
+ROI5,bodgiohg-1,results/ROI5/create_follicle_sdata/output/bodgiohg-1.zarr
+ROI5,boiekfoa-1,results/ROI5/create_follicle_sdata/output/boiekfoa-1.zarr
+ROI5,boielboi-1,results/ROI5/create_follicle_sdata/output/boielboi-1.zarr
+ROI5,boihlccl-1,results/ROI5/create_follicle_sdata/output/boihlccl-1.zarr
+ROI5,boihobpb-1,results/ROI5/create_follicle_sdata/output/boihobpb-1.zarr
+ROI5,bojdjblh-1,results/ROI5/create_follicle_sdata/output/bojdjblh-1.zarr
+ROI5,bojecgab-1,results/ROI5/create_follicle_sdata/output/bojecgab-1.zarr
+ROI5,bojejgio-1,results/ROI5/create_follicle_sdata/output/bojejgio-1.zarr
+ROI5,bojeocll-1,results/ROI5/create_follicle_sdata/output/bojeocll-1.zarr
+ROI5,bojfkokp-1,results/ROI5/create_follicle_sdata/output/bojfkokp-1.zarr
+ROI5,bojfoeoe-1,results/ROI5/create_follicle_sdata/output/bojfoeoe-1.zarr
+ROI5,bokijgej-1,results/ROI5/create_follicle_sdata/output/bokijgej-1.zarr
+ROI5,bokiopkn-1,results/ROI5/create_follicle_sdata/output/bokiopkn-1.zarr
+ROI5,bokkglbb-1,results/ROI5/create_follicle_sdata/output/bokkglbb-1.zarr
+ROI5,boklacll-1,results/ROI5/create_follicle_sdata/output/boklacll-1.zarr
+ROI5,boklnmfj-1,results/ROI5/create_follicle_sdata/output/boklnmfj-1.zarr
+ROI5,bolceind-1,results/ROI5/create_follicle_sdata/output/bolceind-1.zarr
+ROI5,boldhcac-1,results/ROI5/create_follicle_sdata/output/boldhcac-1.zarr
+ROI5,bolffgje-1,results/ROI5/create_follicle_sdata/output/bolffgje-1.zarr
+ROI5,bomckkpo-1,results/ROI5/create_follicle_sdata/output/bomckkpo-1.zarr
+ROI5,cajfleke-1,results/ROI5/create_follicle_sdata/output/cajfleke-1.zarr
+ROI5,cajfljho-1,results/ROI5/create_follicle_sdata/output/cajfljho-1.zarr
+ROI5,cajgbokh-1,results/ROI5/create_follicle_sdata/output/cajgbokh-1.zarr
+ROI5,cajgcjbl-1,results/ROI5/create_follicle_sdata/output/cajgcjbl-1.zarr
+ROI5,cajginge-1,results/ROI5/create_follicle_sdata/output/cajginge-1.zarr
+ROI5,cakgdlkh-1,results/ROI5/create_follicle_sdata/output/cakgdlkh-1.zarr
+ROI5,cakhcaem-1,results/ROI5/create_follicle_sdata/output/cakhcaem-1.zarr
+ROI5,cakhefig-1,results/ROI5/create_follicle_sdata/output/cakhefig-1.zarr
+ROI5,cakhpiil-1,results/ROI5/create_follicle_sdata/output/cakhpiil-1.zarr
+ROI5,cbapjkgd-1,results/ROI5/create_follicle_sdata/output/cbapjkgd-1.zarr
+ROI5,cbbabold-1,results/ROI5/create_follicle_sdata/output/cbbabold-1.zarr
+ROI5,cbbcbbkd-1,results/ROI5/create_follicle_sdata/output/cbbcbbkd-1.zarr
+ROI5,cbbccajh-1,results/ROI5/create_follicle_sdata/output/cbbccajh-1.zarr
+ROI5,cbbdfcad-1,results/ROI5/create_follicle_sdata/output/cbbdfcad-1.zarr
+ROI5,cbbdpeok-1,results/ROI5/create_follicle_sdata/output/cbbdpeok-1.zarr
+ROI5,cbbfipch-1,results/ROI5/create_follicle_sdata/output/cbbfipch-1.zarr
+ROI5,cbbjdolo-1,results/ROI5/create_follicle_sdata/output/cbbjdolo-1.zarr
+ROI5,cbbjehco-1,results/ROI5/create_follicle_sdata/output/cbbjehco-1.zarr
+ROI5,cbchminh-1,results/ROI5/create_follicle_sdata/output/cbchminh-1.zarr
+ROI5,cbchojcf-1,results/ROI5/create_follicle_sdata/output/cbchojcf-1.zarr
+ROI5,cbcmnhfo-1,results/ROI5/create_follicle_sdata/output/cbcmnhfo-1.zarr
+ROI5,cbcnaddj-1,results/ROI5/create_follicle_sdata/output/cbcnaddj-1.zarr
+ROI5,cbcnjpki-1,results/ROI5/create_follicle_sdata/output/cbcnjpki-1.zarr
+ROI5,cbedigob-1,results/ROI5/create_follicle_sdata/output/cbedigob-1.zarr
+ROI5,cbehhnae-1,results/ROI5/create_follicle_sdata/output/cbehhnae-1.zarr
+ROI5,cbeiojeh-1,results/ROI5/create_follicle_sdata/output/cbeiojeh-1.zarr
+ROI5,cbggnjif-1,results/ROI5/create_follicle_sdata/output/cbggnjif-1.zarr
+ROI5,cbgngigl-1,results/ROI5/create_follicle_sdata/output/cbgngigl-1.zarr
+ROI5,cbhmchhe-1,results/ROI5/create_follicle_sdata/output/cbhmchhe-1.zarr
+ROI5,cbhoamml-1,results/ROI5/create_follicle_sdata/output/cbhoamml-1.zarr
+ROI5,cbhplpge-1,results/ROI5/create_follicle_sdata/output/cbhplpge-1.zarr
+ROI5,cbibphmj-1,results/ROI5/create_follicle_sdata/output/cbibphmj-1.zarr
+ROI5,jmihpedl-1,results/ROI5/create_follicle_sdata/output/jmihpedl-1.zarr
+ROI5,jmjcmfie-1,results/ROI5/create_follicle_sdata/output/jmjcmfie-1.zarr
+ROI5,jmlpmdck-1,results/ROI5/create_follicle_sdata/output/jmlpmdck-1.zarr
+ROI5,jmoajhhj-1,results/ROI5/create_follicle_sdata/output/jmoajhhj-1.zarr
+ROI5,jmpbepip-1,results/ROI5/create_follicle_sdata/output/jmpbepip-1.zarr
+ROI5,jmpcnnpp-1,results/ROI5/create_follicle_sdata/output/jmpcnnpp-1.zarr
+ROI5,jnhllefa-1,results/ROI5/create_follicle_sdata/output/jnhllefa-1.zarr
+ROI5,jnhlmoan-1,results/ROI5/create_follicle_sdata/output/jnhlmoan-1.zarr
+ROI5,jnhnpohb-1,results/ROI5/create_follicle_sdata/output/jnhnpohb-1.zarr
+ROI5,jnihcafh-1,results/ROI5/create_follicle_sdata/output/jnihcafh-1.zarr
+ROI5,mjfogcmb-1,results/ROI5/create_follicle_sdata/output/mjfogcmb-1.zarr
+ROI5,mjfpplhh-1,results/ROI5/create_follicle_sdata/output/mjfpplhh-1.zarr
+ROI5,mjgadefi-1,results/ROI5/create_follicle_sdata/output/mjgadefi-1.zarr
+ROI5,mjnjagkn-1,results/ROI5/create_follicle_sdata/output/mjnjagkn-1.zarr
+ROI5,mjnjblha-1,results/ROI5/create_follicle_sdata/output/mjnjblha-1.zarr
+ROI5,mkblgbnh-1,results/ROI5/create_follicle_sdata/output/mkblgbnh-1.zarr
+ROI5,mkhdlill-1,results/ROI5/create_follicle_sdata/output/mkhdlill-1.zarr
+ROI5,mkhfgfpa-1,results/ROI5/create_follicle_sdata/output/mkhfgfpa-1.zarr
+ROI5,mkhgdaak-1,results/ROI5/create_follicle_sdata/output/mkhgdaak-1.zarr
+ROI5,mkhgkbkj-1,results/ROI5/create_follicle_sdata/output/mkhgkbkj-1.zarr
+ROI5,mllmljhb-1,results/ROI5/create_follicle_sdata/output/mllmljhb-1.zarr
+ROI5,mlmhakon-1,results/ROI5/create_follicle_sdata/output/mlmhakon-1.zarr
+ROI5,mlmhalni-1,results/ROI5/create_follicle_sdata/output/mlmhalni-1.zarr
+ROI5,moggjcnj-1,results/ROI5/create_follicle_sdata/output/moggjcnj-1.zarr
+ROI5,mpchpidk-1,results/ROI5/create_follicle_sdata/output/mpchpidk-1.zarr
+ROI5,mpcmhkao-1,results/ROI5/create_follicle_sdata/output/mpcmhkao-1.zarr
+ROI5,mpcnbdei-1,results/ROI5/create_follicle_sdata/output/mpcnbdei-1.zarr
+ROI5,mpoeepim-1,results/ROI5/create_follicle_sdata/output/mpoeepim-1.zarr
+ROI5,naabhgbh-1,results/ROI5/create_follicle_sdata/output/naabhgbh-1.zarr
+ROI5,naaefhha-1,results/ROI5/create_follicle_sdata/output/naaefhha-1.zarr
+ROI5,nabhdlji-1,results/ROI5/create_follicle_sdata/output/nabhdlji-1.zarr
+ROI6,aaaabpba-1,results/ROI6/create_follicle_sdata/output/aaaabpba-1.zarr
+ROI6,aaaaeaam-1,results/ROI6/create_follicle_sdata/output/aaaaeaam-1.zarr
+ROI6,aaaafica-1,results/ROI6/create_follicle_sdata/output/aaaafica-1.zarr
+ROI6,aaaagdha-1,results/ROI6/create_follicle_sdata/output/aaaagdha-1.zarr
+ROI6,aaaahbop-1,results/ROI6/create_follicle_sdata/output/aaaahbop-1.zarr
+ROI6,aaaaimef-1,results/ROI6/create_follicle_sdata/output/aaaaimef-1.zarr
+ROI6,aaaajeoi-1,results/ROI6/create_follicle_sdata/output/aaaajeoi-1.zarr
+ROI6,aaaaoifm-1,results/ROI6/create_follicle_sdata/output/aaaaoifm-1.zarr
+ROI6,aaaaomfa-1,results/ROI6/create_follicle_sdata/output/aaaaomfa-1.zarr
+ROI6,aaabdadi-1,results/ROI6/create_follicle_sdata/output/aaabdadi-1.zarr
+ROI6,aaabefef-1,results/ROI6/create_follicle_sdata/output/aaabefef-1.zarr
+ROI6,aaabgegl-1,results/ROI6/create_follicle_sdata/output/aaabgegl-1.zarr
+ROI6,aaabhldm-1,results/ROI6/create_follicle_sdata/output/aaabhldm-1.zarr
+ROI6,aaabiifc-1,results/ROI6/create_follicle_sdata/output/aaabiifc-1.zarr
+ROI6,aaabiljo-1,results/ROI6/create_follicle_sdata/output/aaabiljo-1.zarr
+ROI6,aaabkbol-1,results/ROI6/create_follicle_sdata/output/aaabkbol-1.zarr
+ROI6,aaacahcj-1,results/ROI6/create_follicle_sdata/output/aaacahcj-1.zarr
+ROI6,aaacclaj-1,results/ROI6/create_follicle_sdata/output/aaacclaj-1.zarr
+ROI6,aaacfaoe-1,results/ROI6/create_follicle_sdata/output/aaacfaoe-1.zarr
+ROI6,aaacflna-1,results/ROI6/create_follicle_sdata/output/aaacflna-1.zarr
+ROI6,aaacgnpp-1,results/ROI6/create_follicle_sdata/output/aaacgnpp-1.zarr
+ROI6,aaacheah-1,results/ROI6/create_follicle_sdata/output/aaacheah-1.zarr
+ROI6,aaachioi-1,results/ROI6/create_follicle_sdata/output/aaachioi-1.zarr
+ROI6,aaachnlm-1,results/ROI6/create_follicle_sdata/output/aaachnlm-1.zarr
+ROI6,aaaciapo-1,results/ROI6/create_follicle_sdata/output/aaaciapo-1.zarr
+ROI6,aaacknlo-1,results/ROI6/create_follicle_sdata/output/aaacknlo-1.zarr
+ROI6,aaacllom-1,results/ROI6/create_follicle_sdata/output/aaacllom-1.zarr
+ROI6,aaacmaog-1,results/ROI6/create_follicle_sdata/output/aaacmaog-1.zarr
+ROI6,aaacniej-1,results/ROI6/create_follicle_sdata/output/aaacniej-1.zarr
+ROI6,aaacnoic-1,results/ROI6/create_follicle_sdata/output/aaacnoic-1.zarr
+ROI6,aaadbmim-1,results/ROI6/create_follicle_sdata/output/aaadbmim-1.zarr
+ROI6,aaadbnbm-1,results/ROI6/create_follicle_sdata/output/aaadbnbm-1.zarr
+ROI6,aaadckmm-1,results/ROI6/create_follicle_sdata/output/aaadckmm-1.zarr
+ROI6,aaadealk-1,results/ROI6/create_follicle_sdata/output/aaadealk-1.zarr
+ROI6,aaadfdei-1,results/ROI6/create_follicle_sdata/output/aaadfdei-1.zarr
+ROI6,aaadflck-1,results/ROI6/create_follicle_sdata/output/aaadflck-1.zarr
+ROI6,aaadfokf-1,results/ROI6/create_follicle_sdata/output/aaadfokf-1.zarr
+ROI6,aaadhkmk-1,results/ROI6/create_follicle_sdata/output/aaadhkmk-1.zarr
+ROI6,aaadhmpk-1,results/ROI6/create_follicle_sdata/output/aaadhmpk-1.zarr
+ROI6,aaadmchd-1,results/ROI6/create_follicle_sdata/output/aaadmchd-1.zarr
+ROI6,aaadmoig-1,results/ROI6/create_follicle_sdata/output/aaadmoig-1.zarr
+ROI6,aaadoghl-1,results/ROI6/create_follicle_sdata/output/aaadoghl-1.zarr
+ROI6,aaadombf-1,results/ROI6/create_follicle_sdata/output/aaadombf-1.zarr
+ROI6,aaadpaak-1,results/ROI6/create_follicle_sdata/output/aaadpaak-1.zarr
+ROI6,aaaedemg-1,results/ROI6/create_follicle_sdata/output/aaaedemg-1.zarr
+ROI6,aaaeiabp-1,results/ROI6/create_follicle_sdata/output/aaaeiabp-1.zarr
+ROI6,aaaejhgk-1,results/ROI6/create_follicle_sdata/output/aaaejhgk-1.zarr
+ROI6,aaaejieh-1,results/ROI6/create_follicle_sdata/output/aaaejieh-1.zarr
+ROI6,aaaelafj-1,results/ROI6/create_follicle_sdata/output/aaaelafj-1.zarr
+ROI6,aaaepbpd-1,results/ROI6/create_follicle_sdata/output/aaaepbpd-1.zarr
+ROI6,aaafbepe-1,results/ROI6/create_follicle_sdata/output/aaafbepe-1.zarr
+ROI6,aaafcalm-1,results/ROI6/create_follicle_sdata/output/aaafcalm-1.zarr
+ROI6,aaafccal-1,results/ROI6/create_follicle_sdata/output/aaafccal-1.zarr
+ROI6,aaafcdoh-1,results/ROI6/create_follicle_sdata/output/aaafcdoh-1.zarr
+ROI6,aaafckfc-1,results/ROI6/create_follicle_sdata/output/aaafckfc-1.zarr
+ROI6,aaafdmme-1,results/ROI6/create_follicle_sdata/output/aaafdmme-1.zarr
+ROI6,aaafelhb-1,results/ROI6/create_follicle_sdata/output/aaafelhb-1.zarr
+ROI6,aaafepki-1,results/ROI6/create_follicle_sdata/output/aaafepki-1.zarr
+ROI6,aaafepnp-1,results/ROI6/create_follicle_sdata/output/aaafepnp-1.zarr
+ROI6,aaaffoii-1,results/ROI6/create_follicle_sdata/output/aaaffoii-1.zarr
+ROI6,aaafhiad-1,results/ROI6/create_follicle_sdata/output/aaafhiad-1.zarr
+ROI6,aaafhjgg-1,results/ROI6/create_follicle_sdata/output/aaafhjgg-1.zarr
+ROI6,aaafiagk-1,results/ROI6/create_follicle_sdata/output/aaafiagk-1.zarr
+ROI6,aaafiglf-1,results/ROI6/create_follicle_sdata/output/aaafiglf-1.zarr
+ROI6,aaafiknb-1,results/ROI6/create_follicle_sdata/output/aaafiknb-1.zarr
+ROI6,aaafjegf-1,results/ROI6/create_follicle_sdata/output/aaafjegf-1.zarr
+ROI6,aaafkejg-1,results/ROI6/create_follicle_sdata/output/aaafkejg-1.zarr
+ROI6,aaafkkck-1,results/ROI6/create_follicle_sdata/output/aaafkkck-1.zarr
+ROI6,aaafmdka-1,results/ROI6/create_follicle_sdata/output/aaafmdka-1.zarr
+ROI6,aaafomic-1,results/ROI6/create_follicle_sdata/output/aaafomic-1.zarr
+ROI6,aaafplgb-1,results/ROI6/create_follicle_sdata/output/aaafplgb-1.zarr
+ROI6,aaagbhdk-1,results/ROI6/create_follicle_sdata/output/aaagbhdk-1.zarr
+ROI6,aaagbocm-1,results/ROI6/create_follicle_sdata/output/aaagbocm-1.zarr
+ROI6,aaagdjac-1,results/ROI6/create_follicle_sdata/output/aaagdjac-1.zarr
+ROI6,aaagibop-1,results/ROI6/create_follicle_sdata/output/aaagibop-1.zarr
+ROI6,aaagljlc-1,results/ROI6/create_follicle_sdata/output/aaagljlc-1.zarr
+ROI6,aaagpejf-1,results/ROI6/create_follicle_sdata/output/aaagpejf-1.zarr
+ROI6,aaagphkb-1,results/ROI6/create_follicle_sdata/output/aaagphkb-1.zarr
+ROI6,aaaheihg-1,results/ROI6/create_follicle_sdata/output/aaaheihg-1.zarr
+ROI6,aaccmnkf-1,results/ROI6/create_follicle_sdata/output/aaccmnkf-1.zarr
+ROI6,aacgghcm-1,results/ROI6/create_follicle_sdata/output/aacgghcm-1.zarr
+ROI6,aajjphef-1,results/ROI6/create_follicle_sdata/output/aajjphef-1.zarr
+ROI6,aanojfkf-1,results/ROI6/create_follicle_sdata/output/aanojfkf-1.zarr
+ROI6,aaokeeoa-1,results/ROI6/create_follicle_sdata/output/aaokeeoa-1.zarr
+ROI6,aapckcpj-1,results/ROI6/create_follicle_sdata/output/aapckcpj-1.zarr
+ROI6,abafckce-1,results/ROI6/create_follicle_sdata/output/abafckce-1.zarr
+ROI6,abbcalon-1,results/ROI6/create_follicle_sdata/output/abbcalon-1.zarr
+ROI6,abblkcdd-1,results/ROI6/create_follicle_sdata/output/abblkcdd-1.zarr
+ROI6,aegniemp-1,results/ROI6/create_follicle_sdata/output/aegniemp-1.zarr
+ROI6,bimfdnjj-1,results/ROI6/create_follicle_sdata/output/bimfdnjj-1.zarr
+ROI6,binnjogh-1,results/ROI6/create_follicle_sdata/output/binnjogh-1.zarr
+ROI6,cbndcgdi-1,results/ROI6/create_follicle_sdata/output/cbndcgdi-1.zarr
+ROI6,cjfpbmfi-1,results/ROI6/create_follicle_sdata/output/cjfpbmfi-1.zarr
+ROI6,ddoopkig-1,results/ROI6/create_follicle_sdata/output/ddoopkig-1.zarr
+ROI6,eaamjoch-1,results/ROI6/create_follicle_sdata/output/eaamjoch-1.zarr
+ROI6,eiojcpmb-1,results/ROI6/create_follicle_sdata/output/eiojcpmb-1.zarr
+ROI6,eponcojg-1,results/ROI6/create_follicle_sdata/output/eponcojg-1.zarr
+ROI6,jnmpbnpa-1,results/ROI6/create_follicle_sdata/output/jnmpbnpa-1.zarr

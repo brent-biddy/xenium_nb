@@ -200,7 +200,7 @@ Key parameters (set in `nextflow.config` or passed via `--param value`):
 | `samplesheet` | `null` | Path to samplesheet CSV |
 | `outdir` | `results` | Output directory |
 | `cell_ids_file` | `full` | Cell ID reference file key or direct path |
-| `container_image` | `babiddy755/xenium_nb:latest` | Container reference pulled by the `test` and `oscer` profiles; may be a registry tag or a local `.sif` path |
+| `container_image` | `babiddy755/xenium_nb:20260505-66addc7` | Container reference pulled by the `test` and `oscer` profiles; may be a registry tag or a local `.sif` path |
 | `cell_ids_registry` | built-in map | Named cell ID files available to `create.nf` |
 | `radius` | `250` | Default bounding box radius (µm) |
 | `create` | `all` | Create workflow mode: `sdata`, `follicle_sdata`, or `all` |
@@ -221,7 +221,7 @@ The built-in analysis registry currently defines:
 | Profile | Description |
 |---------|-------------|
 | (default) | Local execution, no container (use an activated conda env that provides the notebook kernel). |
-| `test` | Local execution with Apptainer, sized for a laptop / WSL2 box (16 GB per process). Override `--container_image` with a local `.sif` path after building `container/Apptainer.def`. |
+| `test` | Local execution with Apptainer, sized for a laptop / WSL2 box (8 GB default; 12 GB for `CREATE_SPATIALDATA` and `SUBSET_FOLLICLE`). Override `--container_image` with a local `.sif` path after building `container/Apptainer.def`. |
 | `oscer` | SLURM executor on OSCER HPC, Apptainer container, scratch-based work directory and image cache. Memory scales 32→64→96 GB across retries. |
 
 Activate with `-profile oscer`:

@@ -16,12 +16,12 @@ samplesheet with:
 The 'path' column points at the exact upstream zarr each row needs, so
 Nextflow stages it directly into the notebook work dir:
 
-    --upstream create_spatialdata
-        path = <outdir>/<roi_id>/create_spatialdata/output/<roi_id>.zarr
+    --upstream create_sdata
+        path = <outdir>/<roi_id>/create_sdata/output/<roi_id>.zarr
         (use this to feed notebook subset_follicle)
 
-    --upstream subset_follicle
-        path = <outdir>/<roi_id>/subset_follicle/output/<cell_id>.zarr
+    --upstream create_follicle_sdata
+        path = <outdir>/<roi_id>/create_follicle_sdata/output/<cell_id>.zarr
         (use this to feed notebook plot_follicle)
 
 All other columns from the cell IDs file (Stage.Labels, Quality, etc.) are
@@ -31,7 +31,7 @@ Usage:
     python bin/make_follicle_samplesheet.py \\
         --cell-ids assets/stage_quality_area_all_rois.csv \\
         --outdir   results \\
-        --upstream create_spatialdata \\
+        --upstream create_sdata \\
         --output   assets/follicle_samplesheet.csv
 """
 
@@ -40,7 +40,13 @@ from pathlib import Path
 import pandas as pd
 
 
-UPSTREAM_CHOICES = ("create_spatialdata", "subset_follicle")
+UPSTREAM_CHOICES = (
+    "create_sdata",
+    "create_follicle_sdata",
+    # Backward-compatible aliases for older workflow naming.
+    "create_spatialdata",
+    "subset_follicle",
+)
 
 
 def parse_args():
@@ -54,10 +60,11 @@ def parse_args():
 
 
 def zarr_path(outdir: str, upstream: str, roi_id: str, cell_id: str) -> str:
-    base = Path(outdir) / roi_id / upstream / "output"
-    if upstream == "create_spatialdata":
+    if upstream in ("create_sdata", "create_spatialdata"):
+        base = Path(outdir) / roi_id / "create_sdata" / "output"
         return str(base / f"{roi_id}.zarr")
-    if upstream == "subset_follicle":
+    if upstream in ("create_follicle_sdata", "subset_follicle"):
+        base = Path(outdir) / roi_id / "create_follicle_sdata" / "output"
         return str(base / f"{cell_id}.zarr")
     raise ValueError(f"Unknown upstream: {upstream}")
 

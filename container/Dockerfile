@@ -39,6 +39,7 @@ import papermill
 import yaml
 import session_info
 import spatialdata
+import spatialdata_io
 import spatialdata_plot
 import scanpy
 import squidpy
