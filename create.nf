@@ -18,6 +18,13 @@ def parseSamplesheet(sheetPath, label) {
         }
 }
 
+def buildSamplesheetInput(rowsChannel, outputName, publishDir) {
+    rowsChannel
+        .collect()
+        .map { rows -> groovy.json.JsonOutput.toJson(rows) }
+        .map { rowsJson -> tuple(outputName, rowsJson, publishDir) }
+}
+
 workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"
     def producerRegistry = NotebookRegistry.producer(projectDir.toString())
@@ -42,24 +49,18 @@ workflow {
         def createSpatialdata = CREATE_SPATIALDATA(createInputs)
         sampleArtifacts = createSpatialdata.artifacts
 
-        def sampleArtifactRows = sampleArtifacts
-            .map { sample, sampleZarr, rowParams ->
-                [
-                    sample: sample,
-                    path  : "${params.outdir}/${sample}/${createNotebook.baseName}/output/${sample}.zarr",
-                ]
-            }
-            .collect()
-            .map { rows -> groovy.json.JsonOutput.toJson(rows) }
-            .map { rowsJson ->
-                tuple(
-                    'sample_sdata_samplesheet.csv',
-                    rowsJson,
-                    "${params.outdir}/${createNotebook.baseName}"
-                )
-            }
+        def sampleArtifactRows = sampleArtifacts.map { sample, sampleZarr, rowParams ->
+            [
+                sample: sample,
+                path  : "${params.outdir}/${sample}/${createNotebook.baseName}/output/${sample}.zarr",
+            ]
+        }
 
-        WRITE_SAMPLE_ANALYSIS_INPUTS(sampleArtifactRows)
+        WRITE_SAMPLE_ANALYSIS_INPUTS(buildSamplesheetInput(
+            sampleArtifactRows,
+            'sample_sdata_samplesheet.csv',
+            "${params.outdir}/${createNotebook.baseName}",
+        ))
     }
 
     if (createMode == 'follicle_sdata') {
@@ -78,28 +79,21 @@ workflow {
         def subsetFollicle = SUBSET_FOLLICLE(subsetInputs)
         def follicleArtifacts = subsetFollicle.artifacts
 
-        def follicleArtifactRows = follicleArtifacts
-            .flatMap { sample, zarrPaths ->
-                def zarrs = zarrPaths instanceof List ? zarrPaths : [zarrPaths]
-                zarrs.collect { zarr ->
-                    def cellId = zarr.baseName
-                    [
-                        sample: sample,
-                        cell  : cellId,
-                        path  : "${params.outdir}/${sample}/${subsetNotebook.baseName}/output/${cellId}.zarr",
-                    ]
-                }
+        def follicleArtifactRows = follicleArtifacts.flatMap { sample, zarrPaths ->
+            def zarrs = zarrPaths instanceof List ? zarrPaths : [zarrPaths]
+            zarrs.collect { zarr ->
+                [
+                    sample: sample,
+                    cell  : zarr.baseName,
+                    path  : "${params.outdir}/${sample}/${subsetNotebook.baseName}/output/${zarr.baseName}.zarr",
+                ]
             }
-            .collect()
-            .map { rows -> groovy.json.JsonOutput.toJson(rows) }
-            .map { rowsJson ->
-                tuple(
-                    'follicle_sdata_samplesheet.csv',
-                    rowsJson,
-                    "${params.outdir}/${subsetNotebook.baseName}"
-                )
-            }
+        }
 
-        WRITE_FOLLICLE_ANALYSIS_INPUTS(follicleArtifactRows)
+        WRITE_FOLLICLE_ANALYSIS_INPUTS(buildSamplesheetInput(
+            follicleArtifactRows,
+            'follicle_sdata_samplesheet.csv',
+            "${params.outdir}/${subsetNotebook.baseName}",
+        ))
     }
 }
