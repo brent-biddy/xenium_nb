@@ -2,10 +2,10 @@
 
 A Nextflow pipeline for Xenium spatial transcriptomics data with two separate entry points:
 
-- `build.nf` builds reusable data artifacts
+- `create.nf` builds reusable data artifacts
 - `analyze.nf` runs analysis notebooks against artifact samplesheets
 
-The build workflow and sample-scoped analysis notebooks use a two-column samplesheet contract:
+The create workflow and sample-scoped analysis notebooks use a two-column samplesheet contract:
 
 ```csv
 sample,path
@@ -33,7 +33,7 @@ Notebook parameters are staged into each task work directory as `params.json` an
 
 ```
 xenium_nb/
-├── build.nf                   # Build workflow: raw Xenium -> sample and follicle artifacts
+├── create.nf                  # Create workflow: raw Xenium -> sample and follicle artifacts
 ├── analyze.nf                 # Analysis workflow: artifact samplesheet -> notebook reports
 ├── nextflow.config            # Parameters and profiles
 ├── conf/
@@ -60,9 +60,9 @@ xenium_nb/
 
 ## Samplesheets
 
-### Build workflow input
+### Create workflow input
 
-Used by `build.nf`. `path` points to a raw Xenium output directory.
+Used by `create.nf`. `path` points to a raw Xenium output directory.
 
 ```csv
 sample,path
@@ -92,9 +92,9 @@ ROI1,aaaalpdj-1,results/ROI1/subset_follicle/output/aaaalpdj-1.zarr
 
 ### Cell ID reference file
 
-`assets/stage_quality_area_all_rois.csv` is used by the build workflow to decide which follicles to subset. It must contain `Donor.ROI` and `cell_id`. An optional `radius` column sets a per-cell bounding box radius (µm); missing values fall back to `params.radius`.
+`assets/stage_quality_area_all_rois.csv` is used by the create workflow to decide which follicles to subset. It must contain `Donor.ROI` and `cell_id`. An optional `radius` column sets a per-cell bounding box radius (µm); missing values fall back to `params.radius`.
 
-`build.nf` can select this file by key. The built-in choices are:
+`create.nf` can select this file by key. The built-in choices are:
 
 - `--cell_ids_file full`
 - `--cell_ids_file small`
@@ -115,10 +115,10 @@ The output directory is written alongside the input as `<input_dir>_downsampled_
 
 ## Usage
 
-### Build artifacts
+### Create artifacts
 
 ```bash
-nextflow run build.nf \
+nextflow run create.nf \
     --samplesheet assets/samplesheet.csv
 ```
 
@@ -134,20 +134,20 @@ and writes:
 - `results/pipeline_info/sample_analysis_inputs.csv`
 - `results/pipeline_info/follicle_analysis_inputs.csv`
 
-### Build sample artifacts only
+### Create sample artifacts only
 
 ```bash
-nextflow run build.nf \
+nextflow run create.nf \
     --samplesheet assets/samplesheet.csv \
     --run_subset_follicle false
 ```
 
 This runs only `create_spatialdata.qmd` and writes `results/pipeline_info/sample_analysis_inputs.csv`.
 
-### Build with the small test follicle file
+### Create with the small test follicle file
 
 ```bash
-nextflow run build.nf \
+nextflow run create.nf \
     --samplesheet assets/samplesheet.csv \
     --cell_ids_file small
 ```
@@ -182,10 +182,10 @@ Key parameters (set in `nextflow.config` or passed via `--param value`):
 | `outdir` | `results` | Output directory |
 | `cell_ids_file` | `full` | Cell ID reference file key or direct path |
 | `container_image` | `babiddy755/xenium_nb:latest` | Container reference pulled by the `local` and `oscer` profiles; may be a registry tag or a local `.sif` path |
-| `cell_ids_registry` | built-in map | Named cell ID files available to `build.nf` |
+| `cell_ids_registry` | built-in map | Named cell ID files available to `create.nf` |
 | `radius` | `250` | Default bounding box radius (µm) |
-| `run_subset_follicle` | `true` | Whether `build.nf` should run `subset_follicle.qmd` after building sample-level zarrs |
-| `producer_registry` | built-in map | The two producer notebooks used by `build.nf` |
+| `run_subset_follicle` | `true` | Whether `create.nf` should run `subset_follicle.qmd` after building sample-level zarrs |
+| `producer_registry` | built-in map | The two producer notebooks used by `create.nf` |
 | `analysis_notebook_registry` | built-in map | Notebook IDs, paths, and scopes used by `analyze.nf` |
 | `notebooks` | `[]` | Analysis notebook IDs to run in `analyze.nf` |
 
@@ -208,7 +208,7 @@ The built-in analysis registry currently defines:
 Activate with `-profile oscer`:
 
 ```bash
-nextflow run build.nf \
+nextflow run create.nf \
     --samplesheet assets/samplesheet.csv \
     -profile oscer
 ```
@@ -230,7 +230,7 @@ To publish the same runtime for OSCER:
 ./container/build_docker.sh
 docker tag xenium_tools_squidpy:local babiddy755/xenium_nb:<tag>
 docker push babiddy755/xenium_nb:<tag>
-nextflow run build.nf --samplesheet assets/samplesheet.csv -profile oscer --container_image babiddy755/xenium_nb:<tag>
+nextflow run create.nf --samplesheet assets/samplesheet.csv -profile oscer --container_image babiddy755/xenium_nb:<tag>
 ```
 
 ---
@@ -273,7 +273,7 @@ If `--run_subset_follicle false` is used, `subset_follicle/` outputs and `follic
 ## Adding notebooks
 
 1. Create a new `.qmd` file in `notebooks/` with a YAML params block declaring at least `sample` and `path`, plus any scope-specific fields such as `cell` for follicle notebooks.
-2. If it is a build-stage producer, register it in `params.producer_registry` and wire it into `build.nf`.
+2. If it is a create-stage producer, register it in `params.producer_registry` and wire it into `create.nf`.
 3. If it is an analysis notebook, register it in `params.analysis_notebook_registry` with a unique ID and a scope of `sample` or `follicle`.
 4. Run analysis notebooks with `nextflow run analyze.nf --samplesheet <artifact_sheet.csv> --notebooks <id1,id2>`.
 5. Any params not declared in the notebook's front matter are automatically filtered out before rendering.

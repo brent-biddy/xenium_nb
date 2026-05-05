@@ -20,7 +20,7 @@ workflow {
         .map { row ->
             def columns = row.keySet().findAll { it != null && it != '' } as Set
             if (!columns.containsAll(requiredColumns)) {
-                error "Build samplesheet must contain at least these columns: sample,path. Found: ${columns.join(',')}"
+                error "Create samplesheet must contain at least these columns: sample,path. Found: ${columns.join(',')}"
             }
             if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
