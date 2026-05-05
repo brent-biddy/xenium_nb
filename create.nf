@@ -40,6 +40,7 @@ workflow {
     def createRegistry = NotebookRegistry.create(projectDir.toString())
     def cellIdsFile = file(params.cell_ids_file)
     def timerScript = file("${projectDir}/bin/timer.py")
+    def publishDirFor = { sample, notebook -> "${params.outdir}/${sample}/${notebook.baseName}" }
     def createMode = params.create.toLowerCase()
     if (!(createMode in ['sdata', 'follicle_sdata', 'all'])) {
         error "Invalid create '${createMode}'. Valid values are: sdata, follicle_sdata, all"
@@ -53,16 +54,15 @@ workflow {
 
         def createNotebook = file(createRegistry.create_sdata.path)
         def createInputs = sampleRows.map { sample, inputPath, rowParams ->
-            def publishDir = "${params.outdir}/${sample}/${createNotebook.baseName}"
-            tuple(createNotebook, timerScript, inputPath, cellIdsFile, sample, publishDir, rowParams, createRegistry.create_sdata.params)
+            tuple(createNotebook, timerScript, inputPath, cellIdsFile, sample, publishDirFor(sample, createNotebook), rowParams, createRegistry.create_sdata.params)
         }
 
         sampleArtifacts = CREATE_SDATA(createInputs).artifacts
 
-        def sampleArtifactRows = sampleArtifacts.map { sample, sampleZarr, rowParams ->
+        def sampleArtifactRows = sampleArtifacts.map { sample, sampleZarr, _rowParams ->
             [
                 sample: sample,
-                path  : "${params.outdir}/${sample}/${createNotebook.baseName}/output/${sample}.zarr",
+                path  : "${publishDirFor(sample, createNotebook)}/output/${sampleZarr.name}",
             ]
         }
 
@@ -82,8 +82,7 @@ workflow {
     if (createMode in ['follicle_sdata', 'all']) {
         def follicleNotebook = file(createRegistry.create_follicle_sdata.path)
         def follicleInputs = sampleArtifacts.map { sample, sampleZarr, rowParams ->
-            def publishDir = "${params.outdir}/${sample}/${follicleNotebook.baseName}"
-            tuple(follicleNotebook, timerScript, sampleZarr, cellIdsFile, sample, publishDir, rowParams, createRegistry.create_follicle_sdata.params)
+            tuple(follicleNotebook, timerScript, sampleZarr, cellIdsFile, sample, publishDirFor(sample, follicleNotebook), rowParams, createRegistry.create_follicle_sdata.params)
         }
 
         def follicleArtifacts = CREATE_FOLLICLE_SDATA(follicleInputs).artifacts
@@ -95,7 +94,7 @@ workflow {
                 [
                     sample: sample,
                     cell  : zarr.baseName,
-                    path  : "${params.outdir}/${sample}/${follicleNotebook.baseName}/output/${zarr.baseName}.zarr",
+                    path  : "${publishDirFor(sample, follicleNotebook)}/output/${zarr.name}",
                 ]
             }
         }
