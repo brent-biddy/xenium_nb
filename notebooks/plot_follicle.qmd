@@ -3,6 +3,7 @@ title: "Plot Follicle"
 jupyter: xenium
 params:
   sample: "default"
+  cell: "default"
   path: "."
 format:
   pptx: default
@@ -28,11 +29,8 @@ with timer("Setup"):
     with open("params.json") as f:
         params = json.load(f)
 
-    sample = params["sample"]
-    cell_id = Path(params["path"]).stem
-    # Sample is constructed as "<roi>_<cell_id>"; strip the cell_id suffix to get the ROI.
-    suffix = f"_{cell_id}"
-    roi = sample[: -len(suffix)] if sample.endswith(suffix) else sample
+    roi = params["sample"]
+    cell_id = params["cell"]
     # 'path' is the staged follicle-level zarr produced by subset_follicle.
     zarr_path = params["path"]
 ```

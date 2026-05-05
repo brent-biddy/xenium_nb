@@ -1,7 +1,5 @@
 #!/usr/bin/env nextflow
 
-import groovy.json.JsonOutput
-
 nextflow.enable.dsl = 2
 
 include { CREATE_SPATIALDATA } from './modules/create_spatialdata'
@@ -11,7 +9,7 @@ include { WRITE_SAMPLESHEET as WRITE_FOLLICLE_ANALYSIS_INPUTS } from './modules/
 
 workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"
-    def expectedColumns = ['sample', 'path'] as Set
+    def requiredColumns = ['sample', 'path'] as Set
     def cellIdsRegistry = params.cell_ids_registry ?: [:]
     def cellIdsFileValue = params.cell_ids_file?.toString()
     def cellIdsFilePath = file(cellIdsRegistry.get(cellIdsFileValue, cellIdsFileValue))
@@ -21,8 +19,8 @@ workflow {
         .splitCsv(header: true)
         .map { row ->
             def columns = row.keySet().findAll { it != null && it != '' } as Set
-            if (columns != expectedColumns) {
-                error "Build samplesheet must contain exactly these columns: sample,path. Found: ${columns.join(',')}"
+            if (!columns.containsAll(requiredColumns)) {
+                error "Build samplesheet must contain at least these columns: sample,path. Found: ${columns.join(',')}"
             }
             if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
@@ -49,7 +47,7 @@ workflow {
             [sample, "${params.outdir}/${sample}/${createNotebook.baseName}/output/${sample}.zarr"]
         }
         .collect()
-        .map { rows -> JsonOutput.toJson(rows) }
+        .map { rows -> groovy.json.JsonOutput.toJson(rows) }
         .map { rowsJson -> tuple('sample_analysis_inputs.csv', rowsJson) }
 
     WRITE_SAMPLE_ANALYSIS_INPUTS(sampleArtifactRows)
@@ -68,11 +66,15 @@ workflow {
                 def zarrs = outputDir.toFile().listFiles()?.findAll { it.name.endsWith('.zarr') } ?: []
                 zarrs.collect { zarr ->
                     def cellId = zarr.baseName
-                    ["${sample}_${cellId}", "${params.outdir}/${sample}/${subsetNotebook.baseName}/output/${cellId}.zarr"]
+                    [
+                        sample: sample,
+                        cell  : cellId,
+                        path  : "${params.outdir}/${sample}/${subsetNotebook.baseName}/output/${cellId}.zarr",
+                    ]
                 }
             }
             .collect()
-            .map { rows -> JsonOutput.toJson(rows) }
+            .map { rows -> groovy.json.JsonOutput.toJson(rows) }
             .map { rowsJson -> tuple('follicle_analysis_inputs.csv', rowsJson) }
 
         WRITE_FOLLICLE_ANALYSIS_INPUTS(follicleArtifactRows)

@@ -5,10 +5,16 @@ A Nextflow pipeline for Xenium spatial transcriptomics data with two separate en
 - `build.nf` builds reusable data artifacts
 - `analyze.nf` runs analysis notebooks against artifact samplesheets
 
-Both workflows use the same two-column samplesheet contract:
+The build workflow and sample-scoped analysis notebooks use a two-column samplesheet contract:
 
 ```csv
 sample,path
+```
+
+Follicle-scoped analysis notebooks use an explicit three-column contract:
+
+```csv
+sample,cell,path
 ```
 
 Notebook parameters are staged into each task work directory as `params.json` and loaded explicitly by the notebook code.
@@ -17,7 +23,7 @@ Notebook parameters are staged into each task work directory as `params.json` an
 
 ## Requirements
 
-- [Nextflow](https://www.nextflow.io/) ≥ 23.0
+- [Nextflow](https://www.nextflow.io/) ≥ 25.10.0
 - For default non-container local runs: [Quarto](https://quarto.org/) ≥ 1.4 and the required Python notebook packages
 - For containerized local runs: Apptainer
 
@@ -36,14 +42,15 @@ xenium_nb/
 │   ├── create_spatialdata.nf  # Sample-level artifact producer
 │   ├── subset_follicle.nf     # Follicle-level artifact producer
 │   ├── run_notebook.nf        # Generic analysis notebook runner
-│   └── write_samplesheet.nf   # Writes two-column artifact samplesheets
+│   └── write_samplesheet.nf   # Writes artifact samplesheets
 ├── notebooks/
 │   ├── create_spatialdata.qmd
 │   ├── subset_follicle.qmd
 │   └── plot_follicle.qmd
 ├── bin/
 │   ├── timer.py               # Timing utilities for notebooks
-│   └── make_follicle_samplesheet.py  # Legacy helper for manual/export workflows
+│   ├── make_follicle_samplesheet.py  # Legacy helper for manual/export workflows
+│   └── downsample_xenium.py   # Regenerates a smaller Xenium output for workflow testing
 └── assets/
     ├── samplesheet.csv        # Sample-level samplesheet
     └── stage_quality_area_all_rois.csv  # Cell ID reference file
@@ -78,9 +85,9 @@ ROI2,results/ROI2/create_spatialdata/output/ROI2.zarr
 Follicle artifact sheet:
 
 ```csv
-sample,path
-ROI1_aaaaimck-1,results/ROI1/subset_follicle/output/aaaaimck-1.zarr
-ROI1_aaaalpdj-1,results/ROI1/subset_follicle/output/aaaalpdj-1.zarr
+sample,cell,path
+ROI1,aaaaimck-1,results/ROI1/subset_follicle/output/aaaaimck-1.zarr
+ROI1,aaaalpdj-1,results/ROI1/subset_follicle/output/aaaalpdj-1.zarr
 ```
 
 ### Cell ID reference file
@@ -91,6 +98,18 @@ ROI1_aaaalpdj-1,results/ROI1/subset_follicle/output/aaaalpdj-1.zarr
 
 - `--cell_ids_file full`
 - `--cell_ids_file small`
+
+### Downsampling Xenium test data
+
+`bin/downsample_xenium.py` regenerates a smaller Xenium output directory by spatially subsampling cells and rebuilding the associated Xenium sidecar files, zarr archives, and reduced-resolution morphology OME-TIFF pyramids.
+
+Example:
+
+```bash
+conda run -n squidpy python bin/downsample_xenium.py /path/to/xenium_output --proportion 0.05
+```
+
+The output directory is written alongside the input as `<input_dir>_downsampled_<pct>pct`.
 
 ---
 
@@ -197,12 +216,12 @@ nextflow run build.nf \
 For local Apptainer validation:
 
 ```bash
-nextflow run analyze.nf \
+HOME=/tmp/xenium_home conda run -n squidpy nextflow run analyze.nf \
     -profile local \
     --samplesheet /tmp/xenium_nb_test/follicle_analysis_inputs.csv \
     --notebooks plot_follicle \
     --outdir /home/babiddy/xenium_nb_results_fresh \
-    --container_image /path/to/xenium_tools_squidpy_local.sif
+    -process.memory '16 GB'
 ```
 
 To publish the same runtime for OSCER:
@@ -236,13 +255,16 @@ results/
 │   │       ├── aaaaimck-1.zarr/
 │   │       └── aaaalpdj-1.zarr/
 │   └── plot_follicle/
-│       ├── ROI1_aaaaimck-1_plot_follicle.html
-│       └── ROI1_aaaalpdj-1_plot_follicle.html
+│       ├── ROI1_aaaaimck-1_plot_follicle.pptx
+│       ├── ROI1_aaaaimck-1_plot_follicle.timing.tsv
+│       ├── ROI1_aaaalpdj-1_plot_follicle.pptx
+│       └── ROI1_aaaalpdj-1_plot_follicle.timing.tsv
 └── ROI2/
     └── ...
 ```
 
-Analysis outputs also publish under the parent sample directory, so follicle reports from `ROI1_aaaaimck-1`, `ROI1_aaaalpdj-1`, and similar artifacts all land under `results/ROI1/plot_follicle/`.
+Analysis outputs also publish under the parent sample directory, so follicle reports for cells like `aaaaimck-1` and `aaaalpdj-1` both land under `results/ROI1/plot_follicle/`.
+For `plot_follicle`, the primary rendered artifact is a `.pptx` deck, with a companion timing TSV.
 
 If `--run_subset_follicle false` is used, `subset_follicle/` outputs and `follicle_analysis_inputs.csv` are not created.
 
@@ -250,7 +272,7 @@ If `--run_subset_follicle false` is used, `subset_follicle/` outputs and `follic
 
 ## Adding notebooks
 
-1. Create a new `.qmd` file in `notebooks/` with a YAML params block declaring at least `sample` and `path`.
+1. Create a new `.qmd` file in `notebooks/` with a YAML params block declaring at least `sample` and `path`, plus any scope-specific fields such as `cell` for follicle notebooks.
 2. If it is a build-stage producer, register it in `params.producer_registry` and wire it into `build.nf`.
 3. If it is an analysis notebook, register it in `params.analysis_notebook_registry` with a unique ID and a scope of `sample` or `follicle`.
 4. Run analysis notebooks with `nextflow run analyze.nf --samplesheet <artifact_sheet.csv> --notebooks <id1,id2>`.

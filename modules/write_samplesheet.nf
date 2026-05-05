@@ -22,9 +22,15 @@ if rows and isinstance(rows[0], str):
     rows = [rows[i:i + 2] for i in range(0, len(rows), 2)]
 
 with open('${output_name}', 'w', newline='') as fh:
-    writer = csv.writer(fh)
-    writer.writerow(['sample', 'path'])
-    writer.writerows(rows)
+    if rows and isinstance(rows[0], dict):
+        headers = list(rows[0].keys())
+        writer = csv.DictWriter(fh, fieldnames=headers)
+        writer.writeheader()
+        writer.writerows(rows)
+    else:
+        writer = csv.writer(fh)
+        writer.writerow(['sample', 'path'])
+        writer.writerows(rows)
 PYEOF
     """
 }

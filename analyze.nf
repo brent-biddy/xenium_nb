@@ -6,7 +6,6 @@ include { RUN_NOTEBOOK } from './modules/run_notebook'
 
 workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"
-    def expectedColumns = ['sample', 'path'] as Set
 
     def notebookIds = (
         params.notebooks == null
@@ -29,15 +28,21 @@ workflow {
     if (scopes.size() != 1) {
         error "All selected notebooks must share one scope. Requested scopes: ${scopes.join(', ')}"
     }
+    def scope = scopes[0]
+    def requiredColumns = scope == 'follicle'
+        ? ['sample', 'cell', 'path'] as Set
+        : ['sample', 'path'] as Set
+
     def rows = Channel
         .fromPath(params.samplesheet)
         .splitCsv(header: true)
         .map { row ->
             def columns = row.keySet().findAll { it != null && it != '' } as Set
-            if (columns != expectedColumns) {
-                error "Analysis samplesheet must contain exactly these columns: sample,path. Found: ${columns.join(',')}"
+            if (!columns.containsAll(requiredColumns)) {
+                error "Analysis samplesheet must contain at least these columns: ${requiredColumns.join(',')}. Found: ${columns.join(',')}"
             }
             if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
+            if (scope == 'follicle' && !row.cell) error "Samplesheet row missing 'cell': ${row}"
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
             def rowMap = new LinkedHashMap(row)
             def sample = rowMap.sample.toString()
@@ -57,13 +62,11 @@ workflow {
     rows
         .combine(notebookChannel)
         .map { sample, artifactPath, rowParams, spec ->
-            // Sample is built as "<roi>_<cellId>"; strip the cellId suffix to
-            // recover the ROI directory the artifact belongs to.
-            def cellId = artifactPath.baseName
-            def suffix = "_${cellId}"
-            def roi = sample.endsWith(suffix) ? sample[0..<(sample.length() - suffix.length())] : sample
-            def publishDir = "${params.outdir}/${roi}/${spec.path.baseName}"
-            tuple(spec.path, timerScript, artifactPath, sample, publishDir, rowParams)
+            def publishSample = spec.scope == 'follicle'
+                ? "${sample}_${rowParams.cell}"
+                : sample
+            def publishDir = "${params.outdir}/${sample}/${spec.path.baseName}"
+            tuple(spec.path, timerScript, artifactPath, publishSample, publishDir, rowParams)
         }
         | RUN_NOTEBOOK
 }
