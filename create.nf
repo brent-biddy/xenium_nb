@@ -41,9 +41,10 @@ workflow {
 
         def timerScript = file("${projectDir}/bin/timer.py")
         def createNotebook = file(params.producer_registry.create_sdata.path)
+        def createNotebookParams = params.producer_registry.create_sdata.params
         def createInputs = sampleRows.map { sample, inputPath, rowParams ->
             def publishDir = "${params.outdir}/${sample}/${createNotebook.baseName}"
-            tuple(createNotebook, timerScript, inputPath, sample, publishDir, rowParams)
+            tuple(createNotebook, timerScript, inputPath, sample, publishDir, rowParams, createNotebookParams)
         }
 
         def createSpatialdata = CREATE_SPATIALDATA(createInputs)
@@ -73,9 +74,10 @@ workflow {
     if (createMode in ['follicle_sdata', 'all']) {
         def timerScript = file("${projectDir}/bin/timer.py")
         def subsetNotebook = file(params.producer_registry.create_follicle_sdata.path)
+        def subsetNotebookParams = params.producer_registry.create_follicle_sdata.params
         def subsetInputs = sampleArtifacts.map { sample, sampleZarr, rowParams ->
             def publishDir = "${params.outdir}/${sample}/${subsetNotebook.baseName}"
-            tuple(sample, sampleZarr, rowParams, cellIdsFilePath, subsetNotebook, timerScript, publishDir)
+            tuple(sample, sampleZarr, rowParams, cellIdsFilePath, subsetNotebook, timerScript, publishDir, subsetNotebookParams)
         }
 
         def subsetFollicle = SUBSET_FOLLICLE(subsetInputs)

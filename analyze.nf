@@ -55,6 +55,7 @@ workflow {
             id   : id,
             scope: registry[id].scope,
             path : file(registry[id].path),
+            params: registry[id].params ?: [],
         ]
     }
     def notebookChannel = Channel.fromList(notebookSpecs)
@@ -66,7 +67,7 @@ workflow {
                 ? "${sample}_${rowParams.cell}"
                 : sample
             def publishDir = "${params.outdir}/${sample}/${spec.path.baseName}"
-            tuple(spec.path, timerScript, artifactPath, publishSample, publishDir, rowParams)
+            tuple(spec.path, timerScript, artifactPath, publishSample, publishDir, rowParams, spec.params)
         }
         | RUN_NOTEBOOK
 }

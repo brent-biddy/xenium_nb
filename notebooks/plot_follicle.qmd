@@ -9,12 +9,20 @@ format:
   pptx: default
 execute:
   echo: false
-  output: false
   warning: false
 ---
 
 ```{python}
-import json
+#| tags: [parameters]
+#| include: false
+
+sample = "default"
+cell = "default"
+path = "."
+```
+
+```{python}
+#| include: false
 from pathlib import Path
 
 import numpy as np
@@ -26,22 +34,20 @@ import spatialdata_plot
 from timer import timer, write_timings_tsv
 
 with timer("Setup"):
-    with open("params.json") as f:
-        params = json.load(f)
-
-    roi = params["sample"]
-    cell_id = params["cell"]
+    roi = sample
+    cell_id = cell
     # 'path' is the staged follicle-level zarr produced by subset_follicle.
-    zarr_path = params["path"]
+    zarr_path = path
 ```
 
 ```{python}
+#| include: false
 with timer("Read zarr"):
     sdata = spatialdata.read_zarr(zarr_path)
-sdata
 ```
 
 ```{python}
+#| include: false
 with timer("Locate oocyte"):
     oocyte_element = None
     outline_element = None
@@ -70,12 +76,14 @@ else:
 ```
 
 ```{python}
+#| include: false
 with timer("List images"):
     image_keys = list(sdata.images.keys())
 print(f"Images: {image_keys}")
 ```
 
 ```{python}
+#| include: false
 figure_specs = []
 figure_dir = Path("plot_follicle_figures")
 figure_dir.mkdir(exist_ok=True)
@@ -187,5 +195,6 @@ for spec in figure_specs:
 ```
 
 ```{python}
+#| include: false
 write_timings_tsv("plot_follicle.timing.tsv")
 ```

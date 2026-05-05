@@ -15,11 +15,19 @@ execute:
 ---
 
 ```{python}
-import json
+#| tags: [parameters]
+
+sample = "default"
+path = "."
+cell_ids_file = "assets/stage_quality_area_all_rois.csv"
+radius = 250
+```
+
+```{python}
 import os
 import pandas as pd
 import spatialdata
-# import session_info  # not in current container
+import session_info
 from timer import timer, timing_summary
 
 
@@ -27,14 +35,8 @@ def normalize_sample_id(value: str) -> str:
     return "".join(ch for ch in str(value).upper() if ch.isalnum())
 
 with timer("Setup"):
-    with open("params.json") as f:
-        params = json.load(f)
-
-    sample = params["sample"]
     # 'path' is the staged sample-level zarr produced by create_sdata.
-    zarr_path = params["path"]
-    cell_ids_file = params["cell_ids_file"]
-    radius = float(params["radius"])
+    zarr_path = path
     default_radius = float(radius)
 ```
 
@@ -160,5 +162,5 @@ timing_summary()
 ## Session Info
 
 ```{python}
-# session_info.show()  # not in current container
+session_info.show()
 ```

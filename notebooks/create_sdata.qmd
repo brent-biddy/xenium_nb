@@ -14,12 +14,19 @@ execute:
 ---
 
 ```{python}
-import json
+#| tags: [parameters]
+
+sample = "default"
+path = "."
+n_jobs = 1
+```
+
+```{python}
 import os
 from pathlib import Path
 import spatialdata_io
 import spatialdata
-# import session_info  # not in current container
+import session_info
 from timer import timer, timing_summary
 
 def prepare_xenium_input(path_str: str) -> str:
@@ -61,12 +68,7 @@ def prepare_xenium_input(path_str: str) -> str:
     return str(compat_root.resolve())
 
 with timer("Setup"):
-    with open("params.json") as f:
-        params = json.load(f)
-
-    sample = params["sample"]
-    path = params["path"]
-    n_jobs = int(params["n_jobs"])
+    n_jobs = int(n_jobs)
     xenium_path = prepare_xenium_input(path)
     output_path = os.path.join("output", f"{sample}.zarr")
 ```
@@ -126,5 +128,5 @@ timing_summary()
 ## Session Info
 
 ```{python}
-# session_info.show()  # not in current container
+session_info.show()
 ```
