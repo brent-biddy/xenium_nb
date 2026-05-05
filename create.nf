@@ -8,7 +8,8 @@
 
 nextflow.enable.dsl = 2
 
-include { WRITE_QUARTO_PARAMS } from './modules/write_quarto_params'
+include { WRITE_QUARTO_PARAMS as SDATA_QUARTO_PARAMS } from './modules/write_quarto_params'
+include { WRITE_QUARTO_PARAMS as FOLLICLE_SDATA_QUARTO_PARAMS } from './modules/write_quarto_params'
 include { RUN_NOTEBOOK as CREATE_SDATA } from './modules/run_notebook'
 include { RUN_NOTEBOOK as CREATE_FOLLICLE_SDATA } from './modules/run_notebook'
 include { WRITE_SAMPLESHEET as WRITE_SDATA_SAMPLESHEET } from './modules/write_samplesheet'
@@ -66,7 +67,7 @@ workflow {
             )
         }
 
-        sampleArtifacts = CREATE_SDATA(WRITE_QUARTO_PARAMS(createInputs).notebook_inputs).artifacts
+        sampleArtifacts = CREATE_SDATA(SDATA_QUARTO_PARAMS(createInputs).notebook_inputs).artifacts
 
         def sampleArtifactRows = sampleArtifacts.map { sample, sampleZarr, _rowParams ->
             [
@@ -104,7 +105,7 @@ workflow {
             )
         }
 
-        def follicleArtifacts = CREATE_FOLLICLE_SDATA(WRITE_QUARTO_PARAMS(follicleInputs).notebook_inputs).artifacts
+        def follicleArtifacts = CREATE_FOLLICLE_SDATA(FOLLICLE_SDATA_QUARTO_PARAMS(follicleInputs).notebook_inputs).artifacts
 
         def follicleArtifactRows = follicleArtifacts.flatMap { sample, zarrPaths, _rowParams ->
             // Nextflow emits a single Path for one match and a List<Path> for many; normalize.
