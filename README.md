@@ -145,10 +145,22 @@ and writes:
 ```bash
 nextflow run create.nf \
     --samplesheet assets/samplesheet.csv \
-    --run_subset_follicle false
+    --create_stage sample
 ```
 
 This runs only `create_sdata.qmd` and writes `results/pipeline_info/sample_analysis_inputs.csv`.
+
+### Create follicle artifacts only
+
+Run this after `create_stage sample` has produced `results/pipeline_info/sample_analysis_inputs.csv`:
+
+```bash
+nextflow run create.nf \
+    --samplesheet results/pipeline_info/sample_analysis_inputs.csv \
+    --create_stage follicle
+```
+
+This runs only `create_follicle_sdata.qmd` and writes `results/pipeline_info/follicle_analysis_inputs.csv`.
 
 ### Create with the small test follicle file
 
@@ -190,7 +202,7 @@ Key parameters (set in `nextflow.config` or passed via `--param value`):
 | `container_image` | `babiddy755/xenium_nb:latest` | Container reference pulled by the `local` and `oscer` profiles; may be a registry tag or a local `.sif` path |
 | `cell_ids_registry` | built-in map | Named cell ID files available to `create.nf` |
 | `radius` | `250` | Default bounding box radius (µm) |
-| `run_subset_follicle` | `true` | Whether `create.nf` should run `create_follicle_sdata.qmd` after building sample-level zarrs |
+| `create_stage` | `both` | Create workflow mode: `sample`, `follicle`, or `both` |
 | `producer_registry` | built-in map | The two producer notebooks used by `create.nf` |
 | `analysis_notebook_registry` | built-in map | Notebook IDs, paths, and scopes used by `analyze.nf` |
 | `notebooks` | `[]` | Analysis notebook IDs to run in `analyze.nf` |
@@ -272,7 +284,7 @@ results/
 Analysis outputs also publish under the parent sample directory, so follicle reports for cells like `aaaaimck-1` and `aaaalpdj-1` both land under `results/ROI1/plot_follicle/`.
 For `plot_follicle`, the primary rendered artifact is a `.pptx` deck, with a companion timing TSV.
 
-If `--run_subset_follicle false` is used, `create_follicle_sdata/` outputs and `follicle_analysis_inputs.csv` are not created.
+If `--create_stage sample` is used, `create_follicle_sdata/` outputs and `follicle_analysis_inputs.csv` are not created.
 
 ---
 
