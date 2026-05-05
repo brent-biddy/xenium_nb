@@ -9,7 +9,7 @@ process RUN_NOTEBOOK {
     }
 
     input:
-    tuple val(notebook),
+    tuple path(notebook),
           val(notebook_base),
           path('timer.py'),
           path(input_path),
