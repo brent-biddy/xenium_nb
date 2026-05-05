@@ -88,4 +88,12 @@ PYEOF
 
     quarto render ${notebook} --output-dir .
     """
+
+    stub:
+    """
+    mkdir -p output
+    touch ${notebook.baseName}.pptx
+    touch ${notebook.baseName}.timing.tsv
+    touch output/.keep
+    """
 }

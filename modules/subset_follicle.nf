@@ -78,4 +78,13 @@ PYEOF
 
     quarto render ${notebook} --output-dir .
     """
+
+    stub:
+    """
+    mkdir -p output/${sample}.zarr
+    touch output/${sample}.zarr/.zgroup
+    touch output/${sample}.zarr/.zattrs
+    touch output/${sample}.zarr/.zmetadata
+    touch ${sample}_${notebook.baseName}.html
+    """
 }
