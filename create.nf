@@ -8,8 +8,8 @@
 
 nextflow.enable.dsl = 2
 
-include { RUN_PRODUCER_NOTEBOOK as CREATE_SPATIALDATA } from './modules/run_producer_notebook'
-include { RUN_PRODUCER_NOTEBOOK as SUBSET_FOLLICLE } from './modules/run_producer_notebook'
+include { RUN_CREATE_NOTEBOOK as CREATE_SDATA } from './modules/run_create_notebook'
+include { RUN_CREATE_NOTEBOOK as CREATE_FOLLICLE_SDATA } from './modules/run_create_notebook'
 include { WRITE_SAMPLESHEET as WRITE_SAMPLE_ANALYSIS_INPUTS } from './modules/write_samplesheet'
 include { WRITE_SAMPLESHEET as WRITE_FOLLICLE_ANALYSIS_INPUTS } from './modules/write_samplesheet'
 
@@ -58,8 +58,8 @@ workflow {
             tuple(createNotebook, timerScript, inputPath, cellIdsFilePath, sample, publishDir, rowParams, createNotebookParams)
         }
 
-        def createSpatialdata = CREATE_SPATIALDATA(createInputs)
-        sampleArtifacts = createSpatialdata.artifacts
+        def createSdata = CREATE_SDATA(createInputs)
+        sampleArtifacts = createSdata.artifacts
 
         def sampleArtifactRows = sampleArtifacts.map { sample, sampleZarr, rowParams ->
             [
@@ -75,7 +75,7 @@ workflow {
         ))
     }
 
-    // Skip CREATE_SPATIALDATA: caller's samplesheet already points at existing sample zarrs.
+    // Skip CREATE_SDATA: caller's samplesheet already points at existing sample zarrs.
     if (createMode == 'follicle_sdata') {
         sampleArtifacts = parseSamplesheet(params.samplesheet, 'Create follicle samplesheet')
     }
@@ -90,8 +90,8 @@ workflow {
             tuple(subsetNotebook, timerScript, sampleZarr, cellIdsFilePath, sample, publishDir, rowParams, subsetNotebookParams)
         }
 
-        def subsetFollicle = SUBSET_FOLLICLE(subsetInputs)
-        def follicleArtifacts = subsetFollicle.artifacts
+        def createFollicleSdata = CREATE_FOLLICLE_SDATA(subsetInputs)
+        def follicleArtifacts = createFollicleSdata.artifacts
 
         def follicleArtifactRows = follicleArtifacts.flatMap { sample, zarrPaths, _rowParams ->
             // Nextflow emits a single Path for one match and a List<Path> for many; normalize.

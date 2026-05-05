@@ -1,8 +1,8 @@
-// Renders a producer Quarto notebook (e.g. create_sdata, create_follicle_sdata)
+// Renders a create-stage Quarto notebook (e.g. create_sdata, create_follicle_sdata)
 // for one sample and emits the resulting zarr artifacts plus the rendered HTML.
 // The output glob `output/*.zarr` accommodates both single-zarr producers and
 // multi-zarr producers (Nextflow emits a Path for one match, a List<Path> for many).
-process RUN_PRODUCER_NOTEBOOK {
+process RUN_CREATE_NOTEBOOK {
     tag "${sample}:${notebook.baseName}"
 
     publishDir({ publish_dir }), mode: 'copy', saveAs: { fn ->
