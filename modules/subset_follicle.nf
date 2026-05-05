@@ -16,7 +16,7 @@ process SUBSET_FOLLICLE {
 
     output:
     tuple val(sample),
-          path("output"), emit: artifacts
+          path("output/*.zarr"), emit: artifacts
     path "*.html", emit: reports
 
     script:

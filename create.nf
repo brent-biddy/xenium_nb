@@ -59,11 +59,11 @@ workflow {
         }
 
         def subsetFollicle = SUBSET_FOLLICLE(subsetInputs)
-        def follicleArtifactGroups = subsetFollicle.artifacts
+        def follicleArtifacts = subsetFollicle.artifacts
 
-        def follicleArtifactRows = follicleArtifactGroups
-            .flatMap { sample, outputDir ->
-                def zarrs = outputDir.toFile().listFiles()?.findAll { it.name.endsWith('.zarr') } ?: []
+        def follicleArtifactRows = follicleArtifacts
+            .flatMap { sample, zarrPaths ->
+                def zarrs = zarrPaths instanceof List ? zarrPaths : [zarrPaths]
                 zarrs.collect { zarr ->
                     def cellId = zarr.baseName
                     [
