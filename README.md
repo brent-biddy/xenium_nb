@@ -17,14 +17,14 @@ Follicle-scoped analysis notebooks use an explicit three-column contract:
 sample,cell,path
 ```
 
-Notebook parameters are staged into each task work directory as `params.json` and loaded explicitly by the notebook code.
+Notebook parameters are filtered to the keys declared in the workflow registry and passed to Quarto with `--execute-params`; the notebook code reads the injected variables directly.
 
 ---
 
 ## Requirements
 
 - [Nextflow](https://www.nextflow.io/) ≥ 25.10.0
-- For default non-container local runs: [Quarto](https://quarto.org/) ≥ 1.4 and the required Python notebook packages
+- For default non-container local runs: [Quarto](https://quarto.org/) ≥ 1.4 and the required Python notebook packages, including `papermill`
 - For containerized local runs: Apptainer
 
 ---
@@ -295,8 +295,8 @@ The sample-stage sheet is the handoff input for `--create follicle_sdata`.
 
 ## Adding notebooks
 
-1. Create a new `.qmd` file in `notebooks/` with a YAML params block declaring at least `sample` and `path`, plus any scope-specific fields such as `cell` for follicle notebooks.
-2. If it is a create-stage producer, register it in `params.producer_registry` and wire it into `create.nf`.
-3. If it is an analysis notebook, register it in `params.analysis_notebook_registry` with a unique ID and a scope of `sample` or `follicle`.
-4. Run analysis notebooks with `nextflow run analyze.nf --samplesheet <artifact_sheet.csv> --notebooks <id1,id2>`.
-5. Any params not declared in the notebook's front matter are automatically filtered out before rendering.
+1. Create a new `.qmd` file in `notebooks/` with a Jupyter `parameters` cell declaring the notebook inputs it expects.
+2. Register the notebook in `params.producer_registry` or `params.analysis_notebook_registry` with a unique ID, a path, and an explicit `params` list naming the keys to pass through.
+3. If it is a create-stage producer, wire it into `create.nf`.
+4. If it is an analysis notebook, set the scope to `sample` or `follicle`.
+5. Run analysis notebooks with `nextflow run analyze.nf --samplesheet <artifact_sheet.csv> --notebooks <id1,id2>`.

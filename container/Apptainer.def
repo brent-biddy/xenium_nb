@@ -44,7 +44,9 @@ From: mambaorg/micromamba:1.5.10
     export PATH=/opt/conda/envs/xenium/bin:/opt/conda/bin:$PATH
     python - <<'PY'
 import nbformat
+import papermill
 import yaml
+import session_info
 import spatialdata
 import spatialdata_io
 import spatialdata_plot

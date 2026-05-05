@@ -35,7 +35,9 @@ ENV PYTHONUNBUFFERED=1
 
 RUN python - <<'PY'
 import nbformat
+import papermill
 import yaml
+import session_info
 import spatialdata
 import spatialdata_plot
 import scanpy

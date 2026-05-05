@@ -50,7 +50,7 @@ Validate the SIF directly:
 
 ```bash
 apptainer exec /absolute/path/to/xenium_tools_squidpy_local.sif \
-  python -c "import spatialdata, spatialdata_io, spatialdata_plot, scanpy, squidpy, nbclient, nbformat, yaml; print('ok')"
+  python -c "import spatialdata, spatialdata_io, spatialdata_plot, scanpy, squidpy, nbclient, nbformat, papermill, session_info, yaml; print('ok')"
 ```
 
 ## Build And Push A Registry Image
@@ -65,7 +65,7 @@ Validate it:
 
 ```bash
 docker run --rm xenium_tools_squidpy:local \
-  python -c "import spatialdata, spatialdata_io, spatialdata_plot, scanpy, squidpy, nbclient, nbformat, yaml; print('ok')"
+  python -c "import spatialdata, spatialdata_io, spatialdata_plot, scanpy, squidpy, nbclient, nbformat, papermill, session_info, yaml; print('ok')"
 ```
 
 You can also pass an explicit image tag:
