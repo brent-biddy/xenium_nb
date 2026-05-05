@@ -28,9 +28,7 @@ workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"
     def producerRegistry = NotebookRegistry.producer(projectDir.toString())
     def requiredColumns = ['sample', 'path'] as Set
-    def cellIdsRegistry = params.cell_ids_registry ?: [:]
-    def cellIdsFileValue = params.cell_ids_file?.toString()
-    def cellIdsFilePath = file(cellIdsRegistry.get(cellIdsFileValue, cellIdsFileValue))
+    def cellIdsFilePath = file(params.cell_ids_file)
     def createMode = params.create?.toString()?.toLowerCase()?.trim() ?: 'all'
     if (!(createMode in ['sdata', 'follicle_sdata', 'all'])) {
         error "Invalid create '${createMode}'. Valid values are: sdata, follicle_sdata, all"

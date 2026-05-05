@@ -97,10 +97,7 @@ ROI1,aaaalpdj-1,results/ROI1/create_follicle_sdata/output/aaaalpdj-1.zarr
 
 `assets/stage_quality_area_all_rois.csv` is used by the create workflow to decide which follicles to subset. It must contain `Donor.ROI` and `cell_id`. An optional `radius` column sets a per-cell bounding box radius (µm); missing values fall back to `params.radius`.
 
-`create.nf` can select this file by key. The built-in choices are:
-
-- `--cell_ids_file full`
-- `--cell_ids_file small`
+`create.nf` reads this file from `--cell_ids_file`, which is a direct CSV path.
 
 ### Downsampling Xenium test data
 
@@ -171,7 +168,7 @@ This runs only `create_follicle_sdata.qmd` and writes `results/create_follicle_s
 ```bash
 nextflow run create.nf \
     --samplesheet assets/samplesheet.csv \
-    --cell_ids_file small
+    --cell_ids_file assets/small_stage_quality_area_all_rois.csv
 ```
 
 ### Analyze follicle artifacts
@@ -179,7 +176,7 @@ nextflow run create.nf \
 ```bash
 nextflow run analyze.nf \
     --samplesheet results/create_follicle_sdata/follicle_sdata_samplesheet.csv \
-    --notebooks plot_follicle
+    --analyze plot_follicle
 ```
 
 ### Analyze sample artifacts
@@ -189,7 +186,7 @@ When you add analysis notebooks that only require sample-level artifacts, point 
 ```bash
 nextflow run analyze.nf \
     --samplesheet results/create_sdata/sample_sdata_samplesheet.csv \
-    --notebooks your_sample_notebook_id
+    --analyze your_sample_notebook_id
 ```
 
 ---
@@ -202,12 +199,11 @@ Key parameters (set in `nextflow.config` or passed via `--param value`):
 |-----------|---------|-------------|
 | `samplesheet` | `null` | Path to samplesheet CSV |
 | `outdir` | `results` | Output directory |
-| `cell_ids_file` | `full` | Cell ID reference file key or direct path |
+| `cell_ids_file` | `${projectDir}/assets/stage_quality_area_all_rois.csv` | Cell ID reference file path |
 | `container_image` | `babiddy755/xenium_nb:20260505-66addc7` | Container reference pulled by the `test` and `oscer` profiles; may be a registry tag or a local `.sif` path |
-| `cell_ids_registry` | built-in map | Named cell ID files available to `create.nf` |
 | `radius` | `250` | Default bounding box radius (µm) |
 | `create` | `all` | Create workflow mode: `sdata`, `follicle_sdata`, or `all` |
-| `notebooks` | `[]` | Analysis notebook IDs to run in `analyze.nf` |
+| `analyze` | `all` | Analysis notebook selector: `all` or a comma-separated list of notebook IDs from `lib/NotebookRegistry.groovy` |
 
 ### Analysis notebook IDs
 
@@ -241,7 +237,6 @@ For local Apptainer validation:
 HOME=/tmp/xenium_home conda run -n squidpy nextflow run analyze.nf \
     -profile test \
     --samplesheet /tmp/xenium_nb_test/follicle_sdata_samplesheet.csv \
-    --notebooks plot_follicle \
     --outdir /home/babiddy/xenium_nb_results_fresh \
     -process.memory '16 GB'
 ```
@@ -302,4 +297,4 @@ The sample-stage sheet is the handoff input for `--create follicle_sdata`.
 2. Register the notebook in `lib/NotebookRegistry.groovy` with a unique ID, a path, and an explicit `params` list naming the keys to pass through.
 3. If it is a create-stage producer, wire it into `create.nf`.
 4. For analysis notebooks, include every required row-level key in the registered `params` list (for example, include `cell` for follicle-level runs).
-5. Run analysis notebooks with `nextflow run analyze.nf --samplesheet <artifact_sheet.csv> --notebooks <id1,id2>`.
+5. Run analysis notebooks with `nextflow run analyze.nf --samplesheet <artifact_sheet.csv> --analyze <id1,id2|all>`.

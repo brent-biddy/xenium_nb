@@ -9,21 +9,22 @@ workflow {
     def registry = NotebookRegistry.analysis(projectDir.toString())
     def pipelineParamKeys = ['cell_ids_file', 'radius', 'n_jobs'] as Set
 
+    def analyzeSelection = params.analyze == null ? 'all' : params.analyze
     def notebookIds = (
-        params.notebooks == null
-            ? []
-            : params.notebooks instanceof List
-                ? params.notebooks.collect { it.toString().trim() }.findAll { it }
-                : params.notebooks.toString().split(',').collect { it.trim() }.findAll { it }
+        analyzeSelection instanceof List
+            ? analyzeSelection.collect { it.toString().trim() }.findAll { it }
+            : analyzeSelection.toString().trim().equalsIgnoreCase('all')
+                ? (registry.keySet() as List).sort()
+                : analyzeSelection.toString().split(',').collect { it.trim() }.findAll { it }
     )
     if (!notebookIds) {
-        error "Please provide at least one notebook ID via --notebooks"
+        error "Please provide at least one analysis notebook ID via --analyze, or use 'all'"
     }
-
     def unknownNotebookIds = notebookIds.findAll { !registry.containsKey(it) }.unique()
     if (unknownNotebookIds) {
-        error "Unknown notebook IDs: ${unknownNotebookIds.join(', ')}. Known IDs: ${registry.keySet().sort().join(', ')}"
+        error "Unknown analysis notebook IDs: ${unknownNotebookIds.join(', ')}. Known IDs: ${registry.keySet().sort().join(', ')}"
     }
+    log.info "Running analysis notebooks: ${notebookIds.join(', ')}"
 
     def notebookParamKeys = notebookIds
         .collectMany { registry[it].params ?: [] }
