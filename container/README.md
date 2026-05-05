@@ -25,9 +25,9 @@ The primary local workflow is:
 If `/tmp` is too small on your machine, point Apptainer at a larger writable temp area:
 
 ```bash
-mkdir -p /home/babiddy/xenium_nb/container/.apptainer-tmp
-APPTAINER_TMPDIR=/home/babiddy/xenium_nb/container/.apptainer-tmp \
-TMPDIR=/home/babiddy/xenium_nb/container/.apptainer-tmp \
+mkdir -p "$PWD/container/.apptainer-tmp"
+APPTAINER_TMPDIR="$PWD/container/.apptainer-tmp" \
+TMPDIR="$PWD/container/.apptainer-tmp" \
   ./container/build_apptainer.sh
 ```
 

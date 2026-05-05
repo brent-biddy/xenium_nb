@@ -5,19 +5,7 @@ A Nextflow pipeline for Xenium spatial transcriptomics data with two separate en
 - `create.nf` builds reusable data artifacts
 - `analyze.nf` runs analysis notebooks against artifact samplesheets
 
-The create workflow and sample-level analysis runs use a two-column samplesheet contract:
-
-```csv
-sample,path
-```
-
-Analysis notebooks that declare a `cell` param use an explicit three-column contract:
-
-```csv
-sample,cell,path
-```
-
-Notebook parameters are filtered to the keys declared in the workflow registry and passed to Quarto with `--execute-params`; the notebook code reads the injected variables directly.
+Notebook-specific inputs, outputs, and samplesheet contracts are documented in [notebooks/README.md](notebooks/README.md).
 
 ---
 
@@ -39,8 +27,6 @@ xenium_nb/
 │   ├── NotebookRegistry.groovy # Pipeline-internal notebook metadata catalog
 │   └── QuartoParams.groovy    # Shared Quarto parameter filtering/merge helper
 ├── nextflow.config            # Parameters and profiles
-├── conf/
-│   └── base.config            # Resource defaults
 ├── modules/
 │   ├── create_spatialdata.nf      # Sample-level artifact producer
 │   ├── subset_follicle.nf         # Follicle-level artifact producer
@@ -48,6 +34,7 @@ xenium_nb/
 │   ├── write_quarto_params.nf     # Renders params.yml for notebooks
 │   └── write_samplesheet.nf       # Writes artifact samplesheets
 ├── notebooks/
+│   ├── README.md
 │   ├── create_sdata.qmd
 │   ├── create_follicle_sdata.qmd
 │   └── plot_follicle.qmd
@@ -62,45 +49,11 @@ xenium_nb/
 
 ---
 
-## Samplesheets
+## Notebook Docs
 
-### Create workflow input
+Detailed notebook contracts and examples live in [notebooks/README.md](notebooks/README.md).
 
-Used by `create.nf`. `path` points to a raw Xenium output directory.
-
-```csv
-sample,path
-ROI1,/path/to/ROI1/xenium_output
-ROI2,/path/to/ROI2/xenium_output
-```
-
-### Analysis workflow input
-
-Used by `analyze.nf`. `path` points to an already-built artifact. If the selected notebook declares `cell` in its registered params, the samplesheet must include the `cell` column.
-
-Sample artifact sheet:
-
-```csv
-sample,path
-ROI1,results/ROI1/create_sdata/output/ROI1.zarr
-ROI2,results/ROI2/create_sdata/output/ROI2.zarr
-```
-
-Follicle artifact sheet:
-
-```csv
-sample,cell,path
-ROI1,aaaaimck-1,results/ROI1/create_follicle_sdata/output/aaaaimck-1.zarr
-ROI1,aaaalpdj-1,results/ROI1/create_follicle_sdata/output/aaaalpdj-1.zarr
-```
-
-### Cell ID reference file
-
-`assets/stage_quality_area_all_rois.csv` is used by the create workflow to decide which follicles to subset. It must contain `Donor.ROI` and `cell_id`. An optional `radius` column sets a per-cell bounding box radius (µm); missing values fall back to `params.radius`.
-
-`create.nf` reads this file from `--cell_ids_file`, which is a direct CSV path.
-
-### Downsampling Xenium test data
+## Downsampling Xenium test data
 
 `bin/downsample_xenium.py` regenerates a smaller Xenium output directory by spatially subsampling cells and rebuilding the associated Xenium sidecar files, zarr archives, and reduced-resolution morphology OME-TIFF pyramids.
 
@@ -150,7 +103,7 @@ nextflow run create.nf \
 ```
 
 This runs only `create_sdata.qmd` and writes `results/create_sdata/sample_sdata_samplesheet.csv`.
-It also writes `results/create_sdata/sample_sdata_samplesheet.csv`, which can be used as the input to `--create follicle_sdata`.
+That sheet can be used as input to `--create follicle_sdata`.
 
 ### Create follicle sdata only
 
@@ -221,7 +174,7 @@ Notebook metadata is defined in [`lib/NotebookRegistry.groovy`](lib/NotebookRegi
 | Profile | Description |
 |---------|-------------|
 | (default) | Local execution, no container (use an activated conda env that provides the notebook kernel). |
-| `test` | Local execution with Apptainer, sized for a laptop / WSL2 box (8 GB default; 12 GB for `CREATE_SPATIALDATA` and `SUBSET_FOLLICLE`). Override `--container_image` with a local `.sif` path after building `container/Apptainer.def`. |
+| `test` | Local execution with Apptainer, sized for a laptop / WSL2 box (8 GB default). Override `--container_image` with a local `.sif` path after building `container/Apptainer.def`. |
 | `oscer` | SLURM executor on OSCER HPC, Apptainer container, scratch-based work directory and image cache. Memory scales 32→64→96 GB across retries. |
 
 Activate with `-profile oscer`:
