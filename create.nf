@@ -55,7 +55,13 @@ workflow {
             }
             .collect()
             .map { rows -> groovy.json.JsonOutput.toJson(rows) }
-            .map { rowsJson -> tuple('sample_analysis_inputs.csv', rowsJson) }
+            .map { rowsJson ->
+                tuple(
+                    'sample_sdata_samplesheet.csv',
+                    rowsJson,
+                    "${params.outdir}/${createNotebook.baseName}"
+                )
+            }
 
         WRITE_SAMPLE_ANALYSIS_INPUTS(sampleArtifactRows)
     } else {
@@ -87,7 +93,13 @@ workflow {
             }
             .collect()
             .map { rows -> groovy.json.JsonOutput.toJson(rows) }
-            .map { rowsJson -> tuple('follicle_analysis_inputs.csv', rowsJson) }
+            .map { rowsJson ->
+                tuple(
+                    'follicle_sdata_samplesheet.csv',
+                    rowsJson,
+                    "${params.outdir}/${subsetNotebook.baseName}"
+                )
+            }
 
         WRITE_FOLLICLE_ANALYSIS_INPUTS(follicleArtifactRows)
     }

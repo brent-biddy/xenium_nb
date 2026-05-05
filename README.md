@@ -137,8 +137,8 @@ and writes:
 
 - sample zarrs under `results/<sample>/create_sdata/output/`
 - follicle zarrs under `results/<sample>/create_follicle_sdata/output/`
-- `results/pipeline_info/sample_analysis_inputs.csv`
-- `results/pipeline_info/follicle_analysis_inputs.csv`
+- `results/create_sdata/sample_sdata_samplesheet.csv`
+- `results/create_follicle_sdata/follicle_sdata_samplesheet.csv`
 
 ### Create sample artifacts only
 
@@ -148,19 +148,20 @@ nextflow run create.nf \
     --create_stage sample
 ```
 
-This runs only `create_sdata.qmd` and writes `results/pipeline_info/sample_analysis_inputs.csv`.
+This runs only `create_sdata.qmd` and writes `results/create_sdata/sample_sdata_samplesheet.csv`.
+It also writes `results/create_sdata/sample_sdata_samplesheet.csv`, which can be used as the input to `--create_stage follicle`.
 
 ### Create follicle artifacts only
 
-Run this after `create_stage sample` has produced `results/pipeline_info/sample_analysis_inputs.csv`:
+Run this after `create_stage sample` has produced `results/create_sdata/sample_sdata_samplesheet.csv`:
 
 ```bash
 nextflow run create.nf \
-    --samplesheet results/pipeline_info/sample_analysis_inputs.csv \
+    --samplesheet results/create_sdata/sample_sdata_samplesheet.csv \
     --create_stage follicle
 ```
 
-This runs only `create_follicle_sdata.qmd` and writes `results/pipeline_info/follicle_analysis_inputs.csv`.
+This runs only `create_follicle_sdata.qmd` and writes `results/create_follicle_sdata/follicle_sdata_samplesheet.csv`.
 
 ### Create with the small test follicle file
 
@@ -174,7 +175,7 @@ nextflow run create.nf \
 
 ```bash
 nextflow run analyze.nf \
-    --samplesheet results/pipeline_info/follicle_analysis_inputs.csv \
+    --samplesheet results/create_follicle_sdata/follicle_sdata_samplesheet.csv \
     --notebooks plot_follicle
 ```
 
@@ -184,7 +185,7 @@ When you add sample-scoped analysis notebooks to the registry, point `analyze.nf
 
 ```bash
 nextflow run analyze.nf \
-    --samplesheet results/pipeline_info/sample_analysis_inputs.csv \
+    --samplesheet results/create_sdata/sample_sdata_samplesheet.csv \
     --notebooks your_sample_notebook_id
 ```
 
@@ -236,7 +237,7 @@ For local Apptainer validation:
 ```bash
 HOME=/tmp/xenium_home conda run -n squidpy nextflow run analyze.nf \
     -profile local \
-    --samplesheet /tmp/xenium_nb_test/follicle_analysis_inputs.csv \
+    --samplesheet /tmp/xenium_nb_test/follicle_sdata_samplesheet.csv \
     --notebooks plot_follicle \
     --outdir /home/babiddy/xenium_nb_results_fresh \
     -process.memory '16 GB'
@@ -260,8 +261,10 @@ results/
 ├── pipeline_info/
 │   ├── timeline.html
 │   ├── report.html
-│   ├── sample_analysis_inputs.csv
-│   └── follicle_analysis_inputs.csv
+├── create_sdata/
+│   └── sample_sdata_samplesheet.csv
+├── create_follicle_sdata/
+│   └── follicle_sdata_samplesheet.csv
 ├── ROI1/
 │   ├── create_sdata/
 │   │   ├── ROI1_create_sdata.html
@@ -284,7 +287,9 @@ results/
 Analysis outputs also publish under the parent sample directory, so follicle reports for cells like `aaaaimck-1` and `aaaalpdj-1` both land under `results/ROI1/plot_follicle/`.
 For `plot_follicle`, the primary rendered artifact is a `.pptx` deck, with a companion timing TSV.
 
-If `--create_stage sample` is used, `create_follicle_sdata/` outputs and `follicle_analysis_inputs.csv` are not created.
+If `--create_stage sample` is used, `create_follicle_sdata/` outputs and `results/create_follicle_sdata/follicle_sdata_samplesheet.csv` are not created.
+
+The sample-stage sheet is the handoff input for `--create_stage follicle`.
 
 ---
 

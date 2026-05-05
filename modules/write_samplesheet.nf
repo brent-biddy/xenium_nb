@@ -1,10 +1,9 @@
 process WRITE_SAMPLESHEET {
     tag "${output_name}"
-
-    publishDir "${params.outdir}/pipeline_info", mode: 'copy'
+    publishDir({ publish_dir }), mode: 'copy'
 
     input:
-    tuple val(output_name), val(rows_json)
+    tuple val(output_name), val(rows_json), val(publish_dir)
 
     output:
     path output_name
