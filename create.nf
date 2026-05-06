@@ -8,10 +8,9 @@
 
 nextflow.enable.dsl = 2
 
-include { WRITE_QUARTO_PARAMS as SDATA_QUARTO_PARAMS } from './modules/write_quarto_params'
-include { WRITE_QUARTO_PARAMS as FOLLICLE_SDATA_QUARTO_PARAMS } from './modules/write_quarto_params'
-include { RUN_NOTEBOOK as CREATE_SDATA } from './modules/run_notebook'
-include { RUN_NOTEBOOK as CREATE_FOLLICLE_SDATA } from './modules/run_notebook'
+include { WRITE_QUARTO_PARAMS as WRITE_CREATE_SDATA_PARAMS } from './modules/write_quarto_params'
+include { WRITE_QUARTO_PARAMS as WRITE_CREATE_FOLLICLE_SDATA_PARAMS } from './modules/write_quarto_params'
+include { CREATE_SDATA; CREATE_FOLLICLE_SDATA } from './modules/create_notebooks'
 include { WRITE_SAMPLESHEET as WRITE_SDATA_SAMPLESHEET } from './modules/write_samplesheet'
 include { WRITE_SAMPLESHEET as WRITE_FOLLICLE_SAMPLESHEET } from './modules/write_samplesheet'
 
@@ -39,7 +38,6 @@ def buildSamplesheetInput(rowsChannel, outputName, publishDir) {
 
 workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"
-    def createRegistry = NotebookRegistry.create(projectDir.toString())
     def timerScript = file("${projectDir}/bin/timer.py")
     def createMode = params.create.toLowerCase()
     if (!(createMode in ['sdata', 'follicle_sdata', 'all'])) {
@@ -48,34 +46,35 @@ workflow {
 
     def createSdataArtifacts = null
     def follicleSourceArtifacts = null
+    def cellIdsFile = file(params.cell_ids_file)
+    def createNotebook = file("${projectDir}/notebooks/create_sdata.qmd")
+    def follicleNotebook = file("${projectDir}/notebooks/create_follicle_sdata.qmd")
 
     // ---- sdata: raw Xenium -> per-sample SpatialData zarr ----
     if (createMode in ['sdata', 'all']) {
         def sampleRows = parseSamplesheet(params.samplesheet, 'Create samplesheet')
 
-        def createNotebook = file(createRegistry.create_sdata.path)
-        def cellIdsFile = params.cell_ids_file.toString()
-        def createInputs = sampleRows.map { sample, inputPath, rowParams ->
-            tuple(
-                createNotebook.toString(),
-                createNotebook.baseName,
-                timerScript.toString(),
-                inputPath.toString(),
-                sample,
-                "${params.outdir}/${sample}/${createNotebook.baseName}",
-                sample,
-                rowParams,
-                cellIdsFile,
-                createRegistry.create_sdata.params
-            )
+        def createParamsInputs = sampleRows.map { sample, inputPath, rowParams ->
+            tuple(sample, inputPath, rowParams + [sample: sample], ['sample', 'path', 'n_jobs'])
+        }
+        def createRunInputs = sampleRows.map { sample, inputPath, rowParams ->
+            tuple(sample, inputPath)
+        }
+        def createRowParams = sampleRows.map { sample, inputPath, rowParams ->
+            tuple(sample, rowParams + [sample: sample])
         }
 
-        def createSdataRun = CREATE_SDATA(SDATA_QUARTO_PARAMS(createInputs).notebook_inputs)
+        def createSdataParams = WRITE_CREATE_SDATA_PARAMS(createParamsInputs)
+        def createSdataRun = CREATE_SDATA(
+            createRunInputs.join(createSdataParams.params_file),
+            Channel.value(createNotebook),
+            Channel.value(timerScript),
+        )
         createSdataArtifacts = createSdataRun.artifacts
-        follicleSourceArtifacts = createSdataArtifacts
+        follicleSourceArtifacts = createSdataArtifacts.join(createRowParams)
 
-        def sampleArtifactRows = createSdataArtifacts.map { sample, sampleZarr, _rowParams ->
-            def imageScaleFactor = _rowParams.image_scale_factor ?: 1.0
+        def sampleArtifactRows = follicleSourceArtifacts.map { sample, sampleZarr, rowParams ->
+            def imageScaleFactor = rowParams.image_scale_factor ?: 1.0
             [
                 sample            : sample,
                 path              : "${params.outdir}/${sample}/${createNotebook.baseName}/output/${sampleZarr.name}",
@@ -97,30 +96,29 @@ workflow {
 
     // ---- follicle_sdata: per-sample SpatialData -> per-cell-ID subset zarrs ----
     if (createMode in ['follicle_sdata', 'all']) {
-        def follicleNotebook = file(createRegistry.create_follicle_sdata.path)
-        def cellIdsFile = params.cell_ids_file.toString()
-        def follicleInputs = follicleSourceArtifacts.map { sample, sampleZarr, rowParams ->
-            tuple(
-                follicleNotebook.toString(),
-                follicleNotebook.baseName,
-                timerScript.toString(),
-                sampleZarr.toString(),
-                sample,
-                "${params.outdir}/${sample}/${follicleNotebook.baseName}",
-                sample,
-                rowParams,
-                cellIdsFile,
-                createRegistry.create_follicle_sdata.params
-            )
+        def follicleParamsInputs = follicleSourceArtifacts.map { sample, sampleZarr, rowParams ->
+            tuple(sample, sampleZarr, rowParams + [sample: sample], ['sample', 'path', 'cell_ids_file', 'radius', 'image_scale_factor'])
+        }
+        def follicleRunInputs = follicleSourceArtifacts.map { sample, sampleZarr, rowParams ->
+            tuple(sample, sampleZarr)
+        }
+        def follicleRowParams = follicleSourceArtifacts.map { sample, sampleZarr, rowParams ->
+            tuple(sample, rowParams + [sample: sample])
         }
 
-        def follicleRun = CREATE_FOLLICLE_SDATA(FOLLICLE_SDATA_QUARTO_PARAMS(follicleInputs).notebook_inputs)
+        def follicleParams = WRITE_CREATE_FOLLICLE_SDATA_PARAMS(follicleParamsInputs)
+        def follicleRun = CREATE_FOLLICLE_SDATA(
+            follicleRunInputs.join(follicleParams.params_file),
+            Channel.value(cellIdsFile),
+            Channel.value(follicleNotebook),
+            Channel.value(timerScript),
+        )
         def follicleArtifacts = follicleRun.artifacts
 
-        def follicleArtifactRows = follicleArtifacts.flatMap { sample, zarrPaths, _rowParams ->
+        def follicleArtifactRows = follicleArtifacts.join(follicleRowParams).flatMap { sample, zarrPaths, rowParams ->
             // Nextflow emits a single Path for one match and a List<Path> for many; normalize.
             def zarrs = zarrPaths instanceof List ? zarrPaths : [zarrPaths]
-            def imageScaleFactor = _rowParams.image_scale_factor ?: 1.0
+            def imageScaleFactor = rowParams.image_scale_factor ?: 1.0
             zarrs.collect { zarr ->
                 [
                     sample            : sample,

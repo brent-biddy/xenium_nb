@@ -17,8 +17,8 @@ process RUN_NOTEBOOK {
           val(publish_dir),
           val(publish_name),
           val(row_params),
-          path(cell_ids_file),
           path('params.yml')
+    path cell_ids_file
 
     output:
     tuple val(sample), path('output/*.zarr'), val(row_params), optional: true, emit: artifacts
