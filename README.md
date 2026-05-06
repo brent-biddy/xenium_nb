@@ -127,7 +127,6 @@ Key parameters (set in `nextflow.config` or passed via `--param value`):
 | `samplesheet` | `null` | Path to samplesheet CSV |
 | `outdir` | `results` | Output directory |
 | `cell_ids_file` | `${projectDir}/assets/stage_quality_area_all_rois.csv` | Cell ID reference file path |
-| `container_image` | `babiddy755/xenium_nb:20260505-66addc7` | Container reference pulled by the `test` and `oscer` profiles; may be a registry tag or a local `.sif` path |
 | `radius` | `250` | Default bounding box radius (µm) |
 | `create` | `all` | Create workflow mode: `sdata`, `follicle_sdata`, or `all` |
 | `analyze` | `all` | Analysis notebook selector: `all` or a comma-separated list of notebook IDs from `lib/NotebookRegistry.groovy` |
@@ -139,7 +138,7 @@ Analysis notebook IDs and how to add new notebooks are documented in [notebooks/
 | Profile | Description |
 |---------|-------------|
 | (default) | Local execution, no container (use an activated conda env that provides the notebook kernel). |
-| `test` | Local execution with Apptainer, sized for a laptop / WSL2 box (8 GB default). Override `--container_image` with a local `.sif` path after building `container/Apptainer.def`. |
+| `test` | Local execution with Apptainer, sized for a laptop / WSL2 box (8 GB default). Build a local `.sif` with `container/build_apptainer.sh` and update `container` in the `test` profile. |
 | `oscer` | SLURM executor on OSCER HPC, Apptainer container, scratch-based work directory and image cache. Memory scales 32→64→96 GB across retries. |
 
 Activate with `-profile oscer`:
@@ -166,7 +165,8 @@ To publish the same runtime for OSCER:
 ./container/build_docker.sh
 docker tag xenium_tools_squidpy:local babiddy755/xenium_nb:<tag>
 docker push babiddy755/xenium_nb:<tag>
-nextflow run create.nf --samplesheet assets/samplesheet.csv -profile oscer --container_image babiddy755/xenium_nb:<tag>
+# Update container in the oscer profile in nextflow.config, then:
+nextflow run create.nf --samplesheet assets/samplesheet.csv -profile oscer
 ```
 
 ---
