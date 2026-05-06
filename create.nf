@@ -82,7 +82,7 @@ workflow {
             
         sampleArtifactRows
             .collect()
-            .map { rows -> tuple('sample_sdata_samplesheet.csv', groovy.json.JsonOutput.toJson(rows)) }
+            .map { rows -> tuple('sample_sdata_samplesheet.csv', rows) }
             .set { sdataSamplesheetInput }
 
         SDATA_SAMPLESHEET(sdataSamplesheetInput)
@@ -144,7 +144,7 @@ workflow {
 
         follicleArtifactRows
             .collect()
-            .map { rows -> tuple('follicle_sdata_samplesheet.csv', groovy.json.JsonOutput.toJson(rows)) }
+            .map { rows -> tuple('follicle_sdata_samplesheet.csv', rows) }
             .set { follicleSheetInput }
 
         FOLLICLE_SAMPLESHEET(follicleSheetInput)
