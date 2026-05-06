@@ -2,14 +2,9 @@ name: Validate notebook registry
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'lib/NotebookRegistry.groovy'
-      - 'notebooks/**.qmd'
   pull_request:
-    paths:
-      - 'lib/NotebookRegistry.groovy'
-      - 'notebooks/**.qmd'
+    branches:
+      - main
 
 jobs:
   validate:
