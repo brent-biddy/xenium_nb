@@ -9,10 +9,10 @@ def renderParamsYaml(Collection declaredParams, String inputPath, Map rowParams)
     def yaml = new org.yaml.snakeyaml.Yaml()
     def merged = new LinkedHashMap()
 
-    merged['path'] = new File(inputPath).name
+    merged['path'] = inputPath
 
     if (declared.contains('cell_ids_file'))
-        merged['cell_ids_file'] = new File(params.cell_ids_file as String).name
+        merged['cell_ids_file'] = new File(params.cell_ids_file as String).absolutePath
     if (declared.contains('radius'))
         merged['radius'] = params.radius
 
