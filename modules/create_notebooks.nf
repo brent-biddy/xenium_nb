@@ -24,7 +24,7 @@ process CREATE_SDATA {
     export TMPDIR="\$PWD/tmp"
     mkdir -p "\$XDG_CACHE_HOME" "\$TMPDIR"
 
-    quarto render ${notebook} --execute-params params.yml --output-dir .
+    quarto render ${notebook} --execute-params params.yml -P n_jobs:${task.cpus} --output-dir .
     """
 
     stub:
@@ -62,7 +62,7 @@ process CREATE_FOLLICLE_SDATA {
     export TMPDIR="\$PWD/tmp"
     mkdir -p "\$XDG_CACHE_HOME" "\$TMPDIR"
 
-    quarto render ${notebook} --execute-params params.yml --output-dir .
+    quarto render ${notebook} --execute-params params.yml -P n_jobs:${task.cpus} --output-dir .
     """
 
     stub:

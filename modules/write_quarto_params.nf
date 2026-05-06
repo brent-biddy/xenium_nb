@@ -2,8 +2,8 @@
 // params. This keeps YAML generation outside the notebook execution process.
 
 // Builds a YAML string from declared per-notebook params and row data.
-// path and n_jobs are always included; cell_ids_file and radius are read
-// from pipeline params when declared.
+// path is always included; cell_ids_file and radius are read from pipeline
+// params when declared. n_jobs is passed directly by the execution process.
 def renderParamsYaml(Collection declaredParams, String inputPath, Map rowParams) {
     def declared = declaredParams as Set
     def yaml = new org.yaml.snakeyaml.Yaml()
@@ -33,7 +33,7 @@ process WRITE_QUARTO_PARAMS {
     tuple val(sample_id), path('params.yml'), emit: params_file
 
     script:
-    def paramsB64 = renderParamsYaml(declared_params, input_path as String, row_params + [n_jobs: task.cpus])
+    def paramsB64 = renderParamsYaml(declared_params, input_path as String, row_params)
         .bytes.encodeBase64().toString()
     """
     python3 -c "import base64; open('params.yml', 'w').write(base64.b64decode('${paramsB64}').decode())"

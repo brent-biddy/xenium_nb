@@ -57,7 +57,7 @@ workflow {
 
         sampleRows
             .map { sample, inputPath, rowParams ->
-                tuple(sample, inputPath, rowParams, ['sample', 'n_jobs'])
+                tuple(sample, inputPath, rowParams, ['sample'])
             }
             .set { sdataParamsInputs }
 
