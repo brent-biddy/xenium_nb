@@ -14,28 +14,6 @@ include { CREATE_SDATA; CREATE_FOLLICLE_SDATA } from './modules/create_notebooks
 include { WRITE_SAMPLESHEET as SDATA_SAMPLESHEET } from './modules/write_samplesheet'
 include { WRITE_SAMPLESHEET as FOLLICLE_SAMPLESHEET } from './modules/write_samplesheet'
 
-// Reads a (sample, path, ...) CSV and emits (sample, file, rowMap) per row.
-// Extra columns are preserved in rowMap so notebooks can read per-sample params.
-def parseSamplesheet(sheetPath) {
-    Channel
-        .fromPath(sheetPath)
-        .splitCsv(header: true)
-        .map { row ->
-            if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
-            if (!row.path)   error "Samplesheet row missing 'path': ${row}"
-            tuple(row.sample.toString(), file(row.path), row)
-        }
-}
-
-// Collects per-sample row maps into a single JSON-encoded payload tuple
-// shaped for WRITE_SAMPLESHEET.
-def buildSamplesheetInput(rowsChannel, outputName, publishDir) {
-    rowsChannel
-        .collect()
-        .map { rows -> groovy.json.JsonOutput.toJson(rows) }
-        .map { rowsJson -> tuple(outputName, rowsJson, publishDir) }
-}
-
 workflow {
     def createMode = params.create.toLowerCase()
 
@@ -50,7 +28,14 @@ workflow {
     def createNotebook = file("${projectDir}/notebooks/create_sdata.qmd")
     def follicleNotebook = file("${projectDir}/notebooks/create_follicle_sdata.qmd")
 
-    parseSamplesheet(params.samplesheet)
+    Channel
+        .fromPath(params.samplesheet)
+        .splitCsv(header: true)
+        .map { row ->
+            if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
+            if (!row.path)   error "Samplesheet row missing 'path': ${row}"
+            tuple(row.sample.toString(), file(row.path), row)
+        }
         .collect(flat: false)
         .set { sampleRowsList }
 
@@ -95,7 +80,9 @@ workflow {
             }
             .set { sampleArtifactRows }
             
-        buildSamplesheetInput(sampleArtifactRows, 'sample_sdata_samplesheet.csv', "${params.outdir}")
+        sampleArtifactRows
+            .collect()
+            .map { rows -> tuple('sample_sdata_samplesheet.csv', groovy.json.JsonOutput.toJson(rows), "${params.outdir}") }
             .set { sdataSamplesheetInput }
 
         SDATA_SAMPLESHEET(sdataSamplesheetInput)
@@ -155,7 +142,9 @@ workflow {
             }
             .set { follicleArtifactRows }
 
-        buildSamplesheetInput(follicleArtifactRows, 'follicle_sdata_samplesheet.csv', "${params.outdir}")
+        follicleArtifactRows
+            .collect()
+            .map { rows -> tuple('follicle_sdata_samplesheet.csv', groovy.json.JsonOutput.toJson(rows), "${params.outdir}") }
             .set { follicleSheetInput }
 
         FOLLICLE_SAMPLESHEET(follicleSheetInput)
