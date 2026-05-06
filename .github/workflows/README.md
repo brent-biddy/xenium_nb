@@ -10,6 +10,6 @@ The validation script lives at [`bin/check_notebook_registry.py`](../../bin/chec
 
 ## Stub run (`stub_run.yml`)
 
-Runs on all PRs targeting `main`.
+Runs on all PRs targeting `main`. Can also be triggered manually via `workflow_dispatch`.
 
 Executes `create.nf` and `analyze.nf` in Nextflow stub mode (`-stub`), which skips actual process execution but verifies that the workflow parses correctly, all `include` statements resolve, and the process wiring is valid. Uses placeholder samplesheets from `assets/`.
