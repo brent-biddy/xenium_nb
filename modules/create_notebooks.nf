@@ -1,3 +1,6 @@
+// Quarto notebook processes for create.nf. Each process renders one notebook
+// to build a SpatialData artifact and publishes the result.
+
 process CREATE_SDATA {
     tag "${sample}"
 

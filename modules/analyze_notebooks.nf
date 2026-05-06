@@ -1,9 +1,10 @@
+// Quarto notebook processes for analyze.nf. Each process renders one notebook
+// against a pre-built SpatialData artifact and publishes the resulting reports.
+
 process PLOT_FOLLICLE {
     tag "${sample}:${cell}"
 
-    publishDir({ "${params.outdir}/${sample}/plot_follicle" }), mode: 'copy', saveAs: { fn ->
-        fn.startsWith('output/') ? fn : "${sample_id}_${fn}"
-    }
+    publishDir { "${params.outdir}/${sample}/plot_follicle" }, mode: 'copy'
 
     input:
     tuple val(sample_id), val(sample), val(cell), path(input_path), path('params.yml')

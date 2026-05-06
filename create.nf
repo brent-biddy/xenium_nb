@@ -16,13 +16,13 @@ include { WRITE_SAMPLESHEET as WRITE_FOLLICLE_SAMPLESHEET } from './modules/writ
 
 // Reads a (sample, path, ...) CSV and emits (sample, file, rowMap) per row.
 // Extra columns are preserved in rowMap so notebooks can read per-sample params.
-def parseSamplesheet(sheetPath, label) {
+def parseSamplesheet(sheetPath) {
     Channel
         .fromPath(sheetPath)
         .splitCsv(header: true)
         .map { row ->
-            if (!row.sample) error "${label} row missing 'sample': ${row}"
-            if (!row.path)   error "${label} row missing 'path': ${row}"
+            if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
+            if (!row.path)   error "Samplesheet row missing 'path': ${row}"
             tuple(row.sample.toString(), file(row.path), row)
         }
 }
@@ -37,102 +37,109 @@ def buildSamplesheetInput(rowsChannel, outputName, publishDir) {
 }
 
 workflow {
-    if (!params.samplesheet) error "Please provide --samplesheet"
-    def timerScript = file("${projectDir}/bin/timer.py")
     def createMode = params.create.toLowerCase()
+
+    if (!params.samplesheet) error "Please provide --samplesheet"
     if (!(createMode in ['sdata', 'follicle_sdata', 'all'])) {
         error "Invalid create '${createMode}'. Valid values are: sdata, follicle_sdata, all"
     }
 
-    def createSdataArtifacts = null
     def follicleSourceArtifacts = null
-    def cellIdsFile = file(params.cell_ids_file)
-    def createNotebook = file("${projectDir}/notebooks/create_sdata.qmd")
-    def follicleNotebook = file("${projectDir}/notebooks/create_follicle_sdata.qmd")
+    def timerScript = Channel.fromPath("${projectDir}/bin/timer.py")
+    def cellIdsFile = Channel.fromPath(params.cell_ids_file)
+    def createNotebook = Channel.fromPath("${projectDir}/notebooks/create_sdata.qmd")
+    def follicleNotebook = Channel.fromPath("${projectDir}/notebooks/create_follicle_sdata.qmd")
+
+    parseSamplesheet(params.samplesheet).set { sampleRows }
 
     // ---- sdata: raw Xenium -> per-sample SpatialData zarr ----
-    if (createMode in ['sdata', 'all']) {
-        def sampleRows = parseSamplesheet(params.samplesheet, 'Create samplesheet')
+    if (createMode == 'sdata' || createMode == 'all') {
 
-        def createParamsInputs = sampleRows.map { sample, inputPath, rowParams ->
-            tuple(sample, inputPath, rowParams + [sample: sample], ['sample', 'path', 'n_jobs'])
-        }
-        def createRunInputs = sampleRows.map { sample, inputPath, rowParams ->
-            tuple(sample, inputPath)
-        }
-        def createRowParams = sampleRows.map { sample, inputPath, rowParams ->
-            tuple(sample, rowParams + [sample: sample])
-        }
+        sampleRows
+            .map { sample, inputPath, rowParams ->
+                tuple(sample, inputPath, rowParams + [sample: sample], ['sample', 'path', 'n_jobs'])
+            }
+            .set { createParamsInputs }
+        
+        WRITE_CREATE_SDATA_PARAMS(createParamsInputs) | set { createSdataParams }
 
-        def createSdataParams = WRITE_CREATE_SDATA_PARAMS(createParamsInputs)
-        def createSdataRun = CREATE_SDATA(
-            createRunInputs.join(createSdataParams.params_file),
-            Channel.value(createNotebook),
-            Channel.value(timerScript),
-        )
-        createSdataArtifacts = createSdataRun.artifacts
-        follicleSourceArtifacts = createSdataArtifacts.join(createRowParams)
+        sampleRows
+            .map { sample, inputPath, rowParams -> tuple(sample, inputPath) }
+            .join(createSdataParams.params_file)
+            .set { createSdataInputs }
+            
+        CREATE_SDATA(createSdataInputs, createNotebook, timerScript) | set { createSdataRun }
 
-        def sampleArtifactRows = follicleSourceArtifacts.map { sample, sampleZarr, rowParams ->
-            def imageScaleFactor = rowParams.image_scale_factor ?: 1.0
-            [
-                sample            : sample,
-                path              : "${params.outdir}/${sample}/${createNotebook.baseName}/output/${sampleZarr.name}",
-                image_scale_factor: imageScaleFactor,
-            ]
-        }
+        follicleSourceArtifacts = createSdataRun.artifacts
+            .join(sampleRows)
+            .map { sample, zarr, inputPath, rowParams ->
+                tuple(sample, zarr, rowParams + [sample: sample])
+            }
 
-        WRITE_SDATA_SAMPLESHEET(buildSamplesheetInput(
-            sampleArtifactRows,
-            'sample_sdata_samplesheet.csv',
-            "${params.outdir}/${createNotebook.baseName}",
-        ))
+        follicleSourceArtifacts
+            .map { sample, sampleZarr, rowParams ->
+                def imageScaleFactor = rowParams.image_scale_factor ?: 1.0
+                [
+                    sample            : sample,
+                    path              : "${params.outdir}/${sample}/create_sdata/output/${sampleZarr.name}",
+                    image_scale_factor: imageScaleFactor,
+                ]
+            }
+            .set { sampleArtifactRows }
+            
+        buildSamplesheetInput(sampleArtifactRows, 'sample_sdata_samplesheet.csv', "${params.outdir}/create_sdata")
+            .set { sdataSamplesheetInput }
+
+        WRITE_SDATA_SAMPLESHEET(sdataSamplesheetInput)
     }
 
     // Skip CREATE_SDATA: caller's samplesheet already points at existing sample zarrs.
     if (createMode == 'follicle_sdata') {
-        follicleSourceArtifacts = parseSamplesheet(params.samplesheet, 'Create follicle samplesheet')
+        follicleSourceArtifacts = sampleRows
     }
 
     // ---- follicle_sdata: per-sample SpatialData -> per-cell-ID subset zarrs ----
-    if (createMode in ['follicle_sdata', 'all']) {
-        def follicleParamsInputs = follicleSourceArtifacts.map { sample, sampleZarr, rowParams ->
-            tuple(sample, sampleZarr, rowParams + [sample: sample], ['sample', 'path', 'cell_ids_file', 'radius', 'image_scale_factor'])
-        }
-        def follicleRunInputs = follicleSourceArtifacts.map { sample, sampleZarr, rowParams ->
-            tuple(sample, sampleZarr)
-        }
-        def follicleRowParams = follicleSourceArtifacts.map { sample, sampleZarr, rowParams ->
-            tuple(sample, rowParams + [sample: sample])
-        }
+    if (createMode == 'follicle_sdata' || createMode == 'all') {
 
-        def follicleParams = WRITE_CREATE_FOLLICLE_SDATA_PARAMS(follicleParamsInputs)
-        def follicleRun = CREATE_FOLLICLE_SDATA(
-            follicleRunInputs.join(follicleParams.params_file),
-            Channel.value(cellIdsFile),
-            Channel.value(follicleNotebook),
-            Channel.value(timerScript),
-        )
-        def follicleArtifacts = follicleRun.artifacts
-
-        def follicleArtifactRows = follicleArtifacts.join(follicleRowParams).flatMap { sample, zarrPaths, rowParams ->
-            // Nextflow emits a single Path for one match and a List<Path> for many; normalize.
-            def zarrs = zarrPaths instanceof List ? zarrPaths : [zarrPaths]
-            def imageScaleFactor = rowParams.image_scale_factor ?: 1.0
-            zarrs.collect { zarr ->
-                [
-                    sample            : sample,
-                    cell              : zarr.baseName,
-                    path              : "${params.outdir}/${sample}/${follicleNotebook.baseName}/output/${zarr.name}",
-                    image_scale_factor: imageScaleFactor,
-                ]
+        follicleSourceArtifacts
+            .map { sample, sampleZarr, rowParams ->
+                tuple(sample, sampleZarr, rowParams + [sample: sample], ['sample', 'path', 'cell_ids_file', 'radius', 'image_scale_factor'])
             }
-        }
+            .set { follicleParamsInputs }
 
-        WRITE_FOLLICLE_SAMPLESHEET(buildSamplesheetInput(
-            follicleArtifactRows,
-            'follicle_sdata_samplesheet.csv',
-            "${params.outdir}/${follicleNotebook.baseName}",
-        ))
+        WRITE_CREATE_FOLLICLE_SDATA_PARAMS(follicleParamsInputs) | set { follicleParams }
+
+        follicleSourceArtifacts
+            .map { sample, sampleZarr, rowParams -> tuple(sample, sampleZarr) }
+            .join(follicleParams.params_file)
+            .set { follicleInputs }
+
+        CREATE_FOLLICLE_SDATA(follicleInputs, cellIdsFile, follicleNotebook, timerScript) | set { follicleRun }
+
+        follicleSourceArtifacts
+            .map { sample, sampleZarr, rowParams -> tuple(sample, rowParams + [sample: sample]) }
+            .set { follicleRowParams }
+
+        follicleRun.artifacts
+            .join(follicleRowParams)
+            .flatMap { sample, zarrPaths, rowParams ->
+                // Nextflow emits a single Path for one match and a List<Path> for many; normalize.
+                def zarrs = zarrPaths instanceof List ? zarrPaths : [zarrPaths]
+                def imageScaleFactor = rowParams.image_scale_factor ?: 1.0
+                zarrs.collect { zarr ->
+                    [
+                        sample            : sample,
+                        cell              : zarr.baseName,
+                        path              : "${params.outdir}/${sample}/create_follicle_sdata/output/${zarr.name}",
+                        image_scale_factor: imageScaleFactor,
+                    ]
+                }
+            }
+            .set { follicleArtifactRows }
+
+        buildSamplesheetInput(follicleArtifactRows, 'follicle_sdata_samplesheet.csv', "${params.outdir}/create_follicle_sdata")
+            .set { follicleSheetInput }
+
+        WRITE_FOLLICLE_SAMPLESHEET(follicleSheetInput)
     }
 }

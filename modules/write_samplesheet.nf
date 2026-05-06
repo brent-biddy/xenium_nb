@@ -1,3 +1,6 @@
+// Writes a CSV samplesheet from a JSON-encoded list of row maps. Downstream
+// workflows use the published CSV to locate artifacts built by create.nf.
+
 process WRITE_SAMPLESHEET {
     tag "${output_name}"
     publishDir({ publish_dir }), mode: 'copy'
