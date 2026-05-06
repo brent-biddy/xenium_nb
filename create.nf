@@ -8,11 +8,11 @@
 
 nextflow.enable.dsl = 2
 
-include { WRITE_QUARTO_PARAMS as WRITE_CREATE_SDATA_PARAMS } from './modules/write_quarto_params'
-include { WRITE_QUARTO_PARAMS as WRITE_CREATE_FOLLICLE_SDATA_PARAMS } from './modules/write_quarto_params'
+include { WRITE_QUARTO_PARAMS as SDATA_PARAMS } from './modules/write_quarto_params'
+include { WRITE_QUARTO_PARAMS as FOLLICLE_SDATA_PARAMS } from './modules/write_quarto_params'
 include { CREATE_SDATA; CREATE_FOLLICLE_SDATA } from './modules/create_notebooks'
-include { WRITE_SAMPLESHEET as WRITE_SDATA_SAMPLESHEET } from './modules/write_samplesheet'
-include { WRITE_SAMPLESHEET as WRITE_FOLLICLE_SAMPLESHEET } from './modules/write_samplesheet'
+include { WRITE_SAMPLESHEET as SDATA_SAMPLESHEET } from './modules/write_samplesheet'
+include { WRITE_SAMPLESHEET as FOLLICLE_SAMPLESHEET } from './modules/write_samplesheet'
 
 // Reads a (sample, path, ...) CSV and emits (sample, file, rowMap) per row.
 // Extra columns are preserved in rowMap so notebooks can read per-sample params.
@@ -57,11 +57,11 @@ workflow {
 
         sampleRows
             .map { sample, inputPath, rowParams ->
-                tuple(sample, inputPath, rowParams + [sample: sample], ['sample', 'path', 'n_jobs'])
+                tuple(sample, inputPath, rowParams, ['sample', 'n_jobs'])
             }
-            .set { createParamsInputs }
-        
-        WRITE_CREATE_SDATA_PARAMS(createParamsInputs) | set { createSdataParams }
+            .set { sdataParamsInputs }
+
+        SDATA_PARAMS(sdataParamsInputs) | set { createSdataParams }
 
         sampleRows
             .map { sample, inputPath, rowParams -> tuple(sample, inputPath) }
@@ -73,7 +73,7 @@ workflow {
         follicleSourceArtifacts = createSdataRun.artifacts
             .join(sampleRows)
             .map { sample, zarr, inputPath, rowParams ->
-                tuple(sample, zarr, rowParams + [sample: sample])
+                tuple(sample, zarr, rowParams)
             }
 
         follicleSourceArtifacts
@@ -90,7 +90,7 @@ workflow {
         buildSamplesheetInput(sampleArtifactRows, 'sample_sdata_samplesheet.csv', "${params.outdir}/create_sdata")
             .set { sdataSamplesheetInput }
 
-        WRITE_SDATA_SAMPLESHEET(sdataSamplesheetInput)
+        SDATA_SAMPLESHEET(sdataSamplesheetInput)
     }
 
     // Skip CREATE_SDATA: caller's samplesheet already points at existing sample zarrs.
@@ -103,11 +103,11 @@ workflow {
 
         follicleSourceArtifacts
             .map { sample, sampleZarr, rowParams ->
-                tuple(sample, sampleZarr, rowParams + [sample: sample], ['sample', 'path', 'cell_ids_file', 'radius', 'image_scale_factor'])
+                tuple(sample, sampleZarr, rowParams, ['sample', 'cell_ids_file', 'radius', 'image_scale_factor'])
             }
             .set { follicleParamsInputs }
 
-        WRITE_CREATE_FOLLICLE_SDATA_PARAMS(follicleParamsInputs) | set { follicleParams }
+        FOLLICLE_SDATA_PARAMS(follicleParamsInputs) | set { follicleParams }
 
         follicleSourceArtifacts
             .map { sample, sampleZarr, rowParams -> tuple(sample, sampleZarr) }
@@ -140,6 +140,6 @@ workflow {
         buildSamplesheetInput(follicleArtifactRows, 'follicle_sdata_samplesheet.csv', "${params.outdir}/create_follicle_sdata")
             .set { follicleSheetInput }
 
-        WRITE_FOLLICLE_SAMPLESHEET(follicleSheetInput)
+        FOLLICLE_SAMPLESHEET(follicleSheetInput)
     }
 }

@@ -1,5 +1,28 @@
 // Writes a Quarto params.yml file from notebook-specific and pipeline-specific
 // params. This keeps YAML generation outside the notebook execution process.
+
+// Builds a YAML string from declared per-notebook params and row data.
+// path and n_jobs are always included; cell_ids_file and radius are read
+// from pipeline params when declared.
+def renderParamsYaml(Collection declaredParams, String inputPath, Map rowParams) {
+    def declared = declaredParams as Set
+    def yaml = new org.yaml.snakeyaml.Yaml()
+    def merged = new LinkedHashMap()
+
+    merged['path'] = new File(inputPath).name
+
+    if (declared.contains('cell_ids_file'))
+        merged['cell_ids_file'] = new File(params.cell_ids_file as String).name
+    if (declared.contains('radius'))
+        merged['radius'] = params.radius
+
+    rowParams.each { key, value ->
+        if (declared.contains(key) && !merged.containsKey(key)) merged[key] = value
+    }
+
+    return yaml.dump(merged)
+}
+
 process WRITE_QUARTO_PARAMS {
     tag "${sample_id}"
 
@@ -10,19 +33,10 @@ process WRITE_QUARTO_PARAMS {
     tuple val(sample_id), path('params.yml'), emit: params_file
 
     script:
-    def paramsYaml = QuartoParams.renderParamsYaml(
-        declared_params,
-        row_params + [path: new File(input_path.toString()).name],
-        [
-            cell_ids_file: new File(params.cell_ids_file.toString()).name,
-            radius       : params.radius,
-            n_jobs       : task.cpus,
-        ]
-    )
+    def paramsB64 = renderParamsYaml(declared_params, input_path as String, row_params + [n_jobs: task.cpus])
+        .bytes.encodeBase64().toString()
     """
-    cat > params.yml << 'PARAMS_EOF'
-${paramsYaml}
-PARAMS_EOF
+    python3 -c "import base64; open('params.yml', 'w').write(base64.b64decode('${paramsB64}').decode())"
     """
 
     stub:

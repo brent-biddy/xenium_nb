@@ -8,7 +8,7 @@
 
 nextflow.enable.dsl = 2
 
-include { WRITE_QUARTO_PARAMS as WRITE_PLOT_FOLLICLE_PARAMS } from './modules/write_quarto_params'
+include { WRITE_QUARTO_PARAMS as PLOT_FOLLICLE_PARAMS } from './modules/write_quarto_params'
 include { PLOT_FOLLICLE } from './modules/analyze_notebooks'
 
 workflow {
@@ -40,10 +40,10 @@ workflow {
             .map { sample, artifactPath, rowParams ->
                 def cell = rowParams.cell.toString()
                 def sampleId = "${sample}_${cell}"
-                tuple(sampleId, artifactPath, rowParams + [sample: sample, cell: cell], ['sample', 'cell', 'path'])
+                tuple(sampleId, artifactPath, rowParams, ['sample', 'cell'])
             }
             .set { plotParamsInputs }
-        WRITE_PLOT_FOLLICLE_PARAMS(plotParamsInputs) | set { plotParams }
+        PLOT_FOLLICLE_PARAMS(plotParamsInputs) | set { plotParams }
 
         rows
             .map { sample, artifactPath, rowParams ->
