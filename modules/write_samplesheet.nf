@@ -19,4 +19,9 @@ process WRITE_SAMPLESHEET {
 ${csv}
 CSVEOF
     """
+
+    stub:
+    """
+    touch ${output_name}
+    """
 }
