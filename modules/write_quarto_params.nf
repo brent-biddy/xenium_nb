@@ -12,7 +12,7 @@ process WRITE_QUARTO_PARAMS {
           val(publish_dir),
           val(publish_name),
           val(row_params),
-          path(cell_ids_file),
+          val(cell_ids_file),
           val(declared_params)
 
     output:
@@ -24,7 +24,7 @@ process WRITE_QUARTO_PARAMS {
           val(publish_dir),
           val(publish_name),
           val(row_params),
-          path(cell_ids_file),
+          val(cell_ids_file),
           path('params.yml'), emit: notebook_inputs
 
     script:

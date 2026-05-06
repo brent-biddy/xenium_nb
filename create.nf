@@ -46,14 +46,15 @@ workflow {
         error "Invalid create '${createMode}'. Valid values are: sdata, follicle_sdata, all"
     }
 
-    def sampleArtifacts = null
+    def createSdataArtifacts = null
+    def follicleSourceArtifacts = null
 
     // ---- sdata: raw Xenium -> per-sample SpatialData zarr ----
     if (createMode in ['sdata', 'all']) {
         def sampleRows = parseSamplesheet(params.samplesheet, 'Create samplesheet')
 
         def createNotebook = file(createRegistry.create_sdata.path)
-        def cellIdsFile = file(params.cell_ids_file)
+        def cellIdsFile = params.cell_ids_file.toString()
         def createInputs = sampleRows.map { sample, inputPath, rowParams ->
             tuple(
                 createNotebook.toString(),
@@ -69,9 +70,11 @@ workflow {
             )
         }
 
-        sampleArtifacts = CREATE_SDATA(SDATA_QUARTO_PARAMS(createInputs).notebook_inputs).artifacts
+        def createSdataRun = CREATE_SDATA(SDATA_QUARTO_PARAMS(createInputs).notebook_inputs)
+        createSdataArtifacts = createSdataRun.artifacts
+        follicleSourceArtifacts = createSdataArtifacts
 
-        def sampleArtifactRows = sampleArtifacts.map { sample, sampleZarr, _rowParams ->
+        def sampleArtifactRows = createSdataArtifacts.map { sample, sampleZarr, _rowParams ->
             def imageScaleFactor = _rowParams.image_scale_factor ?: 1.0
             [
                 sample            : sample,
@@ -89,14 +92,14 @@ workflow {
 
     // Skip CREATE_SDATA: caller's samplesheet already points at existing sample zarrs.
     if (createMode == 'follicle_sdata') {
-        sampleArtifacts = parseSamplesheet(params.samplesheet, 'Create follicle samplesheet')
+        follicleSourceArtifacts = parseSamplesheet(params.samplesheet, 'Create follicle samplesheet')
     }
 
     // ---- follicle_sdata: per-sample SpatialData -> per-cell-ID subset zarrs ----
     if (createMode in ['follicle_sdata', 'all']) {
         def follicleNotebook = file(createRegistry.create_follicle_sdata.path)
-        def cellIdsFile = file(params.cell_ids_file)
-        def follicleInputs = sampleArtifacts.map { sample, sampleZarr, rowParams ->
+        def cellIdsFile = params.cell_ids_file.toString()
+        def follicleInputs = follicleSourceArtifacts.map { sample, sampleZarr, rowParams ->
             tuple(
                 follicleNotebook.toString(),
                 follicleNotebook.baseName,
@@ -111,7 +114,8 @@ workflow {
             )
         }
 
-        def follicleArtifacts = CREATE_FOLLICLE_SDATA(FOLLICLE_SDATA_QUARTO_PARAMS(follicleInputs).notebook_inputs).artifacts
+        def follicleRun = CREATE_FOLLICLE_SDATA(FOLLICLE_SDATA_QUARTO_PARAMS(follicleInputs).notebook_inputs)
+        def follicleArtifacts = follicleRun.artifacts
 
         def follicleArtifactRows = follicleArtifacts.flatMap { sample, zarrPaths, _rowParams ->
             // Nextflow emits a single Path for one match and a List<Path> for many; normalize.

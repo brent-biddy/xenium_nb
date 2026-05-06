@@ -63,8 +63,7 @@ workflow {
         }
 
     def timerScript = file("${projectDir}/bin/timer.py")
-    // TODO: split notebook staging so analysis no longer carries cell_ids_file.
-    def cellIdsFile = file(params.cell_ids_file)
+    def cellIdsFile = params.cell_ids_file.toString()
     def notebookSpecs = notebookIds.collect { id ->
         [path: file(registry[id].path), params: registry[id].params ?: []]
     }
