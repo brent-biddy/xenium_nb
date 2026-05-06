@@ -11,8 +11,12 @@ process WRITE_SAMPLESHEET {
     output:
     path output_name
 
-    exec:
+    script:
     def keys = rows[0].keySet().toList()
-    task.workDir.resolve(output_name).text =
-        ([keys.join(',')] + rows.collect { row -> keys.collect { k -> row[k] ?: '' }.join(',') }).join('\n') + '\n'
+    def csv = ([keys.join(',')] + rows.collect { row -> keys.collect { k -> row[k] ?: '' }.join(',') }).join('\n')
+    """
+    cat > ${output_name} <<'CSVEOF'
+${csv}
+CSVEOF
+    """
 }
