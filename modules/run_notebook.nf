@@ -17,6 +17,7 @@ process RUN_NOTEBOOK {
           val(publish_dir),
           val(publish_name),
           val(row_params),
+          path(cell_ids_file),
           path('params.yml')
 
     output:

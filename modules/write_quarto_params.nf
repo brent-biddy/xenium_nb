@@ -12,6 +12,7 @@ process WRITE_QUARTO_PARAMS {
           val(publish_dir),
           val(publish_name),
           val(row_params),
+          path(cell_ids_file),
           val(declared_params)
 
     output:
@@ -23,6 +24,7 @@ process WRITE_QUARTO_PARAMS {
           val(publish_dir),
           val(publish_name),
           val(row_params),
+          path(cell_ids_file),
           path('params.yml'), emit: notebook_inputs
 
     script:
@@ -30,7 +32,7 @@ process WRITE_QUARTO_PARAMS {
         declared_params,
         row_params + [path: new File(input_path.toString()).name],
         [
-            cell_ids_file: params.cell_ids_file,
+            cell_ids_file: new File(cell_ids_file.toString()).name,
             radius       : params.radius,
             n_jobs       : task.cpus,
         ]

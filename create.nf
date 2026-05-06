@@ -53,6 +53,7 @@ workflow {
         def sampleRows = parseSamplesheet(params.samplesheet, 'Create samplesheet')
 
         def createNotebook = file(createRegistry.create_sdata.path)
+        def cellIdsFile = file(params.cell_ids_file)
         def createInputs = sampleRows.map { sample, inputPath, rowParams ->
             tuple(
                 createNotebook.toString(),
@@ -63,6 +64,7 @@ workflow {
                 "${params.outdir}/${sample}/${createNotebook.baseName}",
                 sample,
                 rowParams,
+                cellIdsFile,
                 createRegistry.create_sdata.params
             )
         }
@@ -93,6 +95,7 @@ workflow {
     // ---- follicle_sdata: per-sample SpatialData -> per-cell-ID subset zarrs ----
     if (createMode in ['follicle_sdata', 'all']) {
         def follicleNotebook = file(createRegistry.create_follicle_sdata.path)
+        def cellIdsFile = file(params.cell_ids_file)
         def follicleInputs = sampleArtifacts.map { sample, sampleZarr, rowParams ->
             tuple(
                 follicleNotebook.toString(),
@@ -103,6 +106,7 @@ workflow {
                 "${params.outdir}/${sample}/${follicleNotebook.baseName}",
                 sample,
                 rowParams,
+                cellIdsFile,
                 createRegistry.create_follicle_sdata.params
             )
         }
