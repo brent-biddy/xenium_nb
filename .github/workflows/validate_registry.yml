@@ -1,0 +1,25 @@
+name: Validate notebook registry
+
+on:
+  push:
+    paths:
+      - 'lib/NotebookRegistry.groovy'
+      - 'notebooks/**.qmd'
+  pull_request:
+    paths:
+      - 'lib/NotebookRegistry.groovy'
+      - 'notebooks/**.qmd'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install pyyaml
+
+      - run: python bin/check_notebook_registry.py
