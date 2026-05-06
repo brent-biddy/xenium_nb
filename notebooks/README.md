@@ -7,7 +7,7 @@ Notebook registry metadata lives in [`../lib/NotebookRegistry.groovy`](../lib/No
 
 | Notebook | Purpose | Params | Main outputs |
 |----------|---------|--------|--------------|
-| `create_sdata.qmd` | Convert a raw Xenium output into a sample-level zarr. | `sample`, `path`, `n_jobs` | `output/<sample>.zarr`, `<sample>_create_sdata.html`, `<sample>_create_sdata.timing.tsv` |
+| `create_sdata.qmd` | Convert a raw Xenium output into a sample-level zarr. | `sample`, `path` | `output/<sample>.zarr`, `<sample>_create_sdata.html`, `<sample>_create_sdata.timing.tsv` |
 | `create_follicle_sdata.qmd` | Subset one sample-level zarr into one zarr per cell ID. | `sample`, `path`, `cell_ids_file`, `radius` | `output/<cell_id>.zarr`, `<sample>_create_follicle_sdata.html`, `<sample>_create_follicle_sdata.timing.tsv` |
 | `plot_follicle.qmd` | Render follicle zarrs into PowerPoint slides. | `sample`, `cell`, `path` | `<sample>_<cell>_plot_follicle.pptx`, `<sample>_<cell>_plot_follicle.timing.tsv` |
 
