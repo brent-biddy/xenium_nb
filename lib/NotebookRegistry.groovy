@@ -7,7 +7,7 @@ class NotebookRegistry {
             ],
             create_follicle_sdata: [
                 path  : "${projectDir}/notebooks/create_follicle_sdata.qmd",
-                params: ['sample', 'path', 'cell_ids_file', 'radius', 'image_scale_factor'],
+                params: ['sample', 'path', 'cell_ids_file', 'radius'],
             ],
         ]
     }

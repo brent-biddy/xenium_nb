@@ -71,11 +71,9 @@ workflow {
 
         follicleSourceArtifacts
             .map { sample, sampleZarr, rowParams ->
-                def imageScaleFactor = rowParams.image_scale_factor ?: 1.0
                 [
-                    sample            : sample,
-                    path              : "${params.outdir}/${sample}/create_sdata/output/${sampleZarr.name}",
-                    image_scale_factor: imageScaleFactor,
+                    sample: sample,
+                    path  : "${params.outdir}/${sample}/create_sdata/output/${sampleZarr.name}",
                 ]
             }
             .set { sampleArtifactRows }
@@ -103,7 +101,7 @@ workflow {
         follicleSourceArtifactRows
             .flatMap { rows ->
                 rows.collect { row ->
-                    tuple(row[0], row[1], row[2], ['sample', 'cell_ids_file', 'radius', 'image_scale_factor'])
+                    tuple(row[0], row[1], row[2], ['sample', 'cell_ids_file', 'radius'])
                 }
             }
             .set { follicleParamsInputs }
@@ -130,13 +128,11 @@ workflow {
             .flatMap { sample, zarrPaths, rowParams ->
                 // Nextflow emits a single Path for one match and a List<Path> for many; normalize.
                 def zarrs = zarrPaths instanceof List ? zarrPaths : [zarrPaths]
-                def imageScaleFactor = rowParams.image_scale_factor ?: 1.0
                 zarrs.collect { zarr ->
                     [
-                        sample            : sample,
-                        cell              : zarr.baseName,
-                        path              : "${params.outdir}/${sample}/create_follicle_sdata/output/${zarr.name}",
-                        image_scale_factor: imageScaleFactor,
+                        sample: sample,
+                        cell  : zarr.baseName,
+                        path  : "${params.outdir}/${sample}/create_follicle_sdata/output/${zarr.name}",
                     ]
                 }
             }
