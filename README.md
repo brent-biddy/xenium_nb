@@ -48,10 +48,6 @@ xenium_nb/
 
 ---
 
-## Notebook Docs
-
-Detailed notebook contracts and examples live in [notebooks/README.md](notebooks/README.md).
-
 ## Downsampling Xenium test data
 
 `bin/downsample_xenium.py` regenerates a smaller Xenium output directory by spatially subsampling cells and rebuilding the associated Xenium sidecar files and zarr archives while copying the original morphology OME-TIFF images through unchanged.
@@ -187,15 +183,7 @@ Key parameters (set in `nextflow.config` or passed via `--param value`):
 | `create` | `all` | Create workflow mode: `sdata`, `follicle_sdata`, or `all` |
 | `analyze` | `all` | Analysis notebook selector: `all` or a comma-separated list of notebook IDs from `lib/NotebookRegistry.groovy` |
 
-### Analysis notebook IDs
-
-The built-in analysis registry currently defines:
-
-| ID | Notebook | Registered params |
-|----|----------|-------------------|
-| `plot_follicle` | `notebooks/plot_follicle.qmd` | `sample`, `cell`, `path` |
-
-Notebook metadata is defined in [`lib/NotebookRegistry.groovy`](lib/NotebookRegistry.groovy), not under `params`.
+Analysis notebook IDs and how to add new notebooks are documented in [notebooks/README.md](notebooks/README.md).
 
 ### Profiles
 
@@ -269,12 +257,3 @@ If `--create sdata` is used, `create_follicle_sdata/` outputs and `results/folli
 
 The sample-stage sheet is the handoff input for `--create follicle_sdata`.
 
----
-
-## Adding notebooks
-
-1. Create a new `.qmd` file in `notebooks/` with a Jupyter `parameters` cell declaring the notebook inputs it expects.
-2. Register the notebook in `lib/NotebookRegistry.groovy` with a unique ID, a path, and an explicit `params` list naming the keys to pass through.
-3. If it is a create-stage producer, wire it into `create.nf`.
-4. For analysis notebooks, include every required row-level key in the registered `params` list (for example, include `cell` for follicle-level runs).
-5. Run analysis notebooks with `nextflow run analyze.nf --samplesheet <artifact_sheet.csv> --analyze <id1,id2|all>`.
