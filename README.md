@@ -152,10 +152,10 @@ nextflow run create.nf \
 For local Apptainer validation:
 
 ```bash
-HOME=/tmp/xenium_home conda run -n squidpy nextflow run analyze.nf \
+conda run -n squidpy nextflow run analyze.nf \
     -profile test \
-    --samplesheet /tmp/xenium_nb_test/follicle_sdata_samplesheet.csv \
-    --outdir /home/babiddy/xenium_nb_results_fresh \
+    --samplesheet /path/to/follicle_sdata_samplesheet.csv \
+    --outdir /path/to/outdir \
     -process.memory '16 GB'
 ```
 
