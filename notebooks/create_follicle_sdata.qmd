@@ -123,6 +123,9 @@ for _, row in cells.iterrows():
 
     with timer(f"Subset {cell_id}"):
         # cell_circles stores pre-computed centroids as Point geometries
+        if cell_id not in circles.index:
+            print(f"  WARNING: {cell_id} not found in cell_circles — skipping")
+            continue
         centroid = circles.loc[cell_id, "geometry"]
         cx, cy   = centroid.x, centroid.y
         min_coordinate = [(cx - radius) * image_query_scale, (cy - radius) * image_query_scale]
