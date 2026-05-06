@@ -3,10 +3,10 @@
 
 process WRITE_SAMPLESHEET {
     tag "${output_name}"
-    publishDir({ publish_dir }), mode: 'copy'
+    publishDir params.outdir, mode: 'copy'
 
     input:
-    tuple val(output_name), val(rows_json), val(publish_dir)
+    tuple val(output_name), val(rows_json)
 
     output:
     path output_name
