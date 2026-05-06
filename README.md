@@ -28,8 +28,8 @@ xenium_nb/
 │   └── QuartoParams.groovy    # Shared Quarto parameter filtering/merge helper
 ├── nextflow.config            # Parameters and profiles
 ├── modules/
-│   ├── create_spatialdata.nf      # Sample-level artifact producer
-│   ├── subset_follicle.nf         # Follicle-level artifact producer
+│   ├── create_notebooks.nf        # Create-stage notebook processes (sdata, follicle_sdata)
+│   ├── analyze_notebooks.nf       # Analysis notebook processes
 │   ├── run_notebook.nf            # Shared notebook runner
 │   ├── write_quarto_params.nf     # Renders params.yml for notebooks
 │   └── write_samplesheet.nf       # Writes artifact samplesheets
@@ -39,9 +39,9 @@ xenium_nb/
 │   ├── create_follicle_sdata.qmd
 │   └── plot_follicle.qmd
 ├── bin/
-│   ├── timer.py               # Timing utilities for notebooks
-│   ├── make_follicle_samplesheet.py  # Legacy helper for manual/export workflows
-│   └── downsample_xenium.py   # Regenerates a smaller Xenium output for workflow testing
+│   ├── timer.py                   # Timing utilities for notebooks
+│   ├── downsample_xenium.py       # Regenerates a smaller Xenium output for workflow testing
+│   └── downsample_xenium_region.py # Crops a Xenium output to one or more bounding boxes
 └── assets/
     ├── samplesheet.csv        # Sample-level samplesheet
     └── stage_quality_area_all_rois.csv  # Cell ID reference file
