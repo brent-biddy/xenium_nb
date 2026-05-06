@@ -6,6 +6,7 @@ params:
   path: "."
   cell_ids_file: "assets/stage_quality_area_all_rois.csv"
   radius: 250
+  image_scale_factor: 1.0
 format:
   html:
     embed-resources: true
@@ -21,6 +22,7 @@ sample = "default"
 path = "."
 cell_ids_file = "assets/stage_quality_area_all_rois.csv"
 radius = 250
+image_scale_factor = 1.0
 ```
 
 ```{python}
@@ -38,6 +40,9 @@ with timer("Setup"):
     # 'path' is the staged sample-level zarr produced by create_sdata.
     zarr_path = path
     default_radius = float(radius)
+    image_scale_factor = float(image_scale_factor)
+    if image_scale_factor <= 0:
+        raise ValueError("image_scale_factor must be positive")
 ```
 
 ## Load SpatialData
@@ -106,6 +111,9 @@ with timer("Load cell circles"):
         .to_affine_matrix(input_axes=("x", "y"), output_axes=("x", "y"))
     )
     radius_scale = float(np.mean(np.abs([affine[0, 0], affine[1, 1]])))
+    # Downsampled images use a smaller pixel grid, so convert the query bbox
+    # into the image's coordinate scale before bounding-box selection.
+    image_query_scale = 1.0 / image_scale_factor
 
 os.makedirs("output", exist_ok=True)
 
@@ -117,11 +125,13 @@ for _, row in cells.iterrows():
         # cell_circles stores pre-computed centroids as Point geometries
         centroid = circles.loc[cell_id, "geometry"]
         cx, cy   = centroid.x, centroid.y
+        min_coordinate = [(cx - radius) * image_query_scale, (cy - radius) * image_query_scale]
+        max_coordinate = [(cx + radius) * image_query_scale, (cy + radius) * image_query_scale]
 
         sdata_fov = sdata.query.bounding_box(
             axes=("x", "y"),
-            min_coordinate=[cx - radius, cy - radius],
-            max_coordinate=[cx + radius, cy + radius],
+            min_coordinate=min_coordinate,
+            max_coordinate=max_coordinate,
             target_coordinate_system="global",
         )
 

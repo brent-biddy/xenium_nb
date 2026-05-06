@@ -70,9 +70,11 @@ workflow {
         sampleArtifacts = CREATE_SDATA(SDATA_QUARTO_PARAMS(createInputs).notebook_inputs).artifacts
 
         def sampleArtifactRows = sampleArtifacts.map { sample, sampleZarr, _rowParams ->
+            def imageScaleFactor = _rowParams.image_scale_factor ?: 1.0
             [
-                sample: sample,
-                path  : "${params.outdir}/${sample}/${createNotebook.baseName}/output/${sampleZarr.name}",
+                sample            : sample,
+                path              : "${params.outdir}/${sample}/${createNotebook.baseName}/output/${sampleZarr.name}",
+                image_scale_factor: imageScaleFactor,
             ]
         }
 
@@ -110,13 +112,15 @@ workflow {
         def follicleArtifactRows = follicleArtifacts.flatMap { sample, zarrPaths, _rowParams ->
             // Nextflow emits a single Path for one match and a List<Path> for many; normalize.
             def zarrs = zarrPaths instanceof List ? zarrPaths : [zarrPaths]
-                zarrs.collect { zarr ->
-                    [
-                        sample: sample,
-                        cell  : zarr.baseName,
-                        path  : "${params.outdir}/${sample}/${follicleNotebook.baseName}/output/${zarr.name}",
-                    ]
-                }
+            def imageScaleFactor = _rowParams.image_scale_factor ?: 1.0
+            zarrs.collect { zarr ->
+                [
+                    sample            : sample,
+                    cell              : zarr.baseName,
+                    path              : "${params.outdir}/${sample}/${follicleNotebook.baseName}/output/${zarr.name}",
+                    image_scale_factor: imageScaleFactor,
+                ]
+            }
         }
 
         WRITE_FOLLICLE_SAMPLESHEET(buildSamplesheetInput(
