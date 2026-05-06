@@ -38,62 +38,11 @@ xenium_nb/
 │   ├── create_follicle_sdata.qmd
 │   └── plot_follicle.qmd
 ├── bin/
-│   ├── timer.py                   # Timing utilities for notebooks
-│   ├── downsample_xenium.py       # Regenerates a smaller Xenium output for workflow testing
-│   └── downsample_xenium_region.py # Crops a Xenium output to one or more bounding boxes
+│   └── timer.py                   # Timing utilities for notebooks
 └── assets/
     ├── samplesheet.csv        # Sample-level samplesheet
     └── stage_quality_area_all_rois.csv  # Cell ID reference file
 ```
-
----
-
-## Downsampling Xenium test data
-
-`bin/downsample_xenium.py` regenerates a smaller Xenium output directory by spatially subsampling cells and rebuilding the associated Xenium sidecar files and zarr archives while copying the original morphology OME-TIFF images through unchanged.
-
-Example:
-
-```bash
-conda run -n squidpy python bin/downsample_xenium.py /path/to/xenium_output --proportion 0.05
-```
-
-The output directory is written alongside the input as `<input_dir>_downsampled_<pct>pct`.
-
-The script now writes zipped zarr outputs from temporary directory-backed stores, which avoids the duplicate-entry warnings from the old zip-store write path.
-
-For smaller local test inputs, `bin/downsample_xenium_region.py` crops the raw
-Xenium output to one or more bounding boxes. It selects cells inside each region,
-keeps transcripts in the same region, rebases spatial coordinates to the crop
-origin, crops `morphology.ome.tif`, crops `morphology_focus/*.ome.tif` while
-preserving all OME-TIFF resolution levels, and rebuilds the associated sidecar
-files.
-
-Single region:
-
-```bash
-conda run -n squidpy python bin/downsample_xenium_region.py /path/to/xenium_output \
-    --bbox 1000 2000 2500 3500 \
-    --region_name follicle_a
-```
-
-Multiple regions:
-
-```csv
-region,xmin,ymin,xmax,ymax
-follicle_a,1000,2000,2500,3500
-follicle_b,4000,1500,5200,2800
-```
-
-```bash
-conda run -n squidpy python bin/downsample_xenium_region.py /path/to/xenium_output \
-    --regions_csv regions.csv
-```
-
-The output root defaults to `<input_dir>_region_downsampled`, with one output
-directory per region. Region coordinates should be in raw Xenium coordinate
-units, not image pixels. If image cropping does not line up with the coordinate
-system, pass `--pixel_size <coordinate-units-per-pixel>` explicitly.
 
 ---
 
