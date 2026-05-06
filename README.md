@@ -24,8 +24,7 @@ xenium_nb/
 ├── create.nf                  # Create workflow: raw Xenium -> sample and follicle artifacts
 ├── analyze.nf                 # Analysis workflow: artifact samplesheet -> notebook reports
 ├── lib/
-│   ├── NotebookRegistry.groovy # Pipeline-internal notebook metadata catalog
-│   └── QuartoParams.groovy    # Shared Quarto parameter filtering/merge helper
+│   └── NotebookRegistry.groovy # Pipeline-internal notebook metadata catalog
 ├── nextflow.config            # Parameters and profiles
 ├── modules/
 │   ├── create_notebooks.nf        # Create-stage notebook processes (sdata, follicle_sdata)
