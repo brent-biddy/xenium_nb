@@ -55,7 +55,7 @@ Detailed notebook contracts and examples live in [notebooks/README.md](notebooks
 
 ## Downsampling Xenium test data
 
-`bin/downsample_xenium.py` regenerates a smaller Xenium output directory by spatially subsampling cells and rebuilding the associated Xenium sidecar files, zarr archives, and reduced-resolution morphology OME-TIFF pyramids.
+`bin/downsample_xenium.py` regenerates a smaller Xenium output directory by spatially subsampling cells and rebuilding the associated Xenium sidecar files and zarr archives while copying the original morphology OME-TIFF images through unchanged.
 
 Example:
 
@@ -65,11 +65,7 @@ conda run -n squidpy python bin/downsample_xenium.py /path/to/xenium_output --pr
 
 The output directory is written alongside the input as `<input_dir>_downsampled_<pct>pct`.
 
-Current follow-up items for `bin/downsample_xenium.py`:
-
-- The script still emits many duplicate-entry warnings while writing zipped zarr outputs.
-- The script currently relies on zarr compatibility helpers added for the local environment; this should be revisited and simplified later.
-- It would be useful to add a deterministic option to force retention of specific cell IDs for workflow tests.
+The script now writes zipped zarr outputs from temporary directory-backed stores, which avoids the duplicate-entry warnings from the old zip-store write path.
 
 ---
 
