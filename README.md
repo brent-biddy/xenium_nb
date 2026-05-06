@@ -67,6 +67,39 @@ The output directory is written alongside the input as `<input_dir>_downsampled_
 
 The script now writes zipped zarr outputs from temporary directory-backed stores, which avoids the duplicate-entry warnings from the old zip-store write path.
 
+For smaller local test inputs, `bin/downsample_xenium_region.py` crops the raw
+Xenium output to one or more bounding boxes. It selects cells inside each region,
+keeps transcripts in the same region, rebases spatial coordinates to the crop
+origin, crops `morphology.ome.tif`, crops `morphology_focus/*.ome.tif` while
+preserving all OME-TIFF resolution levels, and rebuilds the associated sidecar
+files.
+
+Single region:
+
+```bash
+conda run -n squidpy python bin/downsample_xenium_region.py /path/to/xenium_output \
+    --bbox 1000 2000 2500 3500 \
+    --region_name follicle_a
+```
+
+Multiple regions:
+
+```csv
+region,xmin,ymin,xmax,ymax
+follicle_a,1000,2000,2500,3500
+follicle_b,4000,1500,5200,2800
+```
+
+```bash
+conda run -n squidpy python bin/downsample_xenium_region.py /path/to/xenium_output \
+    --regions_csv regions.csv
+```
+
+The output root defaults to `<input_dir>_region_downsampled`, with one output
+directory per region. Region coordinates should be in raw Xenium coordinate
+units, not image pixels. If image cropping does not line up with the coordinate
+system, pass `--pixel_size <coordinate-units-per-pixel>` explicitly.
+
 ---
 
 ## Usage
@@ -87,8 +120,8 @@ and writes:
 
 - sample zarrs under `results/<sample>/create_sdata/output/`
 - follicle zarrs under `results/<sample>/create_follicle_sdata/output/`
-- `results/create_sdata/sample_sdata_samplesheet.csv`
-- `results/create_follicle_sdata/follicle_sdata_samplesheet.csv`
+- `results/sample_sdata_samplesheet.csv`
+- `results/follicle_sdata_samplesheet.csv`
 
 ### Create sdata only
 
@@ -98,20 +131,20 @@ nextflow run create.nf \
     --create sdata
 ```
 
-This runs only `create_sdata.qmd` and writes `results/create_sdata/sample_sdata_samplesheet.csv`.
+This runs only `create_sdata.qmd` and writes `results/sample_sdata_samplesheet.csv`.
 That sheet can be used as input to `--create follicle_sdata`.
 
 ### Create follicle sdata only
 
-Run this after `create sdata` has produced `results/create_sdata/sample_sdata_samplesheet.csv`:
+Run this after `create sdata` has produced `results/sample_sdata_samplesheet.csv`:
 
 ```bash
 nextflow run create.nf \
-    --samplesheet results/create_sdata/sample_sdata_samplesheet.csv \
+    --samplesheet results/sample_sdata_samplesheet.csv \
     --create follicle_sdata
 ```
 
-This runs only `create_follicle_sdata.qmd` and writes `results/create_follicle_sdata/follicle_sdata_samplesheet.csv`.
+This runs only `create_follicle_sdata.qmd` and writes `results/follicle_sdata_samplesheet.csv`.
 
 ### Create with the small test follicle file
 
@@ -125,7 +158,7 @@ nextflow run create.nf \
 
 ```bash
 nextflow run analyze.nf \
-    --samplesheet results/create_follicle_sdata/follicle_sdata_samplesheet.csv \
+    --samplesheet results/follicle_sdata_samplesheet.csv \
     --analyze plot_follicle
 ```
 
@@ -135,7 +168,7 @@ When you add analysis notebooks that only require sample-level artifacts, point 
 
 ```bash
 nextflow run analyze.nf \
-    --samplesheet results/create_sdata/sample_sdata_samplesheet.csv \
+    --samplesheet results/sample_sdata_samplesheet.csv \
     --analyze your_sample_notebook_id
 ```
 
@@ -209,10 +242,8 @@ results/
 ├── pipeline_info/
 │   ├── timeline.html
 │   ├── report.html
-├── create_sdata/
-│   └── sample_sdata_samplesheet.csv
-├── create_follicle_sdata/
-│   └── follicle_sdata_samplesheet.csv
+├── sample_sdata_samplesheet.csv
+├── follicle_sdata_samplesheet.csv
 ├── ROI1/
 │   ├── create_sdata/
 │   │   ├── ROI1_create_sdata.html
@@ -235,7 +266,7 @@ results/
 Analysis outputs also publish under the parent sample directory, so follicle reports for cells like `aaaaimck-1` and `aaaalpdj-1` both land under `results/ROI1/plot_follicle/`.
 For `plot_follicle`, the primary rendered artifact is a `.pptx` deck, with a companion timing TSV.
 
-If `--create sdata` is used, `create_follicle_sdata/` outputs and `results/create_follicle_sdata/follicle_sdata_samplesheet.csv` are not created.
+If `--create sdata` is used, `create_follicle_sdata/` outputs and `results/follicle_sdata_samplesheet.csv` are not created.
 
 The sample-stage sheet is the handoff input for `--create follicle_sdata`.
 

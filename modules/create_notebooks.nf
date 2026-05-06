@@ -4,7 +4,9 @@
 process CREATE_SDATA {
     tag "${sample}"
 
-    publishDir { "${params.outdir}/${sample}/create_sdata" }, mode: 'copy'
+    publishDir { "${params.outdir}/${sample}/create_sdata" },
+        mode: 'copy',
+        saveAs: { fn -> fn.startsWith('output/') ? fn : "${sample}_${fn}" }
 
     input:
     tuple val(sample), path(input_path), path('params.yml')
@@ -41,7 +43,9 @@ process CREATE_SDATA {
 process CREATE_FOLLICLE_SDATA {
     tag "${sample}"
 
-    publishDir { "${params.outdir}/${sample}/create_follicle_sdata" }, mode: 'copy'
+    publishDir { "${params.outdir}/${sample}/create_follicle_sdata" },
+        mode: 'copy',
+        saveAs: { fn -> fn.startsWith('output/') ? fn : "${sample}_${fn}" }
 
     input:
     tuple val(sample), path(input_path), path('params.yml')

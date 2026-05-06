@@ -34,8 +34,8 @@ ROI1,aaaaimck-1,results/ROI1/create_follicle_sdata/output/aaaaimck-1.zarr
 
 ```bash
 nextflow run create.nf --samplesheet assets/samplesheet.csv --create sdata
-nextflow run create.nf --samplesheet results/create_sdata/sample_sdata_samplesheet.csv --create follicle_sdata
-nextflow run analyze.nf --samplesheet results/create_follicle_sdata/follicle_sdata_samplesheet.csv --analyze plot_follicle
+nextflow run create.nf --samplesheet results/sample_sdata_samplesheet.csv --create follicle_sdata
+nextflow run analyze.nf --samplesheet results/follicle_sdata_samplesheet.csv --analyze plot_follicle
 ```
 
 ## Adding A Notebook

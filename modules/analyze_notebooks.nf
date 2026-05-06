@@ -4,7 +4,9 @@
 process PLOT_FOLLICLE {
     tag "${sample}:${cell}"
 
-    publishDir { "${params.outdir}/${sample}/plot_follicle" }, mode: 'copy'
+    publishDir { "${params.outdir}/${sample}/plot_follicle" },
+        mode: 'copy',
+        saveAs: { fn -> fn.startsWith('output/') ? fn : "${sample_id}_${fn}" }
 
     input:
     tuple val(sample_id), val(sample), val(cell), path(input_path), path('params.yml')
