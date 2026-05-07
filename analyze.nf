@@ -34,7 +34,7 @@ workflow {
             tuple(row.sample.toString(), file(row.path), row)
         }
         .collect(flat: false)
-        .set { rowsList }
+        .set { rowsList } // List<tuple(sample, staged_path, row_map)>
 
     // ---- plot_follicle: per-cell follicle plots ----
     if (analyzeMode == 'plot_follicle' || analyzeMode == 'all') {
@@ -44,15 +44,14 @@ workflow {
             .flatMap { rows ->
                 rows.collect { row ->
                     def sample = row[0]
-                    def artifactPath = row[1]
                     def rowParams = row[2]
                     def cell = rowParams.cell.toString()
                     def sampleId = "${sample}_${cell}"
-                    tuple(sampleId, artifactPath, rowParams, analysisRegistry.plot_follicle.params)
+                    tuple(sampleId, rowParams, analysisRegistry.plot_follicle.params)
                 }
             }
-            .set { plotParamsInputs }
-        PLOT_FOLLICLE_PARAMS(plotParamsInputs) | set { plotParams }
+            .set { plotParamsInputs } // tuple(sample_cell_id, row_map, declared_params)
+        PLOT_FOLLICLE_PARAMS(plotParamsInputs) | set { plotParams } // tuple(sample_cell_id, params_yml)
 
         rowsList
             .flatMap { rows ->
@@ -66,7 +65,7 @@ workflow {
                 }
             }
             .join(plotParams.params_file)
-            .set { plotInputs }
+            .set { plotInputs } // tuple(sample_cell_id, sample, cell, staged_path, params_yml)
         PLOT_FOLLICLE(plotInputs, notebook, timerScript)
     }
 }
