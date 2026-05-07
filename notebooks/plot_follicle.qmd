@@ -88,20 +88,21 @@ figure_specs = []
 figure_dir = Path("plot_follicle_figures")
 figure_dir.mkdir(exist_ok=True)
 
-def _render_panel(img_key, ch, vmin, vmax, draw_all_cells, title, figure_path):
-    plot = sdata.pl.render_images(
-        element=img_key,
-        channel=ch,
-        cmap="gray",
-        norm=Normalize(vmin=vmin, vmax=vmax),
-    )
+def _render_panel(img_key, draw_all_cells, title, figure_path, channel=None, vmin=None, vmax=None):
+    if channel is not None:
+        plot = sdata.pl.render_images(
+            element=img_key,
+            channel=channel,
+            cmap="gray",
+            norm=Normalize(vmin=vmin, vmax=vmax),
+        )
+    else:
+        plot = sdata.pl.render_images(element=img_key)
     if draw_all_cells and outline_element is not None:
         plot = plot.pl.render_shapes(
             element=outline_element,
             fill_alpha=0.0,
-            outline_alpha=0.3,
-            outline_color="yellow",
-            outline_width=0.3,
+            outline_width=1,
         )
     if oocyte_element is not None:
         plot = plot.pl.render_shapes(
@@ -111,7 +112,7 @@ def _render_panel(img_key, ch, vmin, vmax, draw_all_cells, title, figure_path):
             palette=["red"],
             fill_alpha=0.0,
             outline_color="red",
-            outline_width=0.5,
+            outline_width=1,
         )
     ax = plot.pl.show(
         title=title,
@@ -119,6 +120,7 @@ def _render_panel(img_key, ch, vmin, vmax, draw_all_cells, title, figure_path):
         coordinate_systems="global",
         return_ax=True,
     )
+    ax.axis("off")
     ax.figure.savefig(figure_path, dpi=200, bbox_inches="tight")
     plt.close(ax.figure)
 
@@ -126,71 +128,83 @@ def _render_panel(img_key, ch, vmin, vmax, draw_all_cells, title, figure_path):
 for img_key in image_keys:
     img = sdata.images[img_key]
     arr = next(iter(img.children.values())).image if hasattr(img, "children") else img
-    for ch in arr.coords["c"].values:
-        channel_name = str(ch)
-        safe_channel = channel_name.replace("/", "_").replace(" ", "_")
-        plain_path = figure_dir / f"{img_key}_{safe_channel}_plain.png"
-        outlined_path = figure_dir / f"{img_key}_{safe_channel}_outlined.png"
 
-        with timer(f"Plot {img_key}[{channel_name}]"):
-            vmin, vmax = np.percentile(np.asarray(arr.sel(c=ch)), [1, 99.5])
-            base_title = f"{roi} / {cell_id} — {img_key} — {channel_name}"
-            _render_panel(img_key, ch, vmin, vmax, False,
-                          f"{base_title} (oocyte)", plain_path)
-            _render_panel(img_key, ch, vmin, vmax, True,
-                          f"{base_title} (oocyte + neighbors)", outlined_path)
-
+    if img_key == "he_aligned":
+        plain_path = figure_dir / f"{img_key}_plain.png"
+        outlined_path = figure_dir / f"{img_key}_outlined.png"
+        with timer(f"Plot {img_key}"):
+            base_title = f"{roi} / {cell_id} — {img_key}"
+            _render_panel(img_key, False, f"{base_title} (oocyte)", plain_path)
+            _render_panel(img_key, True, f"{base_title} (oocyte + neighbors)", outlined_path)
         figure_specs.append(
             {
                 "image_key": img_key,
-                "channel": channel_name,
+                "channel": "H&E",
                 "plain_path": str(plain_path),
                 "outlined_path": str(outlined_path),
             }
         )
+    else:
+        for ch in arr.coords["c"].values:
+            channel_name = str(ch)
+            safe_channel = channel_name.replace("/", "_").replace(" ", "_")
+            plain_path = figure_dir / f"{img_key}_{safe_channel}_plain.png"
+            outlined_path = figure_dir / f"{img_key}_{safe_channel}_outlined.png"
+            with timer(f"Plot {img_key}[{channel_name}]"):
+                vmin, vmax = np.percentile(np.asarray(arr.sel(c=ch)), [1, 99.5])
+                base_title = f"{roi} / {cell_id} — {img_key} — {channel_name}"
+                _render_panel(img_key, False, f"{base_title} (oocyte)", plain_path,
+                              channel=ch, vmin=vmin, vmax=vmax)
+                _render_panel(img_key, True, f"{base_title} (oocyte + neighbors)", outlined_path,
+                              channel=ch, vmin=vmin, vmax=vmax)
+            figure_specs.append(
+                {
+                    "image_key": img_key,
+                    "channel": channel_name,
+                    "plain_path": str(plain_path),
+                    "outlined_path": str(outlined_path),
+                }
+            )
 ```
 
 ```{python}
 #| output: asis
 
 for spec in figure_specs:
+    is_he = spec["channel"] == "H&E"
     intro = (
-        f"The image shows a cropped view of `{roi}` centered on the oocyte "
-        f"(cell ID `{cell_id}`), drawn from the `{spec['image_key']}` morphology image. "
+        f"Cropped view of `{roi}` centered on the oocyte (cell ID `{cell_id}`), "
+        f"drawn from the `{spec['image_key']}` image. "
     )
     plain_segmentation = (
-        f"Shown in red is the default Xenium cell segmentation for the oocyte "
-        f"(`{cell_id}`) the crop is centered on."
+        f"The oocyte (`{cell_id}`) is outlined in red."
         if oocyte_found
         else f"The oocyte (`{cell_id}`) could not be located in the segmentation "
         "shapes, so no red outline is shown."
     )
     outlined_segmentation = (
-        "Shown in red and yellow are the default Xenium cell segmentations: yellow "
-        "outlines mark every neighboring cell in the crop, and red marks the oocyte "
-        f"(`{cell_id}`) the crop is centered on."
+        f"Cell segmentation boundaries are shown as outlines; the oocyte "
+        f"(`{cell_id}`) is highlighted in red."
         if oocyte_found
-        else "Shown in yellow are the default Xenium cell segmentations marking every "
-        f"cell in the crop. The oocyte (`{cell_id}`) could not be located in the "
-        "segmentation shapes, so no red outline is shown."
+        else "Cell segmentation boundaries are shown as outlines. "
+        f"The oocyte (`{cell_id}`) could not be located in the segmentation "
+        "shapes, so no red outline is shown."
     )
 
+    if is_he:
+        channel_desc = "The H&E image is shown in full color."
+    else:
+        channel_desc = (
+            f"The `{spec['channel']}` channel is shown in grayscale, with intensities "
+            "scaled to the 1st–99.5th percentile."
+        )
+
     print(f"## {spec['image_key']} - {spec['channel']} (oocyte)\n")
-    print(
-        intro
-        + f"The `{spec['channel']}` channel is shown in grayscale, with intensities "
-        "scaled to the 1st–99.5th percentile and the colorbar reporting the underlying "
-        f"fluorescence values. {plain_segmentation} Axis units are global microns in "
-        "the slide coordinate system.\n"
-    )
+    print(intro + channel_desc + f" {plain_segmentation}\n")
     print(f"![]({spec['plain_path']})\n")
 
     print(f"## {spec['image_key']} - {spec['channel']} (oocyte + neighbors)\n")
-    print(
-        intro
-        + f"The `{spec['channel']}` channel is shown in grayscale, with intensities "
-        f"scaled to the 1st–99.5th percentile. {outlined_segmentation}\n"
-    )
+    print(intro + channel_desc + f" {outlined_segmentation}\n")
     print(f"![]({spec['outlined_path']})\n")
 ```
 
