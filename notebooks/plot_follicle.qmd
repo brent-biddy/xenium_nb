@@ -102,6 +102,7 @@ def _render_panel(img_key, draw_all_cells, title, figure_path, channel=None, vmi
         plot = plot.pl.render_shapes(
             element=outline_element,
             fill_alpha=0.0,
+            outline_color="yellow" if channel is not None else "black",
             outline_width=1,
         )
     if oocyte_element is not None:
