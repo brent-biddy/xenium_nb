@@ -91,10 +91,7 @@ workflow {
         // follicleRun.artifacts: tuple(sample, List<zarr>)
 
         follicleSourceArtifacts
-            .map { sample, stagedPath, rowMap ->
-                // Ensure sample is present in row_map for downstream param resolution.
-                tuple(sample, rowMap + [sample: sample])
-            }
+            .map { sample, stagedPath, rowMap -> tuple(sample, rowMap) }
             .set { follicleRowParams } // tuple(sample, row_map)
 
         follicleRun.artifacts
