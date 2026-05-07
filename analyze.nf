@@ -1,15 +1,15 @@
 #!/usr/bin/env nextflow
 
-// Renders analysis Quarto plotFollicleNotebooks against pre-built artifacts (typically
+// Renders analysis Quarto notebooks against pre-built artifacts (typically
 // produced by create.nf). The samplesheet must carry whatever per-row params
-// the selected plotFollicleNotebooks declare (e.g. `cell` for plot_follicle).
+// the selected notebooks declare (e.g. `cell` for plot_follicle).
 //
-// --analyze accepts 'all' or a plotFollicleNotebook ID.
+// --analyze accepts 'all' or a notebook ID.
 
 nextflow.enable.dsl = 2
 
 include { paramsFile } from './modules/quarto_params'
-include { PLOT_FOLLICLE } from './modules/analyze_plotFollicleNotebooks'
+include { PLOT_FOLLICLE } from './modules/analyze_notebooks'
 
 workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"
@@ -36,7 +36,7 @@ workflow {
 
     // ---- plot_follicle: per-cell follicle plots ----
     if (analyzeMode == 'plot_follicle' || analyzeMode == 'all') {
-        def plotFollicleNotebook = file("${projectDir}/plotFollicleNotebooks/plot_follicle.qmd")
+        def plotFollicleNotebook = file("${projectDir}/notebooks/analyze_plot_follicle.qmd")
 
         rowsList
             .map { sample, stagedPath, rowMap ->

@@ -7,8 +7,8 @@
     "path": "notebooks/create_follicle_sdata.qmd",
     "params": ["sample", "path", "cell_ids_file", "radius"]
   },
-  "plot_follicle": {
-    "path": "notebooks/plot_follicle.qmd",
+  "analyze_plot_follicle": {
+    "path": "notebooks/analyze_plot_follicle.qmd",
     "params": ["sample", "cell", "path"]
   }
 }
