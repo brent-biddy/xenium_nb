@@ -90,13 +90,8 @@ workflow {
         CREATE_FOLLICLE_SDATA(follicleInputs, cellIdsFile, follicleNotebook, timerScript) | set { follicleRun }
         // follicleRun.artifacts: tuple(sample, List<zarr>)
 
-        follicleSourceArtifacts
-            .map { sample, stagedPath, rowMap -> tuple(sample, rowMap) }
-            .set { follicleRowParams } // tuple(sample, row_map)
-
         follicleRun.artifacts
-            .join(follicleRowParams) // tuple(sample, List<zarr>, row_map)
-            .flatMap { sample, zarrPaths, rowParams ->
+            .flatMap { sample, zarrPaths ->
                 // Nextflow emits a single Path for one match and a List<Path> for many; normalize.
                 def zarrs = zarrPaths instanceof List ? zarrPaths : [zarrPaths]
                 zarrs.collect { zarr ->
