@@ -19,6 +19,4 @@ jobs:
         with:
           python-version: '3.12'
 
-      - run: pip install pyyaml
-
       - run: python bin/check_notebook_registry.py
