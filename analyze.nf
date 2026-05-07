@@ -34,7 +34,7 @@ workflow {
             tuple(row.sample.toString(), file(row.path), row)
         }
         .collect(flat: false)
-        .set { rowsList } // List<tuple(sample, path, row_map)>
+        .set { rowsList } // List<tuple(sample, staged_path, row_map)>
 
     // ---- plot_follicle: per-cell follicle plots ----
     if (analyzeMode == 'plot_follicle' || analyzeMode == 'all') {
@@ -51,7 +51,7 @@ workflow {
                     tuple(sampleId, artifactPath, rowParams, analysisRegistry.plot_follicle.params)
                 }
             }
-            .set { plotParamsInputs } // tuple(sample_cell_id, path, row_map, declared_params)
+            .set { plotParamsInputs } // tuple(sample_cell_id, staged_path, row_map, declared_params)
         PLOT_FOLLICLE_PARAMS(plotParamsInputs) | set { plotParams } // tuple(sample_cell_id, params_yml)
 
         rowsList
@@ -66,7 +66,7 @@ workflow {
                 }
             }
             .join(plotParams.params_file)
-            .set { plotInputs } // tuple(sample_cell_id, sample, cell, path, params_yml)
+            .set { plotInputs } // tuple(sample_cell_id, sample, cell, staged_path, params_yml)
         PLOT_FOLLICLE(plotInputs, notebook, timerScript)
     }
 }

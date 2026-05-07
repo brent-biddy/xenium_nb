@@ -40,7 +40,7 @@ workflow {
             tuple(row.sample.toString(), file(row.path), row)
         }
         .collect(flat: false)
-        .set { sampleRowsList } // List<tuple(sample, path, row_map)>
+        .set { sampleRowsList } // List<tuple(sample, staged_path, row_map)>
 
     // ---- sdata: raw Xenium -> per-sample SpatialData zarr ----
     if (createMode == 'sdata' || createMode == 'all') {
@@ -51,7 +51,7 @@ workflow {
                     tuple(row[0], row[1], row[2], createRegistry.create_sdata.params)
                 }
             }
-            .set { sdataParamsInputs } // tuple(sample, path, row_map, declared_params)
+            .set { sdataParamsInputs } // tuple(sample, staged_path, row_map, declared_params)
 
         SDATA_PARAMS(sdataParamsInputs) | set { createSdataParams } // tuple(sample, params_yml)
 
@@ -60,7 +60,7 @@ workflow {
                 rows.collect { row -> tuple(row[0], row[1]) }
             }
             .join(createSdataParams.params_file)
-            .set { createSdataInputs } // tuple(sample, path, params_yml)
+            .set { createSdataInputs } // tuple(sample, staged_path, params_yml)
 
         CREATE_SDATA(createSdataInputs, createNotebook, timerScript) | set { createSdataRun }
         // createSdataRun.artifacts: tuple(sample, zarr)
