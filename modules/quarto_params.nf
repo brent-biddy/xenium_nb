@@ -1,3 +1,12 @@
+// Writes a Quarto params.yml temp file and returns its Path for channel staging.
+def paramsFile(String id, Collection declaredParams, Map rowParams) {
+    File.createTempFile("params_${id}", ".yml").with {
+        deleteOnExit()
+        text = renderParamsYaml(declaredParams, rowParams)
+        toPath()
+    }
+}
+
 // Builds a Quarto params YAML string from declared per-notebook params and
 // samplesheet row data. Samplesheet columns take precedence; cell_ids_file
 // and radius fall back to pipeline params when not present in the row.

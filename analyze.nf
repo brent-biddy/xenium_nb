@@ -8,7 +8,7 @@
 
 nextflow.enable.dsl = 2
 
-include { renderParamsYaml } from './modules/quarto_params'
+include { paramsFile } from './modules/quarto_params'
 include { PLOT_FOLLICLE } from './modules/analyze_notebooks'
 
 workflow {
@@ -48,10 +48,7 @@ workflow {
                     def rowParams = row[2]
                     def cell = rowParams.cell.toString()
                     def sampleId = "${sample}_${cell}"
-                    def paramsFile = File.createTempFile("params_${sampleId}", ".yml")
-                    paramsFile.deleteOnExit()
-                    paramsFile.text = renderParamsYaml(analysisRegistry.plot_follicle.params, rowParams)
-                    tuple(sampleId, sample, cell, artifactPath, paramsFile.toPath())
+                    tuple(sampleId, sample, cell, artifactPath, paramsFile(sampleId, analysisRegistry.plot_follicle.params, rowParams))
                 }
             }
             .set { plotInputs } // tuple(sample_cell_id, sample, cell, staged_path, params_yml)

@@ -8,7 +8,7 @@
 
 nextflow.enable.dsl = 2
 
-include { renderParamsYaml } from './modules/quarto_params'
+include { paramsFile } from './modules/quarto_params'
 include { CREATE_SDATA; CREATE_FOLLICLE_SDATA } from './modules/create_notebooks'
 
 workflow {
@@ -45,10 +45,7 @@ workflow {
         sampleRowsList
             .flatMap { rows ->
                 rows.collect { row ->
-                    def paramsFile = File.createTempFile("params_${row[0]}", ".yml")
-                    paramsFile.deleteOnExit()
-                    paramsFile.text = renderParamsYaml(createRegistry.create_sdata.params, row[2])
-                    tuple(row[0], row[1], paramsFile.toPath())
+                    tuple(row[0], row[1], paramsFile(row[0], createRegistry.create_sdata.params, row[2]))
                 }
             }
             .set { createSdataInputs } // tuple(sample, staged_path, params_yml)
@@ -97,10 +94,7 @@ workflow {
                 rows.collect { row ->
                     // Override path with the zarr so the notebook receives the correct input path.
                     def rowMap = row[2] + [path: row[1].toString()]
-                    def paramsFile = File.createTempFile("params_${row[0]}", ".yml")
-                    paramsFile.deleteOnExit()
-                    paramsFile.text = renderParamsYaml(createRegistry.create_follicle_sdata.params, rowMap)
-                    tuple(row[0], row[1], paramsFile.toPath())
+                    tuple(row[0], row[1], paramsFile(row[0], createRegistry.create_follicle_sdata.params, rowMap))
                 }
             }
             .set { follicleInputs } // tuple(sample, staged_path, params_yml)
