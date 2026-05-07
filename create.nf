@@ -24,11 +24,8 @@ workflow {
     def follicleSourceArtifacts = null
     def timerScript = file("${projectDir}/bin/timer.py")
     def cellIdsFile = file(params.cell_ids_file)
-    def createNotebook = file("${projectDir}/notebooks/create_sdata.qmd")
-    def follicleNotebook = file("${projectDir}/notebooks/create_follicle_sdata.qmd")
-    def createRegistry = new groovy.json.JsonSlurper()
-        .parse(new File("${projectDir}/assets/notebook_registry.json"))
-        .create
+    def sdataNotebook = file("${projectDir}/notebooks/create_sdata.qmd")
+    def follicleSdataNotebook = file("${projectDir}/notebooks/create_follicle_sdata.qmd")
 
     Channel
         .fromPath(params.samplesheet)
@@ -45,11 +42,11 @@ workflow {
 
         sampleRowsList
             .map { sample, stagedPath, rowMap ->
-                tuple(sample, stagedPath, paramsFile(sample, createRegistry.create_sdata.params, rowMap))
+                tuple(sample, stagedPath, paramsFile(sample, sdataNotebook, rowMap))
             }
             .set { createSdataInputs } // tuple(sample, staged_path, params_yml)
 
-        CREATE_SDATA(createSdataInputs, createNotebook, timerScript) | set { createSdataRun }
+        CREATE_SDATA(createSdataInputs, sdataNotebook, timerScript) | set { createSdataRun }
         // createSdataRun.artifacts: tuple(sample, zarr)
 
         follicleSourceArtifacts = createSdataRun.artifacts
@@ -85,11 +82,11 @@ workflow {
         follicleSourceArtifacts
             .map { sample, stagedPath, rowMap ->
                 // Override path with the zarr so the notebook receives the correct input path.
-                tuple(sample, stagedPath, paramsFile(sample, createRegistry.create_follicle_sdata.params, rowMap + [path: stagedPath.toString()]))
+                tuple(sample, stagedPath, paramsFile(sample, follicleSdataNotebook, rowMap + [path: stagedPath.toString()]))
             }
             .set { follicleInputs } // tuple(sample, staged_path, params_yml)
 
-        CREATE_FOLLICLE_SDATA(follicleInputs, cellIdsFile, follicleNotebook, timerScript) | set { follicleRun }
+        CREATE_FOLLICLE_SDATA(follicleInputs, cellIdsFile, follicleSdataNotebook, timerScript) | set { follicleRun }
         // follicleRun.artifacts: tuple(sample, List<zarr>)
 
         follicleRun.artifacts

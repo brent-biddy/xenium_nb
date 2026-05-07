@@ -22,9 +22,6 @@ workflow {
     }
 
     def timerScript = file("${projectDir}/bin/timer.py")
-    def analysisRegistry = new groovy.json.JsonSlurper()
-        .parse(new File("${projectDir}/assets/notebook_registry.json"))
-        .analysis
 
     // ---- samplesheet ----
     Channel
@@ -39,14 +36,14 @@ workflow {
 
     // ---- plot_follicle: per-cell follicle plots ----
     if (analyzeMode == 'plot_follicle' || analyzeMode == 'all') {
-        def notebook = file("${projectDir}/notebooks/plot_follicle.qmd")
+        def plotFollicleNotebook = file("${projectDir}/notebooks/analyze_plot_follicle.qmd")
 
         rowsList
             .map { sample, stagedPath, rowMap ->
                 def follicleId = "${sample}_${rowMap.cell}"
-                tuple(follicleId, sample, stagedPath, paramsFile(follicleId, analysisRegistry.plot_follicle.params, rowMap))
+                tuple(follicleId, sample, stagedPath, paramsFile(follicleId, plotFollicleNotebook, rowMap))
             }
             .set { plotInputs } // tuple(follicle_id, sample, staged_path, params_yml)
-        PLOT_FOLLICLE(plotInputs, notebook, timerScript)
+        PLOT_FOLLICLE(plotInputs, plotFollicleNotebook, timerScript)
     }
 }

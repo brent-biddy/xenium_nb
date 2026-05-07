@@ -4,7 +4,7 @@
 process PLOT_FOLLICLE {
     tag "${follicle_id}"
 
-    publishDir { "${params.outdir}/${sample}/plot_follicle" },
+    publishDir { "${params.outdir}/${sample}/analyze_plot_follicle" },
         mode: 'copy',
         saveAs: { fn -> fn.startsWith('output/') ? fn : "${follicle_id}_${fn}" }
 
@@ -14,7 +14,7 @@ process PLOT_FOLLICLE {
     path 'timer.py'
 
     output:
-    path "plot_follicle.*", emit: reports
+    path "analyze_plot_follicle.*", emit: reports
     path "output/**", optional: true, hidden: true, emit: output_tree
 
     script:
@@ -30,7 +30,7 @@ process PLOT_FOLLICLE {
 
     stub:
     """
-    touch plot_follicle.pptx
-    touch plot_follicle.timing.tsv
+    touch analyze_plot_follicle.pptx
+    touch analyze_plot_follicle.timing.tsv
     """
 }
