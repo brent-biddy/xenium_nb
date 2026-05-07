@@ -27,7 +27,9 @@ workflow {
     def cellIdsFile = file(params.cell_ids_file)
     def createNotebook = file("${projectDir}/notebooks/create_sdata.qmd")
     def follicleNotebook = file("${projectDir}/notebooks/create_follicle_sdata.qmd")
-    def createRegistry = NotebookRegistry.create(projectDir)
+    def createRegistry = new groovy.json.JsonSlurper()
+        .parse(new File("${projectDir}/assets/notebook_registry.json"))
+        .create
 
     Channel
         .fromPath(params.samplesheet)

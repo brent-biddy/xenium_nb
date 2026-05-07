@@ -20,7 +20,9 @@ workflow {
     }
 
     def timerScript = file("${projectDir}/bin/timer.py")
-    def analysisRegistry = NotebookRegistry.analysis(projectDir)
+    def analysisRegistry = new groovy.json.JsonSlurper()
+        .parse(new File("${projectDir}/assets/notebook_registry.json"))
+        .analysis
 
     // ---- samplesheet ----
     Channel
