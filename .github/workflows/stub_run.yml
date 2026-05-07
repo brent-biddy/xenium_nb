@@ -17,7 +17,7 @@ jobs:
           version: '>=25.10.0'
 
       - name: Stub create.nf
-        run: nextflow run create.nf -stub --samplesheet assets/samplesheet.csv
+        run: nextflow run create.nf -stub --samplesheet assets/samplesheet.csv --create all
 
       - name: Stub analyze.nf
         run: nextflow run analyze.nf -stub --samplesheet assets/ci_analyze_samplesheet.csv --analyze plot_follicle
