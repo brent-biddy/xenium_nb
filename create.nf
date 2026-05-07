@@ -34,7 +34,7 @@ workflow {
         .map { row ->
             if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
-            tuple(row.sample.toString(), file(row.path), row)
+            tuple(row.sample, file(row.path), row)
         }
         .set { sampleRowsList } // tuple(sample, staged_path, row_map)
 

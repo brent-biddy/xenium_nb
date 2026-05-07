@@ -31,7 +31,7 @@ workflow {
         .map { row ->
             if (!row.sample) error "Analysis samplesheet row missing 'sample': ${row}"
             if (!row.path)   error "Analysis samplesheet row missing 'path': ${row}"
-            tuple(row.sample.toString(), file(row.path), row)
+            tuple(row.sample, file(row.path), row)
         }
         .set { rowsList } // tuple(sample, staged_path, row_map)
 
@@ -41,7 +41,7 @@ workflow {
 
         rowsList
             .map { sample, stagedPath, rowMap ->
-                def cell = rowMap.cell.toString()
+                def cell = rowMap.cell
                 def sampleId = "${sample}_${cell}"
                 tuple(sampleId, sample, cell, stagedPath, paramsFile(sampleId, analysisRegistry.plot_follicle.params, rowMap))
             }
