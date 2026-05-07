@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# Validates that every param listed in assets/notebook_registry.json exists in
-# the corresponding notebook's YAML front matter. Run from the repo root.
+# Validates that every param listed in assets/notebook_registry.json exists
+# in the corresponding notebook's YAML front matter. Run from the repo root.
 
 import json
 import re
@@ -26,10 +26,7 @@ def parse_notebook_params(qmd_path: Path) -> set[str]:
 def main() -> int:
     registry = json.loads(REGISTRY_PATH.read_text())
 
-    # Flatten all notebook entries across workflow groups
-    entries = {}
-    for group in registry.values():
-        entries.update(group)
+    entries = registry
 
     errors = []
     for notebook_id, info in entries.items():
