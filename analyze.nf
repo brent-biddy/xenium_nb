@@ -41,10 +41,10 @@ workflow {
 
         rowsList
             .map { sample, stagedPath, rowMap ->
-                def sampleId = "${sample}_${rowMap.cell}"
-                tuple(sampleId, sample, stagedPath, paramsFile(sampleId, analysisRegistry.plot_follicle.params, rowMap))
+                def follicleId = "${sample}_${rowMap.cell}"
+                tuple(follicleId, sample, stagedPath, paramsFile(follicleId, analysisRegistry.plot_follicle.params, rowMap))
             }
-            .set { plotInputs } // tuple(sample_cell_id, sample, staged_path, params_yml)
+            .set { plotInputs } // tuple(follicle_id, sample, staged_path, params_yml)
         PLOT_FOLLICLE(plotInputs, notebook, timerScript)
     }
 }
