@@ -44,7 +44,7 @@ workflow {
         rowsList
             .map { sample, stagedPath, rowMap ->
                 def follicleId = "${sample}_${rowMap.cell}"
-                tuple(follicleId, sample, stagedPath, paramsFile(follicleId, analysisRegistry.plot_follicle.params, rowMap, params.outdir))
+                tuple(follicleId, sample, stagedPath, paramsFile(follicleId, 'plot_follicle', analysisRegistry.plot_follicle.params, rowMap, params.outdir))
             }
             .set { plotInputs } // tuple(follicle_id, sample, staged_path, params_yml)
         PLOT_FOLLICLE(plotInputs, notebook, timerScript)

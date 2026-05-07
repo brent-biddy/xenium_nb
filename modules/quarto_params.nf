@@ -1,8 +1,9 @@
-// Writes a Quarto params YAML file to <outdir>/.params/ and returns its Path
-// for channel staging. Writing to outdir (on shared NFS on HPC) avoids the
-// symlink-to-local-/tmp problem that breaks staged files on compute nodes.
-def paramsFile(String id, Collection declaredParams, Map rowParams, def outdir) {
-    def paramsDir = new File("${outdir}/.quarto_params")
+// Writes a Quarto params YAML file to <outdir>/.quarto_params/<notebook>/
+// and returns its Path for channel staging. Writing to outdir (on shared NFS
+// on HPC) avoids the symlink-to-local-/tmp problem that breaks staged files
+// on compute nodes.
+def paramsFile(String id, String notebook, Collection declaredParams, Map rowParams, def outdir) {
+    def paramsDir = new File("${outdir}/.quarto_params/${notebook}")
     paramsDir.mkdirs()
     def paramsFile = new File(paramsDir, "params_${id}.yml")
     paramsFile.text = renderParamsYaml(declaredParams, rowParams)
