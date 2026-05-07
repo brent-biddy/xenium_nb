@@ -33,23 +33,20 @@ workflow {
             if (!row.path)   error "Analysis samplesheet row missing 'path': ${row}"
             tuple(row.sample.toString(), file(row.path), row)
         }
-        .collect(flat: false)
-        .set { rowsList } // List<tuple(sample, staged_path, row_map)>
+        .set { rowsList } // tuple(sample, staged_path, row_map)
 
     // ---- plot_follicle: per-cell follicle plots ----
     if (analyzeMode == 'plot_follicle' || analyzeMode == 'all') {
         def notebook = file("${projectDir}/notebooks/plot_follicle.qmd")
 
         rowsList
-            .flatMap { rows ->
-                rows.collect { row ->
-                    def sample = row[0]
-                    def artifactPath = row[1]
-                    def rowParams = row[2]
-                    def cell = rowParams.cell.toString()
-                    def sampleId = "${sample}_${cell}"
-                    tuple(sampleId, sample, cell, artifactPath, paramsFile(sampleId, analysisRegistry.plot_follicle.params, rowParams))
-                }
+            .map { row ->
+                def sample = row[0]
+                def artifactPath = row[1]
+                def rowParams = row[2]
+                def cell = rowParams.cell.toString()
+                def sampleId = "${sample}_${cell}"
+                tuple(sampleId, sample, cell, artifactPath, paramsFile(sampleId, analysisRegistry.plot_follicle.params, rowParams))
             }
             .set { plotInputs } // tuple(sample_cell_id, sample, cell, staged_path, params_yml)
         PLOT_FOLLICLE(plotInputs, notebook, timerScript)

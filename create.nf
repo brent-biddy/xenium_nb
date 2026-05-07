@@ -36,17 +36,14 @@ workflow {
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
             tuple(row.sample.toString(), file(row.path), row)
         }
-        .collect(flat: false)
-        .set { sampleRowsList } // List<tuple(sample, staged_path, row_map)>
+        .set { sampleRowsList } // tuple(sample, staged_path, row_map)
 
     // ---- sdata: raw Xenium -> per-sample SpatialData zarr ----
     if (createMode == 'sdata' || createMode == 'all') {
 
         sampleRowsList
-            .flatMap { rows ->
-                rows.collect { row ->
-                    tuple(row[0], row[1], paramsFile(row[0], createRegistry.create_sdata.params, row[2]))
-                }
+            .map { row ->
+                tuple(row[0], row[1], paramsFile(row[0], createRegistry.create_sdata.params, row[2]))
             }
             .set { createSdataInputs } // tuple(sample, staged_path, params_yml)
 
@@ -54,9 +51,7 @@ workflow {
         // createSdataRun.artifacts: tuple(sample, zarr)
 
         follicleSourceArtifacts = createSdataRun.artifacts
-            .join(
-                sampleRowsList.flatMap { rows -> rows }
-            )
+            .join(sampleRowsList)
             .map { sample, zarr, inputPath, rowParams ->
                 tuple(sample, zarr, rowParams)
             }
@@ -78,7 +73,7 @@ workflow {
 
     // Skip CREATE_SDATA: caller's samplesheet already points at existing sample zarrs.
     if (createMode == 'follicle_sdata') {
-        follicleSourceArtifacts = sampleRowsList.flatMap { rows -> rows }
+        follicleSourceArtifacts = sampleRowsList
         // follicleSourceArtifacts: tuple(sample, staged_path, row_map)
     }
 
@@ -86,26 +81,18 @@ workflow {
     if (createMode == 'follicle_sdata' || createMode == 'all') {
 
         follicleSourceArtifacts
-            .collect(flat: false)
-            .set { follicleSourceArtifactRows } // List<tuple(sample, zarr, row_map)>
-
-        follicleSourceArtifactRows
-            .flatMap { rows ->
-                rows.collect { row ->
-                    // Override path with the zarr so the notebook receives the correct input path.
-                    def rowMap = row[2] + [path: row[1].toString()]
-                    tuple(row[0], row[1], paramsFile(row[0], createRegistry.create_follicle_sdata.params, rowMap))
-                }
+            .map { row ->
+                // Override path with the zarr so the notebook receives the correct input path.
+                def rowMap = row[2] + [path: row[1].toString()]
+                tuple(row[0], row[1], paramsFile(row[0], createRegistry.create_follicle_sdata.params, rowMap))
             }
             .set { follicleInputs } // tuple(sample, staged_path, params_yml)
 
         CREATE_FOLLICLE_SDATA(follicleInputs, cellIdsFile, follicleNotebook, timerScript) | set { follicleRun }
         // follicleRun.artifacts: tuple(sample, List<zarr>)
 
-        follicleSourceArtifactRows
-            .flatMap { rows ->
-                rows.collect { row -> tuple(row[0], row[2] + [sample: row[0]]) }
-            }
+        follicleSourceArtifacts
+            .map { row -> tuple(row[0], row[2] + [sample: row[0]]) }
             .set { follicleRowParams } // tuple(sample, row_map)
 
         follicleRun.artifacts
