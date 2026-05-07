@@ -51,7 +51,7 @@ workflow {
         // createSdataRun.artifacts: tuple(sample, zarr)
 
         follicleSourceArtifacts = createSdataRun.artifacts
-            .join(sampleRowsList)
+            .join(sampleRowsList) // tuple(sample, zarr, staged_path, row_map)
             .map { sample, zarr, inputPath, rowParams ->
                 tuple(sample, zarr, rowParams)
             }
@@ -96,7 +96,7 @@ workflow {
             .set { follicleRowParams } // tuple(sample, row_map)
 
         follicleRun.artifacts
-            .join(follicleRowParams)
+            .join(follicleRowParams) // tuple(sample, List<zarr>, row_map)
             .flatMap { sample, zarrPaths, rowParams ->
                 // Nextflow emits a single Path for one match and a List<Path> for many; normalize.
                 def zarrs = zarrPaths instanceof List ? zarrPaths : [zarrPaths]
