@@ -29,8 +29,7 @@ xenium_nb/
 │   ├── create_notebooks.nf        # Create-stage notebook processes (sdata, follicle_sdata)
 │   ├── analyze_notebooks.nf       # Analysis notebook processes
 │   ├── run_notebook.nf            # Shared notebook runner
-│   ├── write_quarto_params.nf     # Renders params.yml for notebooks
-│   └── write_samplesheet.nf       # Writes artifact samplesheets
+│   └── write_quarto_params.nf     # Renders params.yml for notebooks
 ├── notebooks/
 │   ├── README.md
 │   ├── create_sdata.qmd

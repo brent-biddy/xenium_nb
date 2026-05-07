@@ -11,8 +11,6 @@ nextflow.enable.dsl = 2
 include { WRITE_QUARTO_PARAMS as SDATA_PARAMS } from './modules/write_quarto_params'
 include { WRITE_QUARTO_PARAMS as FOLLICLE_SDATA_PARAMS } from './modules/write_quarto_params'
 include { CREATE_SDATA; CREATE_FOLLICLE_SDATA } from './modules/create_notebooks'
-include { WRITE_SAMPLESHEET as SDATA_SAMPLESHEET } from './modules/write_samplesheet'
-include { WRITE_SAMPLESHEET as FOLLICLE_SAMPLESHEET } from './modules/write_samplesheet'
 
 workflow {
     def createMode = params.create.toLowerCase()
@@ -83,12 +81,9 @@ workflow {
             }
             .set { sampleArtifactRows } // Map(sample, path) per item
 
-        sampleArtifactRows
-            .collect()
-            .map { rows -> tuple('sample_sdata_samplesheet.csv', rows) }
-            .set { sdataSamplesheetInput } // tuple(filename, List<Map>)
-
-        SDATA_SAMPLESHEET(sdataSamplesheetInput)
+        Channel.of('sample,path')
+            .concat(sampleArtifactRows.map { row -> "${row.sample},${row.path}" })
+            .collectFile(name: 'sample_sdata_samplesheet.csv', newLine: true, storeDir: params.outdir, sort: false)
     }
 
     // Skip CREATE_SDATA: caller's samplesheet already points at existing sample zarrs.
@@ -147,11 +142,8 @@ workflow {
             }
             .set { follicleArtifactRows } // Map(sample, cell, path) per item
 
-        follicleArtifactRows
-            .collect()
-            .map { rows -> tuple('follicle_sdata_samplesheet.csv', rows) }
-            .set { follicleSheetInput } // tuple(filename, List<Map>)
-
-        FOLLICLE_SAMPLESHEET(follicleSheetInput)
+        Channel.of('sample,cell,path')
+            .concat(follicleArtifactRows.map { row -> "${row.sample},${row.cell},${row.path}" })
+            .collectFile(name: 'follicle_sdata_samplesheet.csv', newLine: true, storeDir: params.outdir, sort: false)
     }
 }
