@@ -45,12 +45,13 @@ workflow {
         sampleRowsList
             .flatMap { rows ->
                 rows.collect { row ->
-                    def paramsB64 = renderParamsYaml(createRegistry.create_sdata.params, row[2])
-                        .bytes.encodeBase64().toString()
-                    tuple(row[0], row[1], paramsB64)
+                    def paramsFile = File.createTempFile("params_${row[0]}", ".yml")
+                    paramsFile.deleteOnExit()
+                    paramsFile.text = renderParamsYaml(createRegistry.create_sdata.params, row[2])
+                    tuple(row[0], row[1], paramsFile.toPath())
                 }
             }
-            .set { createSdataInputs } // tuple(sample, staged_path, params_b64)
+            .set { createSdataInputs } // tuple(sample, staged_path, params_yml)
 
         CREATE_SDATA(createSdataInputs, createNotebook, timerScript) | set { createSdataRun }
         // createSdataRun.artifacts: tuple(sample, zarr)
@@ -96,12 +97,13 @@ workflow {
                 rows.collect { row ->
                     // Override path with the zarr so the notebook receives the correct input path.
                     def rowMap = row[2] + [path: row[1].toString()]
-                    def paramsB64 = renderParamsYaml(createRegistry.create_follicle_sdata.params, rowMap)
-                        .bytes.encodeBase64().toString()
-                    tuple(row[0], row[1], paramsB64)
+                    def paramsFile = File.createTempFile("params_${row[0]}", ".yml")
+                    paramsFile.deleteOnExit()
+                    paramsFile.text = renderParamsYaml(createRegistry.create_follicle_sdata.params, rowMap)
+                    tuple(row[0], row[1], paramsFile.toPath())
                 }
             }
-            .set { follicleInputs } // tuple(sample, staged_path, params_b64)
+            .set { follicleInputs } // tuple(sample, staged_path, params_yml)
 
         CREATE_FOLLICLE_SDATA(follicleInputs, cellIdsFile, follicleNotebook, timerScript) | set { follicleRun }
         // follicleRun.artifacts: tuple(sample, List<zarr>)

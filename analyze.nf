@@ -48,12 +48,13 @@ workflow {
                     def rowParams = row[2]
                     def cell = rowParams.cell.toString()
                     def sampleId = "${sample}_${cell}"
-                    def paramsB64 = renderParamsYaml(analysisRegistry.plot_follicle.params, rowParams)
-                        .bytes.encodeBase64().toString()
-                    tuple(sampleId, sample, cell, artifactPath, paramsB64)
+                    def paramsFile = File.createTempFile("params_${sampleId}", ".yml")
+                    paramsFile.deleteOnExit()
+                    paramsFile.text = renderParamsYaml(analysisRegistry.plot_follicle.params, rowParams)
+                    tuple(sampleId, sample, cell, artifactPath, paramsFile.toPath())
                 }
             }
-            .set { plotInputs } // tuple(sample_cell_id, sample, cell, staged_path, params_b64)
+            .set { plotInputs } // tuple(sample_cell_id, sample, cell, staged_path, params_yml)
         PLOT_FOLLICLE(plotInputs, notebook, timerScript)
     }
 }
