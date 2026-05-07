@@ -12,9 +12,11 @@ include { paramsFile } from './modules/quarto_params'
 include { PLOT_FOLLICLE } from './modules/analyze_notebooks'
 
 workflow {
-    def analyzeMode = (params.analyze ?: 'all').toLowerCase()
-
     if (!params.samplesheet) error "Please provide --samplesheet"
+    if (!params.analyze)     error "Please provide --analyze (plot_follicle, all)"
+
+    def analyzeMode = params.analyze.toLowerCase()
+
     if (!(analyzeMode in ['plot_follicle', 'all'])) {
         error "Invalid --analyze '${analyzeMode}'. Valid values are: plot_follicle, all"
     }

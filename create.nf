@@ -12,11 +12,13 @@ include { paramsFile } from './modules/quarto_params'
 include { CREATE_SDATA; CREATE_FOLLICLE_SDATA } from './modules/create_notebooks'
 
 workflow {
+    if (!params.samplesheet) error "Please provide --samplesheet"
+    if (!params.create)      error "Please provide --create (sdata, follicle_sdata, all)"
+
     def createMode = params.create.toLowerCase()
 
-    if (!params.samplesheet) error "Please provide --samplesheet"
     if (!(createMode in ['sdata', 'follicle_sdata', 'all'])) {
-        error "Invalid create '${createMode}'. Valid values are: sdata, follicle_sdata, all"
+        error "Invalid --create '${createMode}'. Valid values are: sdata, follicle_sdata, all"
     }
 
     def follicleSourceArtifacts = null
