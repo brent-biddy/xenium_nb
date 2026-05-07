@@ -1,18 +1,14 @@
 {
-  "create": {
-    "create_sdata": {
-      "path": "notebooks/create_sdata.qmd",
-      "params": ["sample", "path", "he_image", "he_alignment"]
-    },
-    "create_follicle_sdata": {
-      "path": "notebooks/create_follicle_sdata.qmd",
-      "params": ["sample", "path", "cell_ids_file", "radius"]
-    }
+  "create_sdata": {
+    "path": "notebooks/create_sdata.qmd",
+    "params": ["sample", "path", "he_image", "he_alignment"]
   },
-  "analysis": {
-    "plot_follicle": {
-      "path": "notebooks/plot_follicle.qmd",
-      "params": ["sample", "cell", "path"]
-    }
+  "create_follicle_sdata": {
+    "path": "notebooks/create_follicle_sdata.qmd",
+    "params": ["sample", "path", "cell_ids_file", "radius"]
+  },
+  "plot_follicle": {
+    "path": "notebooks/plot_follicle.qmd",
+    "params": ["sample", "cell", "path"]
   }
 }

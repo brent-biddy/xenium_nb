@@ -26,9 +26,6 @@ workflow {
     def cellIdsFile = file(params.cell_ids_file)
     def createNotebook = file("${projectDir}/notebooks/create_sdata.qmd")
     def follicleNotebook = file("${projectDir}/notebooks/create_follicle_sdata.qmd")
-    def createRegistry = new groovy.json.JsonSlurper()
-        .parse(new File("${projectDir}/assets/notebook_registry.json"))
-        .create
 
     Channel
         .fromPath(params.samplesheet)
@@ -45,7 +42,7 @@ workflow {
 
         sampleRowsList
             .map { sample, stagedPath, rowMap ->
-                tuple(sample, stagedPath, paramsFile(sample, 'create_sdata', createRegistry.create_sdata.params, rowMap, params.outdir))
+                tuple(sample, stagedPath, paramsFile(sample, createNotebook, rowMap))
             }
             .set { createSdataInputs } // tuple(sample, staged_path, params_yml)
 
@@ -85,7 +82,7 @@ workflow {
         follicleSourceArtifacts
             .map { sample, stagedPath, rowMap ->
                 // Override path with the zarr so the notebook receives the correct input path.
-                tuple(sample, stagedPath, paramsFile(sample, 'create_follicle_sdata', createRegistry.create_follicle_sdata.params, rowMap + [path: stagedPath.toString()], params.outdir))
+                tuple(sample, stagedPath, paramsFile(sample, follicleNotebook, rowMap + [path: stagedPath.toString()]))
             }
             .set { follicleInputs } // tuple(sample, staged_path, params_yml)
 
