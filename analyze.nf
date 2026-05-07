@@ -40,13 +40,10 @@ workflow {
         def notebook = file("${projectDir}/notebooks/plot_follicle.qmd")
 
         rowsList
-            .map { row ->
-                def sample = row[0]
-                def artifactPath = row[1]
-                def rowParams = row[2]
-                def cell = rowParams.cell.toString()
+            .map { sample, stagedPath, rowMap ->
+                def cell = rowMap.cell.toString()
                 def sampleId = "${sample}_${cell}"
-                tuple(sampleId, sample, cell, artifactPath, paramsFile(sampleId, analysisRegistry.plot_follicle.params, rowParams))
+                tuple(sampleId, sample, cell, stagedPath, paramsFile(sampleId, analysisRegistry.plot_follicle.params, rowMap))
             }
             .set { plotInputs } // tuple(sample_cell_id, sample, cell, staged_path, params_yml)
         PLOT_FOLLICLE(plotInputs, notebook, timerScript)

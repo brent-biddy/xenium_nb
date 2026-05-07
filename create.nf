@@ -42,8 +42,8 @@ workflow {
     if (createMode == 'sdata' || createMode == 'all') {
 
         sampleRowsList
-            .map { row ->
-                tuple(row[0], row[1], paramsFile(row[0], createRegistry.create_sdata.params, row[2]))
+            .map { sample, stagedPath, rowMap ->
+                tuple(sample, stagedPath, paramsFile(sample, createRegistry.create_sdata.params, rowMap))
             }
             .set { createSdataInputs } // tuple(sample, staged_path, params_yml)
 
@@ -81,10 +81,9 @@ workflow {
     if (createMode == 'follicle_sdata' || createMode == 'all') {
 
         follicleSourceArtifacts
-            .map { row ->
+            .map { sample, stagedPath, rowMap ->
                 // Override path with the zarr so the notebook receives the correct input path.
-                def rowMap = row[2] + [path: row[1].toString()]
-                tuple(row[0], row[1], paramsFile(row[0], createRegistry.create_follicle_sdata.params, rowMap))
+                tuple(sample, stagedPath, paramsFile(sample, createRegistry.create_follicle_sdata.params, rowMap + [path: stagedPath.toString()]))
             }
             .set { follicleInputs } // tuple(sample, staged_path, params_yml)
 
@@ -92,7 +91,7 @@ workflow {
         // follicleRun.artifacts: tuple(sample, List<zarr>)
 
         follicleSourceArtifacts
-            .map { row -> tuple(row[0], row[2] + [sample: row[0]]) }
+            .map { sample, stagedPath, rowMap -> tuple(sample, rowMap + [sample: sample]) }
             .set { follicleRowParams } // tuple(sample, row_map)
 
         follicleRun.artifacts
