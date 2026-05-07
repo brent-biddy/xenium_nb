@@ -8,7 +8,7 @@
 
 nextflow.enable.dsl = 2
 
-include { WRITE_QUARTO_PARAMS as PLOT_FOLLICLE_PARAMS } from './modules/write_quarto_params'
+include { paramsFile } from './modules/quarto_params'
 include { PLOT_FOLLICLE } from './modules/analyze_notebooks'
 
 workflow {
@@ -31,41 +31,20 @@ workflow {
         .map { row ->
             if (!row.sample) error "Analysis samplesheet row missing 'sample': ${row}"
             if (!row.path)   error "Analysis samplesheet row missing 'path': ${row}"
-            tuple(row.sample.toString(), file(row.path), row)
+            tuple(row.sample, file(row.path), row)
         }
-        .collect(flat: false)
-        .set { rowsList } // List<tuple(sample, staged_path, row_map)>
+        .set { rowsList } // tuple(sample, staged_path, row_map)
 
     // ---- plot_follicle: per-cell follicle plots ----
     if (analyzeMode == 'plot_follicle' || analyzeMode == 'all') {
         def notebook = file("${projectDir}/notebooks/plot_follicle.qmd")
 
         rowsList
-            .flatMap { rows ->
-                rows.collect { row ->
-                    def sample = row[0]
-                    def rowParams = row[2]
-                    def cell = rowParams.cell.toString()
-                    def sampleId = "${sample}_${cell}"
-                    tuple(sampleId, rowParams, analysisRegistry.plot_follicle.params)
-                }
+            .map { sample, stagedPath, rowMap ->
+                def follicleId = "${sample}_${rowMap.cell}"
+                tuple(follicleId, sample, stagedPath, paramsFile(follicleId, analysisRegistry.plot_follicle.params, rowMap))
             }
-            .set { plotParamsInputs } // tuple(sample_cell_id, row_map, declared_params)
-        PLOT_FOLLICLE_PARAMS(plotParamsInputs) | set { plotParams } // tuple(sample_cell_id, params_yml)
-
-        rowsList
-            .flatMap { rows ->
-                rows.collect { row ->
-                    def sample = row[0]
-                    def artifactPath = row[1]
-                    def rowParams = row[2]
-                    def cell = rowParams.cell.toString()
-                    def sampleId = "${sample}_${cell}"
-                    tuple(sampleId, sample, cell, artifactPath)
-                }
-            }
-            .join(plotParams.params_file)
-            .set { plotInputs } // tuple(sample_cell_id, sample, cell, staged_path, params_yml)
+            .set { plotInputs } // tuple(follicle_id, sample, staged_path, params_yml)
         PLOT_FOLLICLE(plotInputs, notebook, timerScript)
     }
 }

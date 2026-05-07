@@ -2,14 +2,14 @@
 // against a pre-built SpatialData artifact and publishes the resulting reports.
 
 process PLOT_FOLLICLE {
-    tag "${sample}:${cell}"
+    tag "${follicle_id}"
 
     publishDir { "${params.outdir}/${sample}/plot_follicle" },
         mode: 'copy',
-        saveAs: { fn -> fn.startsWith('output/') ? fn : "${sample_id}_${fn}" }
+        saveAs: { fn -> fn.startsWith('output/') ? fn : "${follicle_id}_${fn}" }
 
     input:
-    tuple val(sample_id), val(sample), val(cell), path(input_path), path('params.yml')
+    tuple val(follicle_id), val(sample), path(input_path), path('params.yml')
     path notebook
     path 'timer.py'
 
