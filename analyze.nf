@@ -20,6 +20,7 @@ workflow {
     }
 
     def timerScript = file("${projectDir}/bin/timer.py")
+    def analysisRegistry = NotebookRegistry.analysis(projectDir)
 
     // ---- samplesheet ----
     Channel
@@ -45,7 +46,7 @@ workflow {
                     def rowParams = row[2]
                     def cell = rowParams.cell.toString()
                     def sampleId = "${sample}_${cell}"
-                    tuple(sampleId, artifactPath, rowParams, ['sample', 'cell'])
+                    tuple(sampleId, artifactPath, rowParams, analysisRegistry.plot_follicle.params)
                 }
             }
             .set { plotParamsInputs }

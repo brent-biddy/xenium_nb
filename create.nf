@@ -27,6 +27,7 @@ workflow {
     def cellIdsFile = file(params.cell_ids_file)
     def createNotebook = file("${projectDir}/notebooks/create_sdata.qmd")
     def follicleNotebook = file("${projectDir}/notebooks/create_follicle_sdata.qmd")
+    def createRegistry = NotebookRegistry.create(projectDir)
 
     Channel
         .fromPath(params.samplesheet)
@@ -45,7 +46,7 @@ workflow {
         sampleRowsList
             .flatMap { rows ->
                 rows.collect { row ->
-                    tuple(row[0], row[1], row[2], ['sample'])
+                    tuple(row[0], row[1], row[2], createRegistry.create_sdata.params)
                 }
             }
             .set { sdataParamsInputs }
@@ -101,7 +102,7 @@ workflow {
         follicleSourceArtifactRows
             .flatMap { rows ->
                 rows.collect { row ->
-                    tuple(row[0], row[1], row[2], ['sample', 'cell_ids_file', 'radius'])
+                    tuple(row[0], row[1], row[2], createRegistry.create_follicle_sdata.params)
                 }
             }
             .set { follicleParamsInputs }

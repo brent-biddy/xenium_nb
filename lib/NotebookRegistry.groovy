@@ -3,7 +3,7 @@ class NotebookRegistry {
         [
             create_sdata: [
                 path  : "${projectDir}/notebooks/create_sdata.qmd",
-                params: ['sample', 'path'],
+                params: ['sample', 'path', 'he_image', 'he_alignment'],
             ],
             create_follicle_sdata: [
                 path  : "${projectDir}/notebooks/create_follicle_sdata.qmd",

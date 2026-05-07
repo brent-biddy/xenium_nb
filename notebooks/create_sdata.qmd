@@ -19,6 +19,8 @@ execute:
 sample = "default"
 path = "."
 n_jobs = 1
+he_image = ""
+he_alignment = ""
 ```
 
 ```{python}
@@ -87,6 +89,30 @@ with timer("Read Xenium"):
         cells_as_circles=True,
     )
 sdata
+```
+
+## Align H&E image
+
+Optionally registers a post-Xenium H&E OME-TIFF into the `SpatialData` object using
+a pre-computed alignment matrix, adding it as the `he_aligned` image element before
+the zarr is written.
+
+```{python}
+if he_image and he_alignment:
+    with timer("Align H&E"):
+        from spatialdata_io import xenium_aligned_image
+        he = xenium_aligned_image(
+            image_path=he_image,
+            alignment_file=he_alignment,
+            image_models_kwargs={
+                "chunks": {"y": 2048, "x": 2048, "c": -1},
+                "scale_factors": [2, 2, 2, 2],
+            },
+        )
+        sdata.images["he_aligned"] = he
+    print(f"H&E aligned: {he_image}")
+else:
+    print("Skipping H&E alignment (he_image/he_alignment not provided).")
 ```
 
 ## Write zarr store
