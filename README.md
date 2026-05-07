@@ -23,8 +23,7 @@ Notebook-specific inputs, outputs, and samplesheet contracts are documented in [
 xenium_nb/
 ├── create.nf                  # Create workflow: raw Xenium -> sample and follicle artifacts
 ├── analyze.nf                 # Analysis workflow: artifact samplesheet -> notebook reports
-├── lib/
-│   └── NotebookRegistry.groovy # Pipeline-internal notebook metadata catalog
+├── lib/                       # (reserved for Nextflow helper classes)
 ├── nextflow.config            # Parameters and profiles
 ├── modules/
 │   ├── create_notebooks.nf        # Create-stage notebook processes (sdata, follicle_sdata)
@@ -40,8 +39,9 @@ xenium_nb/
 ├── bin/
 │   └── timer.py                   # Timing utilities for notebooks
 └── assets/
-    ├── samplesheet.csv        # Sample-level samplesheet
-    └── stage_quality_area_all_rois.csv  # Cell ID reference file
+    ├── samplesheet.csv                    # Sample-level samplesheet
+    ├── stage_quality_area_all_rois.csv    # Cell ID reference file
+    └── notebook_registry.json             # Notebook metadata (paths and declared params)
 ```
 
 ---
@@ -129,7 +129,7 @@ Key parameters (set in `nextflow.config` or passed via `--param value`):
 | `cell_ids_file` | `${projectDir}/assets/stage_quality_area_all_rois.csv` | Cell ID reference file path |
 | `radius` | `250` | Default bounding box radius (µm) |
 | `create` | `all` | Create workflow mode: `sdata`, `follicle_sdata`, or `all` |
-| `analyze` | `all` | Analysis notebook selector: `all` or a comma-separated list of notebook IDs from `lib/NotebookRegistry.groovy` |
+| `analyze` | `all` | Analysis notebook selector: `all` or a comma-separated list of notebook IDs from `assets/notebook_registry.json` |
 
 Analysis notebook IDs and how to add new notebooks are documented in [notebooks/README.md](notebooks/README.md).
 

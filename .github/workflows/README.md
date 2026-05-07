@@ -4,7 +4,7 @@
 
 Runs on push to `main` and on all PRs targeting `main`. Can also be triggered manually via `workflow_dispatch`.
 
-Checks that every param listed in [`lib/NotebookRegistry.groovy`](../../lib/NotebookRegistry.groovy) exists in the corresponding notebook's YAML front matter. Fails if a registry param is missing from the notebook, which indicates the registry and notebook have drifted out of sync.
+Checks that every param listed in [`assets/notebook_registry.json`](../../assets/notebook_registry.json) exists in the corresponding notebook's `#| tags: [parameters]` cell. Fails if a registry param is missing from the notebook, which indicates the registry and notebook have drifted out of sync.
 
 The validation script lives at [`bin/check_notebook_registry.py`](../../bin/check_notebook_registry.py).
 

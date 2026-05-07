@@ -1,19 +1,19 @@
 # Notebook Workflows
 
 This directory contains the Quarto notebooks used by the Nextflow pipelines.
-Notebook registry metadata lives in [`../lib/NotebookRegistry.groovy`](../lib/NotebookRegistry.groovy).
+Notebook registry metadata lives in [`../assets/notebook_registry.json`](../assets/notebook_registry.json).
 
 ## Notebooks
 
 | Notebook | Purpose | Params | Main outputs |
 |----------|---------|--------|--------------|
-| `create_sdata.qmd` | Convert a raw Xenium output into a sample-level zarr. | `sample`, `path` | `output/<sample>.zarr`, `<sample>_create_sdata.html`, `<sample>_create_sdata.timing.tsv` |
+| `create_sdata.qmd` | Convert a raw Xenium output into a sample-level zarr, with optional H&E image alignment. | `sample`, `path`, `he_image` (optional), `he_alignment` (optional) | `output/<sample>.zarr`, `<sample>_create_sdata.html`, `<sample>_create_sdata.timing.tsv` |
 | `create_follicle_sdata.qmd` | Subset one sample-level zarr into one zarr per cell ID. | `sample`, `path`, `cell_ids_file`, `radius` | `output/<cell_id>.zarr`, `<sample>_create_follicle_sdata.html`, `<sample>_create_follicle_sdata.timing.tsv` |
 | `plot_follicle.qmd` | Render follicle zarrs into PowerPoint slides. | `sample`, `cell`, `path` | `<sample>_<cell>_plot_follicle.pptx`, `<sample>_<cell>_plot_follicle.timing.tsv` |
 
 ## Samplesheets
 
-- Create workflow input: `sample,path`
+- Create workflow input: `sample,path` — optionally `he_image,he_alignment` for H&E alignment in `create_sdata`
 - Analysis workflow input: `sample,path` for sample-level notebooks, `sample,cell,path` for notebooks that declare `cell`
 - Follicle reference sheet: `Donor.ROI`, `cell_id`, optional `radius`
 
@@ -45,12 +45,12 @@ The built-in analysis registry currently defines:
 |----|----------|-------------------|
 | `plot_follicle` | `notebooks/plot_follicle.qmd` | `sample`, `cell`, `path` |
 
-Notebook metadata is defined in [`../lib/NotebookRegistry.groovy`](../lib/NotebookRegistry.groovy), not under `params`.
+Notebook metadata is defined in [`../assets/notebook_registry.json`](../assets/notebook_registry.json).
 
 ## Adding A Notebook
 
 1. Create a new `.qmd` file in `notebooks/` with a Jupyter `parameters` cell declaring the notebook inputs it expects.
-2. Register the notebook in [`../lib/NotebookRegistry.groovy`](../lib/NotebookRegistry.groovy) with a unique ID, a path, and an explicit `params` list naming the keys to pass through.
+2. Add an entry to [`../assets/notebook_registry.json`](../assets/notebook_registry.json) under the appropriate workflow group (`create` or `analysis`) with a unique ID, a relative path, and a `params` list naming every key the notebook declares in its `#| tags: [parameters]` cell.
 3. If it is a create-stage producer, wire it into `create.nf`.
 4. For analysis notebooks, include every required row-level key in the registered `params` list (for example, include `cell` for follicle-level runs).
 5. Run analysis notebooks with `nextflow run analyze.nf --samplesheet <artifact_sheet.csv> --analyze <id1,id2|all>`.
