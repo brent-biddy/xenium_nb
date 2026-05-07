@@ -9,7 +9,7 @@ process CREATE_SDATA {
         saveAs: { fn -> fn.startsWith('output/') ? fn : "${sample}_${fn}" }
 
     input:
-    tuple val(sample), path(input_path), path('params.yml')
+    tuple val(sample), path(input_path), val(params_b64)
     path notebook
     path 'timer.py'
 
@@ -20,6 +20,8 @@ process CREATE_SDATA {
 
     script:
     """
+    python3 -c "import base64; open('params.yml', 'w').write(base64.b64decode('${params_b64}').decode())"
+
     # Redirect cache and temp dirs into the writable work dir so quarto/deno
     # don't try to write to a read-only /tmp on HPC compute nodes.
     export XDG_CACHE_HOME="\$PWD/.cache"
@@ -31,6 +33,7 @@ process CREATE_SDATA {
 
     stub:
     """
+    touch params.yml
     mkdir -p output/${sample}.zarr
     touch output/${sample}.zarr/.zgroup
     touch output/${sample}.zarr/.zattrs
@@ -48,7 +51,7 @@ process CREATE_FOLLICLE_SDATA {
         saveAs: { fn -> fn.startsWith('output/') ? fn : "${sample}_${fn}" }
 
     input:
-    tuple val(sample), path(input_path), path('params.yml')
+    tuple val(sample), path(input_path), val(params_b64)
     path cell_ids_file
     path notebook
     path 'timer.py'
@@ -60,6 +63,8 @@ process CREATE_FOLLICLE_SDATA {
 
     script:
     """
+    python3 -c "import base64; open('params.yml', 'w').write(base64.b64decode('${params_b64}').decode())"
+
     # Redirect cache and temp dirs into the writable work dir so quarto/deno
     # don't try to write to a read-only /tmp on HPC compute nodes.
     export XDG_CACHE_HOME="\$PWD/.cache"
@@ -71,6 +76,7 @@ process CREATE_FOLLICLE_SDATA {
 
     stub:
     """
+    touch params.yml
     mkdir -p output/${sample}.zarr
     touch output/${sample}.zarr/.zgroup
     touch output/${sample}.zarr/.zattrs

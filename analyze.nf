@@ -8,7 +8,7 @@
 
 nextflow.enable.dsl = 2
 
-include { WRITE_QUARTO_PARAMS as PLOT_FOLLICLE_PARAMS } from './modules/write_quarto_params'
+include { renderParamsYaml } from './modules/quarto_params'
 include { PLOT_FOLLICLE } from './modules/analyze_notebooks'
 
 workflow {
@@ -44,28 +44,16 @@ workflow {
             .flatMap { rows ->
                 rows.collect { row ->
                     def sample = row[0]
-                    def rowParams = row[2]
-                    def cell = rowParams.cell.toString()
-                    def sampleId = "${sample}_${cell}"
-                    tuple(sampleId, rowParams, analysisRegistry.plot_follicle.params)
-                }
-            }
-            .set { plotParamsInputs } // tuple(sample_cell_id, row_map, declared_params)
-        PLOT_FOLLICLE_PARAMS(plotParamsInputs) | set { plotParams } // tuple(sample_cell_id, params_yml)
-
-        rowsList
-            .flatMap { rows ->
-                rows.collect { row ->
-                    def sample = row[0]
                     def artifactPath = row[1]
                     def rowParams = row[2]
                     def cell = rowParams.cell.toString()
                     def sampleId = "${sample}_${cell}"
-                    tuple(sampleId, sample, cell, artifactPath)
+                    def paramsB64 = renderParamsYaml(analysisRegistry.plot_follicle.params, rowParams)
+                        .bytes.encodeBase64().toString()
+                    tuple(sampleId, sample, cell, artifactPath, paramsB64)
                 }
             }
-            .join(plotParams.params_file)
-            .set { plotInputs } // tuple(sample_cell_id, sample, cell, staged_path, params_yml)
+            .set { plotInputs } // tuple(sample_cell_id, sample, cell, staged_path, params_b64)
         PLOT_FOLLICLE(plotInputs, notebook, timerScript)
     }
 }

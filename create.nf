@@ -8,8 +8,7 @@
 
 nextflow.enable.dsl = 2
 
-include { WRITE_QUARTO_PARAMS as SDATA_PARAMS } from './modules/write_quarto_params'
-include { WRITE_QUARTO_PARAMS as FOLLICLE_SDATA_PARAMS } from './modules/write_quarto_params'
+include { renderParamsYaml } from './modules/quarto_params'
 include { CREATE_SDATA; CREATE_FOLLICLE_SDATA } from './modules/create_notebooks'
 
 workflow {
@@ -46,19 +45,12 @@ workflow {
         sampleRowsList
             .flatMap { rows ->
                 rows.collect { row ->
-                    tuple(row[0], row[2], createRegistry.create_sdata.params)
+                    def paramsB64 = renderParamsYaml(createRegistry.create_sdata.params, row[2])
+                        .bytes.encodeBase64().toString()
+                    tuple(row[0], row[1], paramsB64)
                 }
             }
-            .set { sdataParamsInputs } // tuple(sample, row_map, declared_params)
-
-        SDATA_PARAMS(sdataParamsInputs) | set { createSdataParams } // tuple(sample, params_yml)
-
-        sampleRowsList
-            .flatMap { rows ->
-                rows.collect { row -> tuple(row[0], row[1]) }
-            }
-            .join(createSdataParams.params_file)
-            .set { createSdataInputs } // tuple(sample, staged_path, params_yml)
+            .set { createSdataInputs } // tuple(sample, staged_path, params_b64)
 
         CREATE_SDATA(createSdataInputs, createNotebook, timerScript) | set { createSdataRun }
         // createSdataRun.artifacts: tuple(sample, zarr)
@@ -104,19 +96,12 @@ workflow {
                 rows.collect { row ->
                     // Override path with the zarr so the notebook receives the correct input path.
                     def rowMap = row[2] + [path: row[1].toString()]
-                    tuple(row[0], rowMap, createRegistry.create_follicle_sdata.params)
+                    def paramsB64 = renderParamsYaml(createRegistry.create_follicle_sdata.params, rowMap)
+                        .bytes.encodeBase64().toString()
+                    tuple(row[0], row[1], paramsB64)
                 }
             }
-            .set { follicleParamsInputs } // tuple(sample, row_map, declared_params)
-
-        FOLLICLE_SDATA_PARAMS(follicleParamsInputs) | set { follicleParams } // tuple(sample, params_yml)
-
-        follicleSourceArtifactRows
-            .flatMap { rows ->
-                rows.collect { row -> tuple(row[0], row[1]) }
-            }
-            .join(follicleParams.params_file)
-            .set { follicleInputs } // tuple(sample, zarr, params_yml)
+            .set { follicleInputs } // tuple(sample, staged_path, params_b64)
 
         CREATE_FOLLICLE_SDATA(follicleInputs, cellIdsFile, follicleNotebook, timerScript) | set { follicleRun }
         // follicleRun.artifacts: tuple(sample, List<zarr>)
