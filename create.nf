@@ -48,10 +48,10 @@ workflow {
         sampleRowsList
             .flatMap { rows ->
                 rows.collect { row ->
-                    tuple(row[0], row[1], row[2], createRegistry.create_sdata.params)
+                    tuple(row[0], row[2], createRegistry.create_sdata.params)
                 }
             }
-            .set { sdataParamsInputs } // tuple(sample, staged_path, row_map, declared_params)
+            .set { sdataParamsInputs } // tuple(sample, row_map, declared_params)
 
         SDATA_PARAMS(sdataParamsInputs) | set { createSdataParams } // tuple(sample, params_yml)
 
@@ -94,7 +94,7 @@ workflow {
     // Skip CREATE_SDATA: caller's samplesheet already points at existing sample zarrs.
     if (createMode == 'follicle_sdata') {
         follicleSourceArtifacts = sampleRowsList.flatMap { rows -> rows }
-        // follicleSourceArtifacts: tuple(sample, path, row_map)
+        // follicleSourceArtifacts: tuple(sample, staged_path, row_map)
     }
 
     // ---- follicle_sdata: per-sample SpatialData -> per-cell-ID subset zarrs ----
@@ -107,10 +107,12 @@ workflow {
         follicleSourceArtifactRows
             .flatMap { rows ->
                 rows.collect { row ->
-                    tuple(row[0], row[1], row[2], createRegistry.create_follicle_sdata.params)
+                    // Override path with the zarr so the notebook receives the correct input path.
+                    def rowMap = row[2] + [path: row[1].toString()]
+                    tuple(row[0], rowMap, createRegistry.create_follicle_sdata.params)
                 }
             }
-            .set { follicleParamsInputs } // tuple(sample, zarr, row_map, declared_params)
+            .set { follicleParamsInputs } // tuple(sample, row_map, declared_params)
 
         FOLLICLE_SDATA_PARAMS(follicleParamsInputs) | set { follicleParams } // tuple(sample, params_yml)
 

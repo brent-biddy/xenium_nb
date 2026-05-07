@@ -44,14 +44,13 @@ workflow {
             .flatMap { rows ->
                 rows.collect { row ->
                     def sample = row[0]
-                    def artifactPath = row[1]
                     def rowParams = row[2]
                     def cell = rowParams.cell.toString()
                     def sampleId = "${sample}_${cell}"
-                    tuple(sampleId, artifactPath, rowParams, analysisRegistry.plot_follicle.params)
+                    tuple(sampleId, rowParams, analysisRegistry.plot_follicle.params)
                 }
             }
-            .set { plotParamsInputs } // tuple(sample_cell_id, staged_path, row_map, declared_params)
+            .set { plotParamsInputs } // tuple(sample_cell_id, row_map, declared_params)
         PLOT_FOLLICLE_PARAMS(plotParamsInputs) | set { plotParams } // tuple(sample_cell_id, params_yml)
 
         rowsList
