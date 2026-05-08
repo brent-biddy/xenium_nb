@@ -28,6 +28,9 @@ import os
 from pathlib import Path
 import spatialdata_io
 import spatialdata
+from spatialdata.models import Image3DModel
+from spatialdata.transformations import Identity
+from dask_image.imread import imread as dask_imread
 import session_info
 from timer import timer, timing_summary
 
@@ -89,6 +92,29 @@ with timer("Read Xenium"):
         cells_as_circles=True,
     )
 sdata
+```
+
+## DAPI z-stack
+
+Reads the full 3D DAPI z-stack from `morphology.ome.tif` and adds it to the
+`SpatialData` object as `dapi_3d`, a multiscale image with dimensions
+`(c, z, y, x)`.
+
+```{python}
+morphology_3d_path = Path(xenium_path) / "morphology.ome.tif"
+if morphology_3d_path.exists():
+    with timer("Add DAPI z-stack"):
+        dapi_3d = dask_imread(str(morphology_3d_path))  # (z, y, x)
+        sdata.images["dapi_3d"] = Image3DModel.parse(
+            dapi_3d[None],
+            dims=("c", "z", "y", "x"),
+            c_coords=["DAPI"],
+            transformations={"global": Identity()},
+            scale_factors=[{"y": 2, "x": 2}, {"y": 2, "x": 2}, {"y": 2, "x": 2}, {"y": 2, "x": 2}],
+        )
+    print(sdata.images["dapi_3d"])
+else:
+    print("Skipping DAPI z-stack (morphology.ome.tif not found).")
 ```
 
 ## Align H&E image
