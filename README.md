@@ -32,9 +32,11 @@ xenium_nb/
 │   └── write_quarto_params.nf     # Renders params.yml for notebooks
 ├── notebooks/
 │   ├── README.md
-│   ├── create_sdata.qmd
-│   ├── create_follicle_sdata.qmd
-│   └── plot_follicle.qmd
+│   ├── create/
+│   │   ├── sdata.qmd
+│   │   └── follicle_sdata.qmd
+│   └── analyze/
+│       └── plot_follicle.qmd
 ├── bin/
 │   └── timer.py                   # Timing utilities for notebooks
 └── assets/

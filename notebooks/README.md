@@ -7,9 +7,9 @@ Notebook registry metadata lives in [`../assets/notebook_registry.json`](../asse
 
 | Notebook | Purpose | Params | Main outputs |
 |----------|---------|--------|--------------|
-| `create_sdata.qmd` | Convert a raw Xenium output into a sample-level zarr, with optional H&E image alignment. | `sample`, `path`, `he_image` (optional), `he_alignment` (optional) | `output/<sample>.zarr`, `<sample>_create_sdata.html`, `<sample>_create_sdata.timing.tsv` |
-| `create_follicle_sdata.qmd` | Subset one sample-level zarr into one zarr per cell ID. | `sample`, `path`, `cell_ids_file`, `radius` | `output/<cell_id>.zarr`, `<sample>_create_follicle_sdata.html`, `<sample>_create_follicle_sdata.timing.tsv` |
-| `plot_follicle.qmd` | Render follicle zarrs into PowerPoint slides. | `sample`, `cell`, `path` | `<sample>_<cell>_plot_follicle.pptx`, `<sample>_<cell>_plot_follicle.timing.tsv` |
+| `create/sdata.qmd` | Convert a raw Xenium output into a sample-level zarr, with optional H&E image alignment. | `sample`, `path`, `he_image` (optional), `he_alignment` (optional) | `output/<sample>.zarr`, `<sample>_create_sdata.html`, `<sample>_create_sdata.timing.tsv` |
+| `create/follicle_sdata.qmd` | Subset one sample-level zarr into one zarr per cell ID. | `sample`, `path`, `cell_ids_file`, `radius` | `output/<cell_id>.zarr`, `<sample>_create_follicle_sdata.html`, `<sample>_create_follicle_sdata.timing.tsv` |
+| `analyze/plot_follicle.qmd` | Render follicle zarrs into PowerPoint slides. | `sample`, `cell`, `path` | `<sample>_<cell>_plot_follicle.pptx`, `<sample>_<cell>_plot_follicle.timing.tsv` |
 
 ## Samplesheets
 
@@ -43,13 +43,13 @@ The built-in analysis registry currently defines:
 
 | ID | Notebook | Registered params |
 |----|----------|-------------------|
-| `plot_follicle` | `notebooks/plot_follicle.qmd` | `sample`, `cell`, `path` |
+| `analyze_plot_follicle` | `notebooks/analyze/plot_follicle.qmd` | `sample`, `cell`, `path` |
 
 Notebook metadata is defined in [`../assets/notebook_registry.json`](../assets/notebook_registry.json).
 
 ## Adding A Notebook
 
-1. Create a new `.qmd` file in `notebooks/` with a Jupyter `parameters` cell declaring the notebook inputs it expects.
+1. Create a new `.qmd` file in `notebooks/create/` or `notebooks/analyze/` with a Jupyter `parameters` cell declaring the notebook inputs it expects.
 2. Add an entry to [`../assets/notebook_registry.json`](../assets/notebook_registry.json) under the appropriate workflow group (`create` or `analysis`) with a unique ID, a relative path, and a `params` list naming every key the notebook declares in its `#| tags: [parameters]` cell.
 3. If it is a create-stage producer, wire it into `create.nf`.
 4. For analysis notebooks, include every required row-level key in the registered `params` list (for example, include `cell` for follicle-level runs).
