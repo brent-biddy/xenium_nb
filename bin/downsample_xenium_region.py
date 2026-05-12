@@ -124,10 +124,24 @@ def parse_args():
         action="store_true",
         help="Skip consistency validation after writing each region.",
     )
+    parser.add_argument(
+        "--he_image",
+        type=Path,
+        default=None,
+        help="Path to H&E OME-TIFF to crop alongside the Xenium region.",
+    )
+    parser.add_argument(
+        "--he_alignment",
+        type=Path,
+        default=None,
+        help="Path to alignment matrix CSV (3x3, H&E pixels -> Xenium coords).",
+    )
     args = parser.parse_args()
 
     if bool(args.bbox) == bool(args.regions_csv):
         parser.error("Provide exactly one of --bbox or --regions_csv.")
+    if bool(args.he_image) != bool(args.he_alignment):
+        parser.error("--he_image and --he_alignment must be provided together.")
     if args.proportion <= 0 or args.proportion > 1:
         parser.error("--proportion must be > 0 and <= 1.")
     return args
@@ -450,6 +464,103 @@ def crop_tiff_level(level, base_shape, x0, y0, x1, y1):
     return cropped
 
 
+def _read_tiff_level_crop(level, y0, x0, y1, x1):
+    """Read a (y0:y1, x0:x1) crop from a tifffile series level.
+
+    Handles tiled and non-tiled pages and both greyscale (YX) and RGB (YXS)
+    images. Only tiles that overlap the crop are read.
+    """
+    pages = list(level.pages)
+    if not pages:
+        return np.zeros((y1 - y0, x1 - x0), dtype=np.uint8)
+
+    page = pages[0]
+    lh, lw = level.shape[0], level.shape[1]
+    has_channels = level.ndim == 3
+    n_ch = level.shape[2] if has_channels else 1
+
+    if not page.is_tiled:
+        arr = page.asarray()
+        return arr[y0:y1, x0:x1]
+
+    result_shape = (y1 - y0, x1 - x0, n_ch) if has_channels else (y1 - y0, x1 - x0)
+    result = np.zeros(result_shape, dtype=page.dtype)
+
+    keyframe = page.keyframe
+    tile_h = keyframe.tilelength
+    tile_w = keyframe.tilewidth
+    tiles_x = int(np.ceil(lw / tile_w))
+
+    for ty in range(y0 // tile_h, (y1 - 1) // tile_h + 1):
+        for tx in range(x0 // tile_w, (x1 - 1) // tile_w + 1):
+            tile_idx = ty * tiles_x + tx
+            fh = page.parent.filehandle
+            fh.open()
+            fh.seek(page.dataoffsets[tile_idx])
+            encoded = fh.read(page.databytecounts[tile_idx])
+            tile, _, _ = page.decode(encoded, tile_idx)
+            tile = np.squeeze(tile)
+
+            src_y0 = ty * tile_h
+            src_x0 = tx * tile_w
+            src_y1 = min(src_y0 + tile.shape[0], lh)
+            src_x1 = min(src_x0 + tile.shape[1], lw)
+
+            ov_y0, ov_y1 = max(y0, src_y0), min(y1, src_y1)
+            ov_x0, ov_x1 = max(x0, src_x0), min(x1, src_x1)
+            if ov_y0 >= ov_y1 or ov_x0 >= ov_x1:
+                continue
+
+            result[ov_y0 - y0:ov_y1 - y0, ov_x0 - x0:ov_x1 - x0] = (
+                tile[ov_y0 - src_y0:ov_y1 - src_y0, ov_x0 - src_x0:ov_x1 - src_x0]
+            )
+
+    return result
+
+
+def crop_he_ome_tiff(src, dst, x0, y0, x1, y1):
+    """Crop an RGB OME-TIFF (YXS axes) to the given pixel bounds.
+
+    Uses (x0, y0, x1, y1) to match the convention of crop_ome_tiff.
+    Each pyramid level is cropped proportionally; only overlapping tiles
+    are read so the full base image is never loaded into memory.
+    """
+    import tifffile
+
+    with tifffile.TiffFile(src) as tif:
+        series = tif.series[0]
+        levels = list(series.levels) if getattr(series, "levels", None) else [series]
+        base_h, base_w = levels[0].shape[0], levels[0].shape[1]
+
+        crops = []
+        for level in levels:
+            lh, lw = level.shape[0], level.shape[1]
+            scale_y = base_h / lh
+            scale_x = base_w / lw
+            ly0 = max(0, int(np.floor(y0 / scale_y)))
+            lx0 = max(0, int(np.floor(x0 / scale_x)))
+            ly1 = min(lh, max(ly0 + 1, int(np.ceil(y1 / scale_y))))
+            lx1 = min(lw, max(lx0 + 1, int(np.ceil(x1 / scale_x))))
+            crops.append(_read_tiff_level_crop(level, ly0, lx0, ly1, lx1))
+
+    with tifffile.TiffWriter(dst, bigtiff=True, ome=True) as tif_out:
+        tif_out.write(
+            crops[0],
+            subifds=max(0, len(crops) - 1),
+            photometric="rgb",
+            compression="deflate",
+            metadata={"axes": "YXS"},
+        )
+        for crop in crops[1:]:
+            tif_out.write(
+                crop,
+                subfiletype=1,
+                photometric="rgb",
+                compression="deflate",
+                metadata=None,
+            )
+
+
 def crop_ome_tiff(src, dst, x0, y0, x1, y1):
     import tifffile
 
@@ -482,7 +593,42 @@ def crop_ome_tiff(src, dst, x0, y0, x1, y1):
             )
 
 
-def copy_and_crop_images(input_dir, output_dir, region, pixel_size):
+def load_he_alignment(alignment_path):
+    """Read a 3x3 affine matrix from a CSV with one row per matrix row."""
+    rows = []
+    with open(alignment_path) as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                rows.append([float(v) for v in line.split(",")])
+    return np.array(rows)
+
+
+def he_crop_bounds(region, alignment_matrix):
+    """Return H&E pixel (x0, y0, x1, y1) for a Xenium coordinate bbox.
+
+    alignment_matrix maps H&E pixels -> Xenium coords; we invert it to get
+    Xenium coords -> H&E pixels, then take the axis-aligned bounding box of
+    the four transformed corners.
+    """
+    xenium_to_he = np.linalg.inv(alignment_matrix)
+    corners = np.array([
+        [region.xmin, region.ymin, 1],
+        [region.xmax, region.ymin, 1],
+        [region.xmin, region.ymax, 1],
+        [region.xmax, region.ymax, 1],
+    ])
+    transformed = (xenium_to_he @ corners.T).T
+    px = transformed[:, 0]
+    py = transformed[:, 1]
+    x0 = max(0, int(np.floor(px.min())))
+    y0 = max(0, int(np.floor(py.min())))
+    x1 = max(x0 + 1, int(np.ceil(px.max())))
+    y1 = max(y0 + 1, int(np.ceil(py.max())))
+    return x0, y0, x1, y1
+
+
+def copy_and_crop_images(input_dir, output_dir, region, pixel_size, he_image=None, he_alignment=None):
     copy_files = [
         "experiment.xenium",
         "gene_panel.json",
@@ -507,6 +653,11 @@ def copy_and_crop_images(input_dir, output_dir, region, pixel_size):
         for image in sorted(focus_in.glob("*.ome.tif")):
             print(f"    morphology_focus/{image.name} crop...")
             crop_ome_tiff(image, focus_out / image.name, x0, y0, x1, y1)
+
+    if he_image is not None and he_alignment is not None:
+        hx0, hy0, hx1, hy1 = he_crop_bounds(region, he_alignment)
+        print(f"    he_image.ome.tif crop pixels x={hx0}:{hx1}, y={hy0}:{hy1}...")
+        crop_he_ome_tiff(he_image, output_dir / "he_image.ome.tif", hx0, hy0, hx1, hy1)
 
 
 def shift_zarr_dataset_if_spatial(key, data, region):
@@ -598,7 +749,7 @@ def process_cells_zarr_region(input_dir, output_dir, selected_indices, n_total, 
     store_in.close()
 
 
-def run_region(input_dir, output_dir, region, proportion, grid_size, pixel_size, skip_validation):
+def run_region(input_dir, output_dir, region, proportion, grid_size, pixel_size, skip_validation, he_image=None, he_alignment=None):
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"\nRegion:     {region.name}")
     print(f"Output:     {output_dir}")
@@ -648,7 +799,7 @@ def run_region(input_dir, output_dir, region, proportion, grid_size, pixel_size,
     process_cfm_zarr(input_dir, output_dir, selected_ids)
 
     print("\nStep 9: Copying metadata and cropping images...")
-    copy_and_crop_images(input_dir, output_dir, region, pixel_size)
+    copy_and_crop_images(input_dir, output_dir, region, pixel_size, he_image=he_image, he_alignment=he_alignment)
 
     if not skip_validation:
         print("\nStep 10: Validating output...")
@@ -666,12 +817,16 @@ def main():
     )
     regions = load_regions(args)
     pixel_size = args.pixel_size if args.pixel_size else infer_pixel_size(input_dir)
+    he_image = args.he_image.resolve() if args.he_image else None
+    he_alignment = load_he_alignment(args.he_alignment) if args.he_alignment else None
 
     print(f"Input:      {input_dir}")
     print(f"Output root:{output_root}")
     print(f"Regions:    {len(regions)}")
     print(f"Proportion: {args.proportion}")
     print(f"Grid size:  {args.grid_size}")
+    if he_image:
+        print(f"H&E image:  {he_image}")
 
     t0 = time.time()
     try:
@@ -684,6 +839,8 @@ def main():
                 grid_size=args.grid_size,
                 pixel_size=pixel_size,
                 skip_validation=args.skip_validation,
+                he_image=he_image,
+                he_alignment=he_alignment,
             )
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
