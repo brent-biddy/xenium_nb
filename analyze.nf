@@ -36,7 +36,7 @@ workflow {
 
     // ---- plot_follicle: per-cell follicle plots ----
     if (analyzeMode == 'plot_follicle' || analyzeMode == 'all') {
-        def plotFollicleNotebook = file("${projectDir}/notebooks/analyze_plot_follicle.qmd")
+        def plotFollicleNotebook = file("${projectDir}/notebooks/analyze/plot_follicle.qmd")
 
         rowsList
             .map { sample, stagedPath, rowMap ->

@@ -24,8 +24,8 @@ workflow {
     def follicleSourceArtifacts = null
     def timerScript = file("${projectDir}/bin/timer.py")
     def cellIdsFile = file(params.cell_ids_file)
-    def sdataNotebook = file("${projectDir}/notebooks/create_sdata.qmd")
-    def follicleSdataNotebook = file("${projectDir}/notebooks/create_follicle_sdata.qmd")
+    def sdataNotebook = file("${projectDir}/notebooks/create/sdata.qmd")
+    def follicleSdataNotebook = file("${projectDir}/notebooks/create/follicle_sdata.qmd")
 
     Channel
         .fromPath(params.samplesheet)
@@ -97,7 +97,7 @@ workflow {
                     [
                         sample: sample,
                         cell  : zarr.baseName,
-                        path  : "${params.outdir}/${sample}/create_follicle_sdata/output/${zarr.name}",
+                        path  : "${params.outdir}/${sample}/follicle_sdata/output/${zarr.name}",
                     ]
                 }
             }
