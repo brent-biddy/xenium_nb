@@ -30,6 +30,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 import spatialdata
 import spatialdata_plot
+from spatialdata.models import Image2DModel
 
 from timer import timer, write_timings_tsv
 
@@ -130,42 +131,65 @@ for img_key in image_keys:
     img = sdata.images[img_key]
     arr = next(iter(img.children.values())).image if hasattr(img, "children") else img
 
-    if img_key == "he_aligned":
-        plain_path = figure_dir / f"{img_key}_plain.png"
-        outlined_path = figure_dir / f"{img_key}_outlined.png"
-        with timer(f"Plot {img_key}"):
-            base_title = f"{roi} / {cell_id} — {img_key}"
-            _render_panel(img_key, False, f"{base_title} (oocyte)", plain_path)
-            _render_panel(img_key, True, f"{base_title} (oocyte + neighbors)", outlined_path)
-        figure_specs.append(
-            {
-                "image_key": img_key,
-                "channel": "H&E",
-                "plain_path": str(plain_path),
-                "outlined_path": str(outlined_path),
-            }
+    if "z" in arr.dims:
+        # spatialdata_plot only handles 2D images. Register the middle z-plane as a
+        # temporary element so the existing render pipeline works unchanged.
+        z_mid = arr.sizes["z"] // 2
+        preview_key = f"{img_key}_preview"
+        slice_2d = arr.isel(z=z_mid).drop_vars("z")
+        sdata.images[preview_key] = Image2DModel.parse(
+            slice_2d,
+            dims=("c", "y", "x"),
+            c_coords=list(arr.coords["c"].values),
         )
+        plot_key = preview_key
+        plot_arr = slice_2d
+        plot_label = f"{img_key} (z={z_mid})"
     else:
-        for ch in arr.coords["c"].values:
-            channel_name = str(ch)
-            safe_channel = channel_name.replace("/", "_").replace(" ", "_")
-            plain_path = figure_dir / f"{img_key}_{safe_channel}_plain.png"
-            outlined_path = figure_dir / f"{img_key}_{safe_channel}_outlined.png"
-            with timer(f"Plot {img_key}[{channel_name}]"):
-                vmin, vmax = np.percentile(np.asarray(arr.sel(c=ch)), [1, 99.5])
-                base_title = f"{roi} / {cell_id} — {img_key} — {channel_name}"
-                _render_panel(img_key, False, f"{base_title} (oocyte)", plain_path,
-                              channel=ch, vmin=vmin, vmax=vmax)
-                _render_panel(img_key, True, f"{base_title} (oocyte + neighbors)", outlined_path,
-                              channel=ch, vmin=vmin, vmax=vmax)
+        plot_key = img_key
+        plot_arr = arr
+        plot_label = img_key
+
+    try:
+        if img_key == "he_aligned":
+            plain_path = figure_dir / f"{img_key}_plain.png"
+            outlined_path = figure_dir / f"{img_key}_outlined.png"
+            with timer(f"Plot {img_key}"):
+                base_title = f"{roi} / {cell_id} — {plot_label}"
+                _render_panel(plot_key, False, f"{base_title} (oocyte)", plain_path)
+                _render_panel(plot_key, True, f"{base_title} (oocyte + neighbors)", outlined_path)
             figure_specs.append(
                 {
                     "image_key": img_key,
-                    "channel": channel_name,
+                    "channel": "H&E",
                     "plain_path": str(plain_path),
                     "outlined_path": str(outlined_path),
                 }
             )
+        else:
+            for ch in plot_arr.coords["c"].values:
+                channel_name = str(ch)
+                safe_channel = channel_name.replace("/", "_").replace(" ", "_")
+                plain_path = figure_dir / f"{img_key}_{safe_channel}_plain.png"
+                outlined_path = figure_dir / f"{img_key}_{safe_channel}_outlined.png"
+                with timer(f"Plot {img_key}[{channel_name}]"):
+                    vmin, vmax = np.percentile(np.asarray(plot_arr.sel(c=ch)), [1, 99.5])
+                    base_title = f"{roi} / {cell_id} — {plot_label} — {channel_name}"
+                    _render_panel(plot_key, False, f"{base_title} (oocyte)", plain_path,
+                                  channel=ch, vmin=vmin, vmax=vmax)
+                    _render_panel(plot_key, True, f"{base_title} (oocyte + neighbors)", outlined_path,
+                                  channel=ch, vmin=vmin, vmax=vmax)
+                figure_specs.append(
+                    {
+                        "image_key": img_key,
+                        "channel": channel_name,
+                        "plain_path": str(plain_path),
+                        "outlined_path": str(outlined_path),
+                    }
+                )
+    finally:
+        if plot_key != img_key:
+            del sdata.images[plot_key]
 ```
 
 ```{python}

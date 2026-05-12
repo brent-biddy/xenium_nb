@@ -97,7 +97,7 @@ workflow {
                     [
                         sample: sample,
                         cell  : zarr.baseName,
-                        path  : "${params.outdir}/${sample}/create_follicle_sdata/output/${zarr.name}",
+                        path  : "${params.outdir}/${sample}/follicle_sdata/output/${zarr.name}",
                     ]
                 }
             }

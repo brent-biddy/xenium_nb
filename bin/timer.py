@@ -34,8 +34,11 @@ def write_timings_tsv(path):
         f.write(f"Total\t{total:.4f}\n")
 
 
-def timing_summary():
-    """Print a formatted table of all recorded timings and a total."""
+def timing_summary(path=None):
+    """Print a formatted table of all recorded timings and a total.
+
+    If path is provided, also write the timings to a TSV file.
+    """
     if not _timings:
         print("No timings recorded.")
         return
@@ -52,3 +55,5 @@ def timing_summary():
     minutes, seconds = divmod(total, 60)
     total_str = f"{int(minutes)}m {seconds:.1f}s" if minutes > 0 else f"{seconds:.2f}s"
     print(f"{'Total':<{col}}  {total_str:>10}")
+    if path is not None:
+        write_timings_tsv(path)

@@ -174,7 +174,7 @@ with timer("Summary"):
 ## Timings
 
 ```{python}
-timing_summary()
+timing_summary(path="sdata.timing.tsv")
 ```
 
 ## Session Info

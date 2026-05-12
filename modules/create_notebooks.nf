@@ -15,7 +15,7 @@ process CREATE_SDATA {
 
     output:
     tuple val(sample), path('output/*.zarr'), emit: artifacts
-    path "create_sdata.*", emit: reports
+    path "sdata.*", emit: reports
     path "output/**", optional: true, hidden: true, emit: output_tree
 
     script:
@@ -35,15 +35,15 @@ process CREATE_SDATA {
     touch output/${sample}.zarr/.zgroup
     touch output/${sample}.zarr/.zattrs
     touch output/${sample}.zarr/.zmetadata
-    touch create_sdata.html
-    touch create_sdata.timing.tsv
+    touch sdata.html
+    touch sdata.timing.tsv
     """
 }
 
 process CREATE_FOLLICLE_SDATA {
     tag "${sample}"
 
-    publishDir { "${params.outdir}/${sample}/create_follicle_sdata" },
+    publishDir { "${params.outdir}/${sample}/follicle_sdata" },
         mode: 'copy',
         saveAs: { fn -> fn.startsWith('output/') ? fn : "${sample}_${fn}" }
 
@@ -55,7 +55,7 @@ process CREATE_FOLLICLE_SDATA {
 
     output:
     tuple val(sample), path('output/*.zarr'), emit: artifacts
-    path "create_follicle_sdata.*", emit: reports
+    path "follicle_sdata.*", emit: reports
     path "output/**", optional: true, hidden: true, emit: output_tree
 
     script:
@@ -75,7 +75,7 @@ process CREATE_FOLLICLE_SDATA {
     touch output/${sample}.zarr/.zgroup
     touch output/${sample}.zarr/.zattrs
     touch output/${sample}.zarr/.zmetadata
-    touch create_follicle_sdata.html
-    touch create_follicle_sdata.timing.tsv
+    touch follicle_sdata.html
+    touch follicle_sdata.timing.tsv
     """
 }
