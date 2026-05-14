@@ -151,7 +151,7 @@ for img_key in image_keys:
         plot_label = img_key
 
     try:
-        if img_key == "he_aligned":
+        if img_key in ("he_image", "he_aligned"):
             plain_path = figure_dir / f"{img_key}_plain.png"
             outlined_path = figure_dir / f"{img_key}_outlined.png"
             with timer(f"Plot {img_key}"):
