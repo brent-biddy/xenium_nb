@@ -134,7 +134,7 @@ def parse_args():
         "--he_alignment",
         type=Path,
         default=None,
-        help="Path to alignment matrix CSV (3x3, H&E pixels -> Xenium coords).",
+        help="Path to alignment matrix CSV (3x3, H&E pixels -> Xenium pixels).",
     )
     args = parser.parse_args()
 
@@ -594,7 +594,7 @@ def crop_ome_tiff(src, dst, x0, y0, x1, y1):
 
 
 def load_he_alignment(alignment_path):
-    """Read a 3x3 affine matrix from a CSV with one row per matrix row."""
+    """Read a 3x3 affine matrix (H&E pixels -> Xenium pixels) from a CSV."""
     rows = []
     with open(alignment_path) as f:
         for line in f:
@@ -604,19 +604,19 @@ def load_he_alignment(alignment_path):
     return np.array(rows)
 
 
-def he_crop_bounds(region, alignment_matrix):
+def he_crop_bounds(region, alignment_matrix, pixel_size):
     """Return H&E pixel (x0, y0, x1, y1) for a Xenium coordinate bbox.
 
-    alignment_matrix maps H&E pixels -> Xenium coords; we invert it to get
-    Xenium coords -> H&E pixels, then take the axis-aligned bounding box of
-    the four transformed corners.
+    alignment_matrix maps H&E pixels -> Xenium pixels; we invert it to get
+    Xenium pixels -> H&E pixels. Region coords are in µm so we first divide
+    by pixel_size to convert to Xenium pixels before applying the inverse.
     """
     xenium_to_he = np.linalg.inv(alignment_matrix)
     corners = np.array([
-        [region.xmin, region.ymin, 1],
-        [region.xmax, region.ymin, 1],
-        [region.xmin, region.ymax, 1],
-        [region.xmax, region.ymax, 1],
+        [region.xmin / pixel_size, region.ymin / pixel_size, 1],
+        [region.xmax / pixel_size, region.ymin / pixel_size, 1],
+        [region.xmin / pixel_size, region.ymax / pixel_size, 1],
+        [region.xmax / pixel_size, region.ymax / pixel_size, 1],
     ])
     transformed = (xenium_to_he @ corners.T).T
     px = transformed[:, 0]
@@ -655,9 +655,32 @@ def copy_and_crop_images(input_dir, output_dir, region, pixel_size, he_image=Non
             crop_ome_tiff(image, focus_out / image.name, x0, y0, x1, y1)
 
     if he_image is not None and he_alignment is not None:
-        hx0, hy0, hx1, hy1 = he_crop_bounds(region, he_alignment)
+        hx0, hy0, hx1, hy1 = he_crop_bounds(region, he_alignment, pixel_size)
         print(f"    he_image.ome.tif crop pixels x={hx0}:{hx1}, y={hy0}:{hy1}...")
         crop_he_ome_tiff(he_image, output_dir / "he_image.ome.tif", hx0, hy0, hx1, hy1)
+
+        # Build the alignment matrix for the cropped H&E in spatialdata global space
+        # (Xenium pixel units). The input matrix maps H&E pixels → Xenium pixels; we
+        # adjust only the translation to account for the H&E crop origin (hx0, hy0)
+        # and the rebased Xenium origin (region.xmin / pixel_size, region.ymin / pixel_size).
+        # No row scaling is needed — the matrix already outputs Xenium pixels.
+        cropped_matrix = he_alignment.copy()
+        cropped_matrix[0, 2] = (
+            he_alignment[0, 0] * hx0 + he_alignment[0, 1] * hy0 + he_alignment[0, 2]
+            - region.xmin / pixel_size
+        )
+        cropped_matrix[1, 2] = (
+            he_alignment[1, 0] * hx0 + he_alignment[1, 1] * hy0 + he_alignment[1, 2]
+            - region.ymin / pixel_size
+        )
+        cropped_matrix[2] = [0.0, 0.0, 1.0]
+        # spatialdata_io.xenium() auto-detects alignment files named
+        # <image_stem>alignment.csv, so he_image.ome.tif → he_imagealignment.csv.
+        alignment_out = output_dir / "he_imagealignment.csv"
+        with open(alignment_out, "w") as f:
+            for row in cropped_matrix:
+                f.write(",".join(f"{v}" for v in row) + "\n")
+        print(f"    he_imagealignment.csv written")
 
 
 def shift_zarr_dataset_if_spatial(key, data, region):
