@@ -25,6 +25,13 @@ def renderParamsYaml(Collection declaredParams, Map rowParams) {
 
     merged['path'] = new File(rowParams.path as String).absolutePath
 
+    // Resolve optional file-path params to absolute when provided
+    ['he_image', 'he_alignment'].each { key ->
+        if (declared.contains(key) && rowParams.containsKey(key) && rowParams[key]) {
+            merged[key] = new File(rowParams[key] as String).absolutePath
+        }
+    }
+
     rowParams.each { key, value ->
         if (declared.contains(key) && !merged.containsKey(key)) merged[key] = value
     }

@@ -19,6 +19,8 @@ execute:
 sample = "default"
 path = "."
 n_jobs = 1
+he_image = ""
+he_alignment = ""
 ```
 
 ```{python}
@@ -27,8 +29,8 @@ from pathlib import Path
 import numpy as np
 import spatialdata_io
 import spatialdata
-from spatialdata.models import Image2DModel, Image3DModel
-from spatialdata.transformations import Affine, Identity, get_transformation, set_transformation
+from spatialdata.models import Image3DModel
+from spatialdata.transformations import Identity
 from dask_image.imread import imread as dask_imread
 import session_info
 from timer import timer, timing_summary
@@ -93,42 +95,31 @@ with timer("Read Xenium"):
 sdata
 ```
 
-## Fix H&E image axes
+## Load H&E image
 
-`spatialdata_io.xenium()` loads the H&E via `xenium_aligned_image`, which uses
-`Affine(M, input_axes=("x","y"), output_axes=("x","y"))`. When serialized, this
-produces global output axes `(c, x, y)` — non-standard vs the `(c, y, x)` used
-by every other element. Spatialdata-plot uses positional axis ordering when
-rendering, so the H&E ends up with x and y swapped relative to all other elements,
-causing it to appear at the wrong location.
-
-The fix rebuilds the transform as a full `(c, y, x) → (c, y, x)` affine using the
-same alignment matrix values. With explicit channel axes in both input and output,
-spatialdata preserves the `(c, y, x)` ordering rather than normalizing to `(c, x, y)`.
+`spatialdata_io.xenium()` auto-loads the H&E when `he_image.ome.tif` and
+`he_imagealignment.csv` are present in the Xenium directory following the expected
+naming convention. When the image lives at an arbitrary path, pass `he_image` and
+`he_alignment` as notebook params to load it explicitly.
 
 ```{python}
-if "he_image" in sdata.images:
-    alignment_path = Path(xenium_path) / "he_imagealignment.csv"
-    if alignment_path.exists():
-        # M_raw: row 0 → x_xenium_px, row 1 → y_xenium_px, input (x_col, y_row)
-        M_raw = np.loadtxt(alignment_path, delimiter=",")
-        # Build (c,y,x)→(c,y,x) 4×4 matrix.
-        # Columns: [c_in, y_in(row), x_in(col), 1]
-        # y_global = M_raw[1,0]*x_col + M_raw[1,1]*y_row + M_raw[1,2]
-        # x_global = M_raw[0,0]*x_col + M_raw[0,1]*y_row + M_raw[0,2]
-        M_full = np.array([
-            [1, 0,           0,           0          ],
-            [0, M_raw[1, 1], M_raw[1, 0], M_raw[1, 2]],  # y_out
-            [0, M_raw[0, 1], M_raw[0, 0], M_raw[0, 2]],  # x_out
-            [0, 0,           0,           1          ],
-        ])
-        new_tf = Affine(M_full, input_axes=("c", "y", "x"), output_axes=("c", "y", "x"))
-        set_transformation(sdata.images["he_image"], new_tf, "global")
-        print(f"Fixed he_image transform: output_axes = {new_tf.output_axes}")
-    else:
-        print("No he_imagealignment.csv found, skipping he_image axis fix.")
+if "he_image" not in sdata.images and he_image and he_alignment:
+    from spatialdata_io import xenium_aligned_image
+    with timer("Load H&E"):
+        he = xenium_aligned_image(
+            image_path=he_image,
+            alignment_file=he_alignment,
+            image_models_kwargs={
+                "chunks": {"y": 2048, "x": 2048, "c": -1},
+                "scale_factors": [2, 2, 2, 2],
+            },
+        )
+    sdata.images["he_image"] = he
+    print(f"Loaded H&E from {he_image}")
+elif "he_image" in sdata.images:
+    print("H&E auto-detected by spatialdata_io.")
 else:
-    print("No he_image in sdata.")
+    print("No H&E image found.")
 ```
 
 ## DAPI z-stack
