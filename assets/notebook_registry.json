@@ -1,7 +1,7 @@
 {
   "sdata": {
     "path": "notebooks/create/sdata.qmd",
-    "params": ["sample", "path"]
+    "params": ["sample", "path", "he_image", "he_alignment"]
   },
   "follicle_sdata": {
     "path": "notebooks/create/follicle_sdata.qmd",
