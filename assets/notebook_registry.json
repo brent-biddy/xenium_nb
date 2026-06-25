@@ -1,12 +1,4 @@
 {
-  "sdata": {
-    "path": "notebooks/create/sdata.qmd",
-    "params": ["sample", "path", "he_image", "he_alignment"]
-  },
-  "follicle_sdata": {
-    "path": "notebooks/create/follicle_sdata.qmd",
-    "params": ["sample", "path", "cell_ids_file", "radius"]
-  },
   "plot_follicle": {
     "path": "notebooks/analyze/plot_follicle.qmd",
     "params": ["sample", "cell", "path"]

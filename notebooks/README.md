@@ -3,17 +3,18 @@
 This directory contains the Quarto notebooks used by the Nextflow pipelines.
 Notebook registry metadata lives in [`../assets/notebook_registry.json`](../assets/notebook_registry.json).
 
+The create-stage steps (`CREATE_SDATA`, `CREATE_FOLLICLE_SDATA`) run plain Python scripts
+in `bin/` rather than notebooks — see `bin/create_sdata.py` and `bin/create_follicle_sdata.py`.
+
 ## Notebooks
 
 | Notebook | Purpose | Params | Main outputs |
 |----------|---------|--------|--------------|
-| `create/sdata.qmd` | Convert a raw Xenium output into a sample-level zarr, with optional H&E image alignment. | `sample`, `path`, `he_image` (optional), `he_alignment` (optional) | `output/<sample>.zarr`, `<sample>_create_sdata.html`, `<sample>_create_sdata.timing.tsv` |
-| `create/follicle_sdata.qmd` | Subset one sample-level zarr into one zarr per cell ID. | `sample`, `path`, `cell_ids_file`, `radius` | `output/<cell_id>.zarr`, `<sample>_create_follicle_sdata.html`, `<sample>_create_follicle_sdata.timing.tsv` |
-| `analyze/plot_follicle.qmd` | Render follicle zarrs into PowerPoint slides. | `sample`, `cell`, `path` | `<sample>_<cell>_plot_follicle.pptx`, `<sample>_<cell>_plot_follicle.timing.tsv` |
+| `analyze/plot_follicle.qmd` | Render follicle zarrs into PowerPoint slides. | `sample`, `cell`, `path` | `<cell>_plot_follicle.pptx`, `<cell>_plot_follicle.timing.tsv` |
 
 ## Samplesheets
 
-- Create workflow input: `sample,path` — optionally `he_image,he_alignment` for H&E alignment in `create_sdata`
+- Create workflow input: `sample,path` — optionally `he_image,he_alignment` for H&E alignment
 - Analysis workflow input: `sample,path` for sample-level notebooks, `sample,cell,path` for notebooks that declare `cell`
 - Follicle reference sheet: `Donor.ROI`, `cell_id`, optional `radius`
 
@@ -21,12 +22,12 @@ Examples:
 
 ```csv
 sample,path
-ROI1,/path/to/ROI1/xenium_output
+ROI1_A,/path/to/ROI1_A/xenium_output
 ```
 
 ```csv
 sample,cell,path
-ROI1,aaaaimck-1,results/ROI1/create_follicle_sdata/output/aaaaimck-1.zarr
+ROI1_A,aaaaimck-1,results/ROI1_A/follicle_sdata/output/aaaaimck-1.zarr
 ```
 
 ## Running
@@ -43,14 +44,21 @@ The built-in analysis registry currently defines:
 
 | ID | Notebook | Registered params |
 |----|----------|-------------------|
-| `analyze_plot_follicle` | `notebooks/analyze/plot_follicle.qmd` | `sample`, `cell`, `path` |
+| `plot_follicle` | `notebooks/analyze/plot_follicle.qmd` | `sample`, `cell`, `path` |
 
 Notebook metadata is defined in [`../assets/notebook_registry.json`](../assets/notebook_registry.json).
 
-## Adding A Notebook
+## Adding an analysis notebook
 
-1. Create a new `.qmd` file in `notebooks/create/` or `notebooks/analyze/` with a Jupyter `parameters` cell declaring the notebook inputs it expects.
-2. Add an entry to [`../assets/notebook_registry.json`](../assets/notebook_registry.json) under the appropriate workflow group (`create` or `analysis`) with a unique ID, a relative path, and a `params` list naming every key the notebook declares in its `#| tags: [parameters]` cell.
-3. If it is a create-stage producer, wire it into `create.nf`.
-4. For analysis notebooks, include every required row-level key in the registered `params` list (for example, include `cell` for follicle-level runs).
-5. Run analysis notebooks with `nextflow run analyze.nf --samplesheet <artifact_sheet.csv> --analyze <id1,id2|all>`.
+1. Create `notebooks/analyze/<name>.qmd` with a `#| tags: [parameters]` Python cell declaring all inputs.
+2. Add an entry to [`../assets/notebook_registry.json`](../assets/notebook_registry.json) with a unique ID, the relative path, and a `params` list matching the parameters cell exactly.
+3. Wire a new process into `modules/analyze_notebooks.nf` and `analyze.nf`.
+4. Run `python bin/check_notebook_registry.py` to verify.
+
+## Adding a create-stage script
+
+Create-stage steps run plain Python scripts, not notebooks.
+
+1. Create `bin/<name>.py` with an `argparse` CLI matching the inputs the process needs.
+2. Wire a new process into `modules/create_notebooks.nf` and `create.nf`.
+3. No registry entry is needed for scripts.

@@ -2,13 +2,12 @@
 
 // Builds Xenium SpatialData artifacts and the samplesheets that downstream
 // workflows (analyze.nf) consume. Modes:
-//   sdata           - render create_sdata.qmd per ROI from raw Xenium output
-//   follicle_sdata  - render create_follicle_sdata.qmd per cell ID from existing sample zarrs
+//   sdata           - run create_sdata.py per ROI from raw Xenium output
+//   follicle_sdata  - run create_follicle_sdata.py per cell ID from existing sample zarrs
 //   all             - run both, chaining sdata outputs into the follicle step
 
 nextflow.enable.dsl = 2
 
-include { paramsFile } from './modules/quarto_params'
 include { CREATE_SDATA; CREATE_FOLLICLE_SDATA } from './modules/create_notebooks'
 
 workflow {
@@ -22,10 +21,7 @@ workflow {
     }
 
     def follicleSourceArtifacts = null
-    def timerScript = file("${projectDir}/bin/timer.py")
     def cellIdsFile = file(params.cell_ids_file)
-    def sdataNotebook = file("${projectDir}/notebooks/create/sdata.qmd")
-    def follicleSdataNotebook = file("${projectDir}/notebooks/create/follicle_sdata.qmd")
 
     Channel
         .fromPath(params.samplesheet)
@@ -42,22 +38,24 @@ workflow {
 
         sampleRowsList
             .map { sample, stagedPath, rowMap ->
-                tuple(sample, stagedPath, paramsFile(sample, sdataNotebook, rowMap))
+                def heImage = rowMap.he_image    ? new File(rowMap.he_image    as String).absolutePath : ""
+                def heAlign = rowMap.he_alignment ? new File(rowMap.he_alignment as String).absolutePath : ""
+                tuple(sample, stagedPath, heImage, heAlign)
             }
-            .set { createSdataInputs } // tuple(sample, staged_path, params_yml)
+            .set { createSdataInputs } // tuple(sample, staged_path, he_image, he_alignment)
 
-        CREATE_SDATA(createSdataInputs, sdataNotebook, timerScript) | set { createSdataRun }
+        CREATE_SDATA(createSdataInputs) | set { createSdataRun }
         // createSdataRun.artifacts: tuple(sample, zarr)
 
         follicleSourceArtifacts = createSdataRun.artifacts
             .join(sampleRowsList) // tuple(sample, zarr, staged_path, row_map)
             .map { sample, zarr, inputPath, rowParams ->
-                tuple(sample, zarr, rowParams)
+                tuple(sample, zarr)
             }
-        // follicleSourceArtifacts: tuple(sample, zarr, row_map)
+        // follicleSourceArtifacts: tuple(sample, zarr)
 
         follicleSourceArtifacts
-            .map { sample, sampleZarr, rowParams ->
+            .map { sample, sampleZarr ->
                 [
                     sample: sample,
                     path  : "${params.outdir}/${sample}/create_sdata/output/${sampleZarr.name}",
@@ -73,20 +71,14 @@ workflow {
     // Skip CREATE_SDATA: caller's samplesheet already points at existing sample zarrs.
     if (createMode == 'follicle_sdata') {
         follicleSourceArtifacts = sampleRowsList
-        // follicleSourceArtifacts: tuple(sample, staged_path, row_map)
+            .map { sample, stagedPath, rowMap -> tuple(sample, stagedPath) }
+        // follicleSourceArtifacts: tuple(sample, staged_path)
     }
 
     // ---- follicle_sdata: per-sample SpatialData -> per-cell-ID subset zarrs ----
     if (createMode == 'follicle_sdata' || createMode == 'all') {
 
-        follicleSourceArtifacts
-            .map { sample, stagedPath, rowMap ->
-                // Override path with the zarr so the notebook receives the correct input path.
-                tuple(sample, stagedPath, paramsFile(sample, follicleSdataNotebook, rowMap + [path: stagedPath.toString()]))
-            }
-            .set { follicleInputs } // tuple(sample, staged_path, params_yml)
-
-        CREATE_FOLLICLE_SDATA(follicleInputs, cellIdsFile, follicleSdataNotebook, timerScript) | set { follicleRun }
+        CREATE_FOLLICLE_SDATA(follicleSourceArtifacts, cellIdsFile, params.radius) | set { follicleRun }
         // follicleRun.artifacts: tuple(sample, List<zarr>)
 
         follicleRun.artifacts
