@@ -410,13 +410,11 @@ def scaled_crop_bounds(base_shape, level_shape, x0, y0, x1, y1):
 
 
 def crop_tiff_level(level, base_shape, x0, y0, x1, y1):
+    """Crop one pyramid level of a Xenium morphology OME-TIFF (channels as pages, CYX layout)."""
     lx0, ly0, lx1, ly1 = scaled_crop_bounds(base_shape, level.shape, x0, y0, x1, y1)
     crop_height = ly1 - ly0
     crop_width = lx1 - lx0
     pages = list(level.pages)
-
-    if len(pages) == 1 and not pages[0].is_tiled:
-        return crop_array_last_yx(level.asarray(), lx0, ly0, lx1, ly1)
 
     if not pages or not pages[0].is_tiled:
         return crop_array_last_yx(level.asarray(), lx0, ly0, lx1, ly1)
@@ -477,7 +475,7 @@ def crop_tiff_level(level, base_shape, x0, y0, x1, y1):
 
 
 def _read_tiff_level_crop(level, y0, x0, y1, x1):
-    """Read a (y0:y1, x0:x1) crop from a tifffile series level.
+    """Crop one pyramid level of an H&E OME-TIFF (channels in last axis, YXS/RGB layout).
 
     Handles tiled and non-tiled pages and both greyscale (YX) and RGB (YXS)
     images. Only tiles that overlap the crop are read.
