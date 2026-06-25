@@ -115,15 +115,17 @@ def main():
                 # Tag every cell in this follicle's table with the follicle ID so
                 # downstream notebooks can identify which follicle a cell belongs to.
                 obs["follicle_id"] = cell_id
-                if cell_id not in obs.index:
+                # obs is indexed by integers; cell IDs are in the cell_id column.
+                mask = obs["cell_id"] == cell_id
+                if not mask.any():
                     print(f"  WARNING: {cell_id} not in table.obs — per-cell metadata not embedded")
                 else:
                     # Embed any extra columns from the cell_ids_file (e.g. stage,
-                    # quality score) directly into the index cell's obs row so the
+                    # quality score) into the follicle cell's obs row so the
                     # metadata travels with the zarr artifact.
                     meta = row.drop(labels=["cell_id", "radius"]).to_dict()
                     for col, val in meta.items():
-                        obs.loc[cell_id, col] = val
+                        obs.loc[mask, col] = val
             sdata_fov.write(out, overwrite=True)
 
         print(f"  {cell_id}: centroid=({cx:.1f}, {cy:.1f})  radius={radius:.1f}  →  {out}")
