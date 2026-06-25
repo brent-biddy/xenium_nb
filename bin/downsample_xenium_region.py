@@ -172,6 +172,10 @@ def safe_name(name):
     return "".join(c if c.isalnum() or c in "._-" else "_" for c in name)
 
 
+# ---------------------------------------------------------------------------
+# Cell selection
+# ---------------------------------------------------------------------------
+
 def bbox_mask(x, y, region):
     return (
         (x >= region.xmin)
@@ -212,6 +216,10 @@ def select_cells_in_region(input_dir, region, proportion, grid_size):
     gc.collect()
     return selected_indices, selected_ids, n_total
 
+
+# ---------------------------------------------------------------------------
+# Tabular files
+# ---------------------------------------------------------------------------
 
 def shift_spatial_columns(df, region):
     x_columns = [
@@ -307,6 +315,10 @@ def process_transcripts_in_region(input_dir, output_dir, selected_ids, region, p
     csv_path.unlink()
     return total_kept
 
+
+# ---------------------------------------------------------------------------
+# Image cropping
+# ---------------------------------------------------------------------------
 
 def infer_pixel_size(input_dir):
     def pixel_size_from_transform(transform):
@@ -618,6 +630,10 @@ def crop_ome_tiff(src, dst, x0, y0, x1, y1):
         tifffile.tiffcomment(str(dst), ome_xml_fixed)
 
 
+# ---------------------------------------------------------------------------
+# H&E alignment
+# ---------------------------------------------------------------------------
+
 def load_he_alignment(alignment_path):
     """Read a 3x3 affine matrix (H&E pixels -> Xenium pixels) from a CSV."""
     rows = []
@@ -652,6 +668,10 @@ def he_crop_bounds(region, alignment_matrix, pixel_size):
     y1 = max(y0 + 1, int(np.ceil(py.max())))
     return x0, y0, x1, y1
 
+
+# ---------------------------------------------------------------------------
+# Orchestration
+# ---------------------------------------------------------------------------
 
 def copy_and_crop_images(input_dir, output_dir, region, pixel_size, he_image=None, he_alignment=None):
     copy_files = [
@@ -707,6 +727,10 @@ def copy_and_crop_images(input_dir, output_dir, region, pixel_size, he_image=Non
                 f.write(",".join(f"{v}" for v in row) + "\n")
         print(f"    he_imagealignment.csv written")
 
+
+# ---------------------------------------------------------------------------
+# Zarr processing
+# ---------------------------------------------------------------------------
 
 def shift_zarr_dataset_if_spatial(key, data, region):
     lowered = key.lower()
