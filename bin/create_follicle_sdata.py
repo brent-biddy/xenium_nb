@@ -71,9 +71,12 @@ def load_cells(cell_ids_file: str, sample: str, default_radius: float) -> pd.Dat
 def main():
     args = parse_args()
 
-    with timer("Setup"):
-        zarr_path = args.path
-        default_radius = float(args.radius)
+    zarr_path = args.path
+    default_radius = float(args.radius)
+
+    print(f"Sample:   {args.sample}")
+    print(f"Input:    {zarr_path}")
+    print(f"Output:   output/")
 
     with timer("Read zarr"):
         sdata = spatialdata.read_zarr(zarr_path)
@@ -126,14 +129,15 @@ def main():
 
         print(f"  {cell_id}: centroid=({cx:.1f}, {cy:.1f})  radius={radius:.1f}  →  {out}")
 
-    print(f"\nSample:        {args.sample}")
-    print(f"Input zarr:    {zarr_path}")
-    print(f"Cells written: {len(cells)}")
+    print(f"\nCells written: {len(cells)}")
     for _, row in cells.iterrows():
         print(f"  output/{row['cell_id']}.zarr  (radius={row['radius']}µm)")
 
-    timing_summary()
-    session_info.show()
+    timing_summary(path=f"output/{args.sample}_timing.tsv")
+
+    session_info_path = f"output/{args.sample}_session_info.txt"
+    session_info.show(write_req_file=True, req_file_name=session_info_path)
+    print(f"Session info written to {session_info_path}")
 
 
 if __name__ == "__main__":
