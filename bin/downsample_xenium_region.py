@@ -20,12 +20,10 @@ regions.csv must contain: region,xmin,ymin,xmax,ymax
 import argparse
 import gc
 import gzip
-import json
 import shutil
 import sys
 import tempfile
 import time
-import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -36,6 +34,10 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 import zarr
+
+# Xenium pixel size in µm/pixel — a fixed instrument constant used to convert
+# bounding box coordinates from µm (user-facing) to pixels (image space).
+XENIUM_PIXEL_SIZE_UM = 0.2125
 
 from downsample_xenium import (
     archive_directory_as_zip,
@@ -53,6 +55,8 @@ from downsample_xenium import (
 )
 
 
+# Region is immutable so it can be freely passed between functions without risk
+# of accidental mutation.
 @dataclass(frozen=True)
 class Region:
     name: str
@@ -114,10 +118,7 @@ def parse_args():
         "--pixel_size",
         type=float,
         default=None,
-        help=(
-            "Coordinate units per image pixel. Defaults to the cells.zarr mask "
-            "transform when available, otherwise 1.0."
-        ),
+        help="Coordinate units per image pixel. Defaults to XENIUM_PIXEL_SIZE_UM (0.2125).",
     )
     parser.add_argument(
         "--skip_validation",
@@ -148,6 +149,7 @@ def parse_args():
 
 
 def load_regions(args):
+    """Parse --bbox or --regions_csv into a list of Region objects."""
     if args.bbox:
         xmin, ymin, xmax, ymax = args.bbox
         regions = [Region(args.region_name, xmin, ymin, xmax, ymax)]
@@ -169,10 +171,16 @@ def load_regions(args):
 
 
 def safe_name(name):
+    """Sanitize a region name for use as a filesystem directory name."""
     return "".join(c if c.isalnum() or c in "._-" else "_" for c in name)
 
 
+# ---------------------------------------------------------------------------
+# Cell selection
+# ---------------------------------------------------------------------------
+
 def bbox_mask(x, y, region):
+    """Return a boolean array that is True for points inside the region bbox."""
     return (
         (x >= region.xmin)
         & (x < region.xmax)
@@ -182,6 +190,13 @@ def bbox_mask(x, y, region):
 
 
 def select_cells_in_region(input_dir, region, proportion, grid_size):
+    """Return (selected_indices, selected_ids, n_total) for cells inside region.
+
+    When proportion < 1, cells are spatially downsampled: the region is divided
+    into a grid and `proportion` of cells are randomly kept per grid cell. This
+    preserves spatial coverage better than random global subsampling.
+    Seed is fixed (42) for reproducibility.
+    """
     rng = np.random.default_rng(42)
 
     cells_table = pq.read_table(
@@ -194,6 +209,8 @@ def select_cells_in_region(input_dir, region, proportion, grid_size):
     in_region = bbox_mask(x, y, region)
 
     if proportion < 1.0 and in_region.any():
+        # Divide the region into grid cells and sample `proportion` of cells
+        # from each grid cell independently to preserve spatial coverage.
         grid_x = ((x - region.xmin) / grid_size).astype(int)
         grid_y = ((y - region.ymin) / grid_size).astype(int)
         selected_mask = np.zeros(len(x), dtype=bool)
@@ -213,7 +230,17 @@ def select_cells_in_region(input_dir, region, proportion, grid_size):
     return selected_indices, selected_ids, n_total
 
 
+# ---------------------------------------------------------------------------
+# Tabular files
+# ---------------------------------------------------------------------------
+
 def shift_spatial_columns(df, region):
+    """Rebase spatial coordinates in a DataFrame to the crop origin.
+
+    Subtracts region.xmin/ymin from all recognised spatial column names so
+    that coordinates in the output are relative to the crop's top-left corner
+    rather than the full slide origin.
+    """
     x_columns = [
         "x_centroid",
         "x_location",
@@ -240,6 +267,7 @@ def shift_spatial_columns(df, region):
 
 
 def subset_spatial_parquet_and_csv(input_dir, output_dir, filename, selected_ids, region):
+    """Filter a parquet file to selected_ids, rebase coordinates, write parquet + csv.gz."""
     table = pq.read_table(input_dir / f"{filename}.parquet")
     mask = pc.is_in(table.column("cell_id"), value_set=pa.array(list(selected_ids)))
     sub = table.filter(mask).to_pandas()
@@ -253,6 +281,16 @@ def subset_spatial_parquet_and_csv(input_dir, output_dir, filename, selected_ids
 
 
 def process_transcripts_in_region(input_dir, output_dir, selected_ids, region, proportion):
+    """Filter transcripts.parquet to the region, writing parquet + csv.gz.
+
+    Reads in 1M-row batches to avoid loading the full transcript table into
+    memory (whole-slide transcript files can exceed several GB).
+
+    Assigned transcripts (cell_id != UNASSIGNED) are kept only if their cell
+    is in selected_ids. Unassigned transcripts are kept if they fall inside
+    the region bbox; if proportion < 1 they are additionally randomly thinned
+    to match the cell downsampling rate.
+    """
     rng = np.random.default_rng(42)
     selected_ids_arrow = pa.array(list(selected_ids))
     parquet_file = pq.ParquetFile(input_dir / "transcripts.parquet")
@@ -308,69 +346,12 @@ def process_transcripts_in_region(input_dir, output_dir, selected_ids, region, p
     return total_kept
 
 
-def infer_pixel_size(input_dir):
-    def pixel_size_from_transform(transform):
-        if transform.shape[0] >= 2 and transform.shape[1] >= 2:
-            pixels_per_unit = float(np.mean(np.abs([transform[0, 0], transform[1, 1]])))
-            if np.isfinite(pixels_per_unit) and pixels_per_unit > 0:
-                return 1.0 / pixels_per_unit
-        return None
-
-    try:
-        import numcodecs
-
-        with zipfile.ZipFile(input_dir / "cells.zarr.zip") as zf:
-            meta = json.loads(zf.read("masks/homogeneous_transform/.zarray"))
-            raw = zf.read("masks/homogeneous_transform/0.0")
-            compressor = meta.get("compressor")
-            if compressor and compressor.get("id") == "blosc":
-                raw = numcodecs.Blosc().decode(raw)
-            transform = np.frombuffer(raw, dtype=np.dtype(meta["dtype"])).reshape(meta["shape"])
-            pixel_size = pixel_size_from_transform(transform)
-            if pixel_size:
-                return pixel_size
-    except Exception:
-        pass
-
-    try:
-        store = open_zip_read_store(input_dir / "cells.zarr.zip", mode="r")
-        z = zarr.open(store, mode="r")
-        transform = np.asarray(z["masks/homogeneous_transform"][:], dtype=float)
-        store.close()
-        pixel_size = pixel_size_from_transform(transform)
-        if pixel_size:
-            return pixel_size
-    except Exception:
-        pass
-
-    exp = input_dir / "experiment.xenium"
-    if exp.exists():
-        try:
-            data = json.loads(exp.read_text())
-            candidates = []
-
-            def walk(obj):
-                if isinstance(obj, dict):
-                    for key, value in obj.items():
-                        lowered = str(key).lower()
-                        if "pixel" in lowered and isinstance(value, (int, float)):
-                            candidates.append(float(value))
-                        walk(value)
-                elif isinstance(obj, list):
-                    for value in obj:
-                        walk(value)
-
-            walk(data)
-            candidates = [v for v in candidates if np.isfinite(v) and v > 0]
-            if candidates:
-                return candidates[0]
-        except Exception:
-            pass
-
-    return 1.0
-
+# ---------------------------------------------------------------------------
+# Image cropping
+# ---------------------------------------------------------------------------
 
 def crop_bounds_pixels(region, pixel_size):
+    """Convert a µm bounding box to pixel indices, flooring/ceiling to include all partial pixels."""
     x0 = max(0, int(np.floor(region.xmin / pixel_size)))
     y0 = max(0, int(np.floor(region.ymin / pixel_size)))
     x1 = max(x0 + 1, int(np.ceil(region.xmax / pixel_size)))
@@ -379,6 +360,7 @@ def crop_bounds_pixels(region, pixel_size):
 
 
 def crop_array_last_yx(arr, x0, y0, x1, y1):
+    """Crop the last two axes (y, x) of an array, clamping to array bounds."""
     key = [slice(None)] * arr.ndim
     key[-2] = slice(y0, min(y1, arr.shape[-2]))
     key[-1] = slice(x0, min(x1, arr.shape[-1]))
@@ -386,6 +368,12 @@ def crop_array_last_yx(arr, x0, y0, x1, y1):
 
 
 def scaled_crop_bounds(base_shape, level_shape, x0, y0, x1, y1):
+    """Scale base-level pixel crop bounds to a lower pyramid level.
+
+    OME-TIFF pyramids store each level at a reduced resolution. To crop the
+    same physical region at every level, the base-level pixel bounds must be
+    scaled by the ratio between base and level dimensions.
+    """
     base_y, base_x = base_shape[-2], base_shape[-1]
     level_y, level_x = level_shape[-2], level_shape[-1]
     scale_y = base_y / level_y
@@ -398,17 +386,16 @@ def scaled_crop_bounds(base_shape, level_shape, x0, y0, x1, y1):
 
 
 def crop_tiff_level(level, base_shape, x0, y0, x1, y1):
+    """Crop one pyramid level of a Xenium morphology OME-TIFF (channels as pages, CYX layout)."""
     lx0, ly0, lx1, ly1 = scaled_crop_bounds(base_shape, level.shape, x0, y0, x1, y1)
     crop_height = ly1 - ly0
     crop_width = lx1 - lx0
     pages = list(level.pages)
 
-    if len(pages) == 1 and not pages[0].is_tiled:
-        return crop_array_last_yx(level.asarray(), lx0, ly0, lx1, ly1)
-
     if not pages or not pages[0].is_tiled:
         return crop_array_last_yx(level.asarray(), lx0, ly0, lx1, ly1)
 
+    # Allocate output array over all pages (one page per channel).
     sample_shape = (len(pages), crop_height, crop_width)
     cropped = np.zeros(sample_shape, dtype=pages[0].dtype)
     keyframe = pages[0].keyframe
@@ -439,6 +426,8 @@ def crop_tiff_level(level, base_shape, x0, y0, x1, y1):
                 src_x1 = min(src_x0 + tile.shape[-1], page_width)
                 src_y1 = min(src_y0 + tile.shape[-2], page_height)
 
+                # Compute the overlap between this tile and the crop window,
+                # then copy only the overlapping pixels into the output array.
                 overlap_x0 = max(lx0, src_x0)
                 overlap_y0 = max(ly0, src_y0)
                 overlap_x1 = min(lx1, src_x1)
@@ -465,7 +454,7 @@ def crop_tiff_level(level, base_shape, x0, y0, x1, y1):
 
 
 def _read_tiff_level_crop(level, y0, x0, y1, x1):
-    """Read a (y0:y1, x0:x1) crop from a tifffile series level.
+    """Crop one pyramid level of an H&E OME-TIFF (channels in last axis, YXS/RGB layout).
 
     Handles tiled and non-tiled pages and both greyscale (YX) and RGB (YXS)
     images. Only tiles that overlap the crop are read.
@@ -562,6 +551,7 @@ def crop_he_ome_tiff(src, dst, x0, y0, x1, y1):
 
 
 def crop_ome_tiff(src, dst, x0, y0, x1, y1):
+    """Crop a Xenium morphology OME-TIFF to the given pixel bounds, preserving channel names."""
     import re
     import tifffile
 
@@ -618,6 +608,10 @@ def crop_ome_tiff(src, dst, x0, y0, x1, y1):
         tifffile.tiffcomment(str(dst), ome_xml_fixed)
 
 
+# ---------------------------------------------------------------------------
+# H&E alignment
+# ---------------------------------------------------------------------------
+
 def load_he_alignment(alignment_path):
     """Read a 3x3 affine matrix (H&E pixels -> Xenium pixels) from a CSV."""
     rows = []
@@ -635,6 +629,8 @@ def he_crop_bounds(region, alignment_matrix, pixel_size):
     alignment_matrix maps H&E pixels -> Xenium pixels; we invert it to get
     Xenium pixels -> H&E pixels. Region coords are in µm so we first divide
     by pixel_size to convert to Xenium pixels before applying the inverse.
+    All four corners of the bbox are transformed to handle non-axis-aligned
+    rotations in the alignment, then we take the bounding box of the result.
     """
     xenium_to_he = np.linalg.inv(alignment_matrix)
     corners = np.array([
@@ -653,7 +649,129 @@ def he_crop_bounds(region, alignment_matrix, pixel_size):
     return x0, y0, x1, y1
 
 
+# ---------------------------------------------------------------------------
+# Zarr processing
+# ---------------------------------------------------------------------------
+
+def shift_zarr_dataset_if_spatial(key, data, region):
+    """Rebase spatial coordinates in a zarr dataset array to the crop origin."""
+    lowered = key.lower()
+    if data.ndim == 1 and ("x" in lowered or "y" in lowered):
+        if lowered in {"x", "vertex_x", "vertices_x", "x_location", "x_centroid"}:
+            return data - region.xmin
+        if lowered in {"y", "vertex_y", "vertices_y", "y_location", "y_centroid"}:
+            return data - region.ymin
+    if data.ndim == 2 and data.shape[1] >= 2 and lowered in {"vertices", "points"}:
+        data = data.copy()
+        data[:, 0] -= region.xmin
+        data[:, 1] -= region.ymin
+    return data
+
+
+def process_cells_zarr_region(input_dir, output_dir, selected_indices, n_total, region, pixel_size):
+    """Crop cells.zarr.zip to the selected cells and region pixel bounds.
+
+    Writes cell_id, cell_summary (rebased), segmentation masks (cropped and
+    filtered to selected cells), and polygon_sets (filtered and rebased) to a
+    new cells.zarr.zip. The homogeneous_transform is updated so that the
+    cropped zarr's coordinate system aligns with the rebased cell coordinates.
+
+    Xenium mask values are global cell IDs (not 1-based local indices). The
+    global-to-local mapping is derived from the sorted unique mask values: the
+    i-th sorted unique value corresponds to the i-th cell in the cell_id array.
+    This matches the convention spatialdata_io uses when building its indices
+    mapping. For masks where the count of unique labels equals n_total (the cell
+    mask), extra pixels from cells whose centroids fall outside the bbox are
+    zeroed out. For masks with fewer unique labels (e.g. the nucleus mask),
+    spatial cropping alone is used — spatialdata_io does not cell-match nuclei.
+    """
+    store_in = open_zip_read_store(input_dir / "cells.zarr.zip", mode="r")
+    z_in = zarr.open(store_in, mode="r")
+    x0, y0, x1, y1 = crop_bounds_pixels(region, pixel_size)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        z_out = open_directory_group(tmpdir, mode="w")
+
+        create_zarr_dataset(z_out, "cell_id", data=z_in["cell_id"][:][selected_indices])
+        cell_summary = z_in["cell_summary"][:][selected_indices]
+        summary_attrs = z_in["cell_summary"].attrs.asdict()
+        # column_names may be stored under different attribute keys across Xenium versions.
+        summary_columns = (
+            summary_attrs.get("columns")
+            or summary_attrs.get("column_names")
+            or summary_attrs.get("_ARRAY_DIMENSIONS")
+            or []
+        )
+        if cell_summary.ndim == 2 and len(summary_columns) == cell_summary.shape[1]:
+            cell_summary = cell_summary.copy()
+            for idx, column in enumerate(summary_columns):
+                if column in {"x_centroid", "x"}:
+                    cell_summary[:, idx] -= region.xmin
+                if column in {"y_centroid", "y"}:
+                    cell_summary[:, idx] -= region.ymin
+        create_zarr_dataset(z_out, "cell_summary", data=cell_summary)
+        z_out["cell_summary"].attrs.update(summary_attrs)
+
+        masks_out = z_out.create_group("masks")
+        transform = np.asarray(z_in["masks/homogeneous_transform"][:], dtype=float)
+        if transform.shape[0] >= 2 and transform.shape[1] >= 3:
+            # Adjust the translation column of the transform to account for the
+            # pixel crop offset (x0, y0) and the rebased coordinate origin.
+            transform = transform.copy()
+            transform[0, 2] = transform[0, 2] + x0 * transform[0, 0] - region.xmin
+            transform[1, 2] = transform[1, 2] + y0 * transform[1, 1] - region.ymin
+        create_zarr_dataset(masks_out, "homogeneous_transform", data=transform)
+
+        for mask_name in ["0", "1"]:
+            print(f"    mask {mask_name} crop...")
+            mask_in = z_in[f"masks/{mask_name}"]
+            full_mask = np.asarray(mask_in)
+            crop = full_mask[y0:min(y1, mask_in.shape[0]), x0:min(x1, mask_in.shape[1])].copy()
+
+            # Derive selected global label IDs when the mask has exactly one
+            # unique label per cell (n_total). This is true for the cell mask
+            # (masks/1) but not always for the nucleus mask (masks/0).
+            all_unique = np.sort(np.unique(full_mask[full_mask > 0]))
+            if len(all_unique) == n_total:
+                selected_global_labels = set(all_unique[selected_indices].tolist())
+                nonzero = crop > 0
+                if nonzero.any():
+                    keep = np.isin(crop[nonzero], list(selected_global_labels))
+                    crop[nonzero] = np.where(keep, crop[nonzero], 0)
+
+            create_zarr_dataset(masks_out, mask_name, data=crop, chunks=mask_in.chunks)
+
+        # Remap cell_index values in polygon_sets from original indices to the
+        # new 0-based indices within the selected subset.
+        old_to_new_idx = {old: new for new, old in enumerate(selected_indices)}
+        for ps_name in ["0", "1"]:
+            ps_in = z_in[f"polygon_sets/{ps_name}"]
+            cell_index = ps_in["cell_index"][:]
+            keep_mask = np.isin(cell_index, selected_indices)
+            ps_out = z_out.create_group(f"polygon_sets/{ps_name}")
+            for key in ps_in.keys():
+                data = ps_in[key][:][keep_mask]
+                if key == "cell_index":
+                    data = np.array([old_to_new_idx[i] for i in data], dtype=data.dtype)
+                else:
+                    data = shift_zarr_dataset_if_spatial(key, data, region)
+                create_zarr_dataset(ps_out, key, data=data)
+            if ps_in.attrs:
+                ps_out.attrs.update(ps_in.attrs.asdict())
+
+        close_zarr_group(z_out)
+        archive_directory_as_zip(tmpdir_path, output_dir / "cells.zarr.zip")
+
+    store_in.close()
+
+
+# ---------------------------------------------------------------------------
+# Orchestration
+# ---------------------------------------------------------------------------
+
 def copy_and_crop_images(input_dir, output_dir, region, pixel_size, he_image=None, he_alignment=None):
+    """Copy metadata files and crop morphology/H&E images to the region."""
     copy_files = [
         "experiment.xenium",
         "gene_panel.json",
@@ -708,96 +826,8 @@ def copy_and_crop_images(input_dir, output_dir, region, pixel_size, he_image=Non
         print(f"    he_imagealignment.csv written")
 
 
-def shift_zarr_dataset_if_spatial(key, data, region):
-    lowered = key.lower()
-    if data.ndim == 1 and ("x" in lowered or "y" in lowered):
-        if lowered in {"x", "vertex_x", "vertices_x", "x_location", "x_centroid"}:
-            return data - region.xmin
-        if lowered in {"y", "vertex_y", "vertices_y", "y_location", "y_centroid"}:
-            return data - region.ymin
-    if data.ndim == 2 and data.shape[1] >= 2 and lowered in {"vertices", "points"}:
-        data = data.copy()
-        data[:, 0] -= region.xmin
-        data[:, 1] -= region.ymin
-    return data
-
-
-def process_cells_zarr_region(input_dir, output_dir, selected_indices, n_total, region, pixel_size):
-    store_in = open_zip_read_store(input_dir / "cells.zarr.zip", mode="r")
-    z_in = zarr.open(store_in, mode="r")
-    x0, y0, x1, y1 = crop_bounds_pixels(region, pixel_size)
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir_path = Path(tmpdir)
-        z_out = open_directory_group(tmpdir, mode="w")
-
-        create_zarr_dataset(z_out, "cell_id", data=z_in["cell_id"][:][selected_indices])
-        cell_summary = z_in["cell_summary"][:][selected_indices]
-        summary_attrs = z_in["cell_summary"].attrs.asdict()
-        summary_columns = (
-            summary_attrs.get("columns")
-            or summary_attrs.get("column_names")
-            or summary_attrs.get("_ARRAY_DIMENSIONS")
-            or []
-        )
-        if cell_summary.ndim == 2 and len(summary_columns) == cell_summary.shape[1]:
-            cell_summary = cell_summary.copy()
-            for idx, column in enumerate(summary_columns):
-                if column in {"x_centroid", "x"}:
-                    cell_summary[:, idx] -= region.xmin
-                if column in {"y_centroid", "y"}:
-                    cell_summary[:, idx] -= region.ymin
-        create_zarr_dataset(z_out, "cell_summary", data=cell_summary)
-        z_out["cell_summary"].attrs.update(summary_attrs)
-
-        selected_label_ids = selected_indices + 1
-        lookup = np.zeros(n_total + 1, dtype=bool)
-        lookup[selected_label_ids] = True
-
-        masks_out = z_out.create_group("masks")
-        transform = np.asarray(z_in["masks/homogeneous_transform"][:], dtype=float)
-        if transform.shape[0] >= 2 and transform.shape[1] >= 3:
-            transform = transform.copy()
-            transform[0, 2] = transform[0, 2] + x0 * transform[0, 0] - region.xmin
-            transform[1, 2] = transform[1, 2] + y0 * transform[1, 1] - region.ymin
-        create_zarr_dataset(masks_out, "homogeneous_transform", data=transform)
-
-        for mask_name in ["0", "1"]:
-            print(f"    mask {mask_name} crop...")
-            mask_in = z_in[f"masks/{mask_name}"]
-            crop = np.asarray(mask_in[y0:min(y1, mask_in.shape[0]), x0:min(x1, mask_in.shape[1])])
-            nonzero = crop > 0
-            if nonzero.any():
-                in_range = crop <= n_total
-                keep = np.zeros_like(crop, dtype=bool)
-                valid = nonzero & in_range
-                keep[valid] = lookup[crop[valid]]
-                crop[nonzero & ~keep] = 0
-            create_zarr_dataset(masks_out, mask_name, data=crop, chunks=mask_in.chunks)
-
-        old_to_new_idx = {old: new for new, old in enumerate(selected_indices)}
-        for ps_name in ["0", "1"]:
-            ps_in = z_in[f"polygon_sets/{ps_name}"]
-            cell_index = ps_in["cell_index"][:]
-            keep_mask = np.isin(cell_index, selected_indices)
-            ps_out = z_out.create_group(f"polygon_sets/{ps_name}")
-            for key in ps_in.keys():
-                data = ps_in[key][:][keep_mask]
-                if key == "cell_index":
-                    data = np.array([old_to_new_idx[i] for i in data], dtype=data.dtype)
-                else:
-                    data = shift_zarr_dataset_if_spatial(key, data, region)
-                create_zarr_dataset(ps_out, key, data=data)
-            if ps_in.attrs:
-                ps_out.attrs.update(ps_in.attrs.asdict())
-
-        close_zarr_group(z_out)
-        archive_directory_as_zip(tmpdir_path, output_dir / "cells.zarr.zip")
-
-    store_in.close()
-
-
 def run_region(input_dir, output_dir, region, proportion, grid_size, pixel_size, skip_validation, he_image=None, he_alignment=None):
+    """Run all crop/subset steps for a single region and write the output directory."""
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"\nRegion:     {region.name}")
     print(f"Output:     {output_dir}")
@@ -864,7 +894,7 @@ def main():
         else input_dir.parent / f"{input_dir.name}_region_downsampled"
     )
     regions = load_regions(args)
-    pixel_size = args.pixel_size if args.pixel_size else infer_pixel_size(input_dir)
+    pixel_size = args.pixel_size if args.pixel_size else XENIUM_PIXEL_SIZE_UM
     he_image = args.he_image.resolve() if args.he_image else None
     he_alignment = load_he_alignment(args.he_alignment) if args.he_alignment else None
 

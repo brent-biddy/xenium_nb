@@ -12,13 +12,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ### Run create workflow
-Both `--samplesheet` and `--create` are required. Valid `--create` values: `sdata`, `follicle_sdata`, `all`.
+Both `--samplesheet` and `--create` are required. Valid `--create` values: `downsample`, `sdata`, `follicle_sdata`, `all`.
 
 ```bash
+nextflow run create.nf --samplesheet assets/samplesheet.csv --create downsample
 nextflow run create.nf --samplesheet assets/samplesheet.csv --create all
 nextflow run create.nf --samplesheet assets/samplesheet.csv --create sdata
 nextflow run create.nf --samplesheet results/sample_sdata_samplesheet.csv --create follicle_sdata
 ```
+
+The `downsample` mode requires the samplesheet to include `xmin,ymin,xmax,ymax` columns (µm coordinates) and an optional `region_name` column. The `region_name` defaults to the sample ID if omitted.
 
 ### Run analyze workflow
 Both `--samplesheet` and `--analyze` are required. Valid `--analyze` values: `plot_follicle`, `all`.
@@ -45,6 +48,7 @@ nextflow run analyze.nf --analyze plot_follicle -profile test
 
 ### Stub run (CI-equivalent, no script/notebook execution)
 ```bash
+nextflow run create.nf -stub --create downsample -profile test
 nextflow run create.nf -stub --create all -profile test
 nextflow run analyze.nf -stub --samplesheet assets/ci_analyze_samplesheet.csv --analyze plot_follicle
 ```

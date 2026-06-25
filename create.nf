@@ -2,13 +2,14 @@
 
 // Builds Xenium SpatialData artifacts and the samplesheets that downstream
 // workflows (analyze.nf) consume. Modes:
+//   downsample      - crop raw Xenium output to a bounding box region
 //   sdata           - run create_sdata.py per ROI from raw Xenium output
 //   follicle_sdata  - run create_follicle_sdata.py per cell ID from existing sample zarrs
-//   all             - run both, chaining sdata outputs into the follicle step
+//   all             - run sdata + follicle_sdata, chaining outputs
 
 nextflow.enable.dsl = 2
 
-include { CREATE_SDATA; CREATE_FOLLICLE_SDATA } from './modules/create_notebooks'
+include { DOWNSAMPLE_XENIUM_REGION; CREATE_SDATA; CREATE_FOLLICLE_SDATA } from './modules/create_notebooks'
 
 workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"
@@ -16,8 +17,8 @@ workflow {
 
     def createMode = params.create.toLowerCase()
 
-    if (!(createMode in ['sdata', 'follicle_sdata', 'all'])) {
-        error "Invalid --create '${createMode}'. Valid values are: sdata, follicle_sdata, all"
+    if (!(createMode in ['downsample', 'sdata', 'follicle_sdata', 'all'])) {
+        error "Invalid --create '${createMode}'. Valid values are: downsample, sdata, follicle_sdata, all"
     }
 
     def follicleSourceArtifacts = null
@@ -32,6 +33,21 @@ workflow {
             tuple(row.sample, file(row.path), row)
         }
         .set { sampleRowsList } // tuple(sample, staged_path, row_map)
+
+    // ---- downsample: crop raw Xenium output to a bounding box region ----
+    if (createMode == 'downsample') {
+
+        sampleRowsList
+            .map { sample, stagedPath, rowMap ->
+                def heImage = rowMap.he_image     ? new File(rowMap.he_image     as String).absolutePath : ""
+                def heAlign = rowMap.he_alignment ? new File(rowMap.he_alignment as String).absolutePath : ""
+                def regionName = rowMap.region_name ?: sample
+                tuple(sample, stagedPath, rowMap.xmin, rowMap.ymin, rowMap.xmax, rowMap.ymax, regionName, heImage, heAlign)
+            }
+            .set { downsampleInputs } // tuple(sample, staged_path, xmin, ymin, xmax, ymax, region_name, he_image, he_alignment)
+
+        DOWNSAMPLE_XENIUM_REGION(downsampleInputs)
+    }
 
     // ---- sdata: raw Xenium -> per-sample SpatialData zarr ----
     if (createMode == 'sdata' || createMode == 'all') {
