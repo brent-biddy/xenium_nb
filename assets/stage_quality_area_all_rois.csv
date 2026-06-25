@@ -1,4 +1,4 @@
-﻿Donor.ROI,Image,User,Stage.Labels,Quality,Notes,Time,cell_id,cell_area
+Donor.ROI,Image,User,Stage.Labels,Quality,Notes,Time,cell_id,cell_area
 ROI1,ROI1_aaaaimck-1.png,Taylor,early transitioning,good,,22:31.9,aaaaimck-1,669.2156493
 ROI1,ROI1_aaaalpdj-1.png,Taylor,late transitioning,good,,23:55.1,aaaalpdj-1,790.2795599
 ROI1,ROI1_aaabfpcg-1.png,Taylor,early transitioning,okay,"less than half the oocyte captured, but still oocyte specific",29:09.4,aaabfpcg-1,244.4307901
