@@ -75,10 +75,13 @@ def main():
         with timer("Add DAPI z-stack"):
             dapi_3d = dask_imread(str(morphology_3d_path))
             sdata.images["dapi_3d"] = Image3DModel.parse(
-                dapi_3d[None],
+                dapi_3d[None],  # imread returns (z, y, x); [None] adds the required c axis → (c, z, y, x)
                 dims=("c", "z", "y", "x"),
                 c_coords=["DAPI"],
                 transformations={"global": Identity()},
+                # imread reads only the base level; scale_factors rebuilds the pyramid.
+                # y/x only — z is not downsampled. 4 halvings reaches a screen-sized
+                # resolution, a sensible floor for whole-slide viewing.
                 scale_factors=[{"y": 2, "x": 2}, {"y": 2, "x": 2}, {"y": 2, "x": 2}, {"y": 2, "x": 2}],
             )
         print(sdata.images["dapi_3d"])
