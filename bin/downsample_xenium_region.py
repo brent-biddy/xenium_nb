@@ -573,8 +573,23 @@ def crop_ome_tiff(src, dst, x0, y0, x1, y1):
             crop_tiff_level(level, base_shape, x0, y0, x1, y1)
             for level in levels
         ]
+        # Read channel names from OME metadata before closing the file handle.
+        # tifffile generates a fresh OME header on write, so without this the
+        # names are lost and spatialdata_io's v4 reader raises "channel without a name".
+        channel_names = None
+        if tif.is_ome:
+            try:
+                import ome_types
+                ome = ome_types.from_xml(tifffile.tiffcomment(str(src)), validate=False)
+                names = [ch.name for ch in ome.images[0].pixels.channels]
+                if any(n is not None for n in names):
+                    channel_names = names
+            except Exception:
+                pass
 
     metadata = {"axes": axes} if axes and len(axes) == crops[0].ndim else None
+    if metadata is not None and channel_names:
+        metadata["Channel"] = {"Name": channel_names}
     with tifffile.TiffWriter(dst, bigtiff=True, ome=True) as tif:
         tif.write(
             crops[0],
