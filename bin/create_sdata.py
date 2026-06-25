@@ -2,8 +2,13 @@
 """
 create_sdata.py - Convert raw Xenium output to a SpatialData zarr store.
 
+Reads a Xenium output directory and writes a SpatialData zarr store containing
+cells, transcripts, segmentation masks, morphology images, and optionally an
+aligned H&E image and DAPI z-stack. The zarr is the primary artifact consumed
+by downstream analysis notebooks.
+
 Writes output/<sample>.zarr into the current working directory.
-Timing and session info are printed to stdout.
+Timing and session info are written to output/ alongside the zarr.
 
 Usage:
     create_sdata.py --sample ROI1_A --path /data/ROI1_A --n_jobs 4
@@ -35,6 +40,8 @@ def parse_args():
     parser.add_argument("--he_image", default="", help="Path to H&E OME-TIFF (optional)")
     parser.add_argument("--he_alignment", default="", help="Path to H&E alignment CSV (optional)")
     args = parser.parse_args()
+    # Both H&E args must be provided together — the alignment matrix is meaningless
+    # without the image and vice versa.
     if bool(args.he_image) != bool(args.he_alignment):
         parser.error("--he_image and --he_alignment must be provided together")
     return args
@@ -44,18 +51,26 @@ def main():
     args = parse_args()
 
     output_path = os.path.join("output", f"{args.sample}.zarr")
+    # morphology.ome.tif is the full DAPI z-stack (all focal planes). It is separate
+    # from morphology_focus/, which contains the single best-focus plane per channel.
     morphology_3d_path = Path(args.path) / "morphology.ome.tif"
 
     print(f"Sample:  {args.sample}")
     print(f"Input:   {args.path}")
     print(f"Output:  {output_path}")
 
+    # spatialdata_io.xenium() reads the standard Xenium output files: cells,
+    # transcripts, segmentation masks (cell/nucleus labels), and morphology_focus
+    # images. n_jobs parallelises transcript and cell reading.
     with timer("Read Xenium"):
         sdata = spatialdata_io.xenium(
             path=args.path,
             n_jobs=args.n_jobs,
         )
 
+    # spatialdata_io auto-detects an H&E image if one is named with the expected
+    # Xenium suffix alongside the data. If not auto-detected, load it explicitly
+    # using the provided image path and alignment matrix.
     if "he_image" not in sdata.images and args.he_image and args.he_alignment:
         with timer("Load H&E"):
             # imread reads only the base level of the OME-TIFF pyramid; scale_factors
@@ -75,6 +90,8 @@ def main():
     else:
         print("No H&E image found.")
 
+    # morphology.ome.tif is not loaded by the xenium() reader — it adds the full
+    # z-stack separately so downstream notebooks can inspect individual focal planes.
     if morphology_3d_path.exists():
         with timer("Add DAPI z-stack"):
             dapi_3d = dask_imread(str(morphology_3d_path))
@@ -97,6 +114,8 @@ def main():
         sdata.write(output_path, overwrite=True)
     print(f"Written to {output_path}")
 
+    # Print every element in the sdata object so the Nextflow log serves as a
+    # record of what was written to the zarr.
     print("\nElements:")
     for group_name in ("images", "labels", "points", "shapes", "tables"):
         group = getattr(sdata, group_name, {})
