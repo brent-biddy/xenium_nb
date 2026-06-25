@@ -40,8 +40,7 @@ def parse_args():
     parser.add_argument("--he_image", default="", help="Path to H&E OME-TIFF (optional)")
     parser.add_argument("--he_alignment", default="", help="Path to H&E alignment CSV (optional)")
     args = parser.parse_args()
-    # Both H&E args must be provided together — the alignment matrix is meaningless
-    # without the image and vice versa.
+    # Both H&E args must be provided together
     if bool(args.he_image) != bool(args.he_alignment):
         parser.error("--he_image and --he_alignment must be provided together")
     return args
@@ -112,8 +111,7 @@ def main():
         sdata.write(output_path, overwrite=True)
     print(f"Written to {output_path}")
 
-    # Print every element in the sdata object so the Nextflow log serves as a
-    # record of what was written to the zarr.
+    # Print every element in the sdata object
     print("\nElements:")
     for group_name in ("images", "labels", "points", "shapes", "tables"):
         group = getattr(sdata, group_name, {})
