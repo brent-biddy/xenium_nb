@@ -25,6 +25,9 @@ import session_info
 from timer import timer, timing_summary
 
 
+# Normalize sample IDs to alphanumeric uppercase for fuzzy matching between the
+# samplesheet (e.g. "ROI1_A") and the cell_ids_file Donor.ROI column (e.g. "ROI1-A"),
+# which may use different separators or capitalisation conventions.
 def normalize_sample_id(value: str) -> str:
     return "".join(ch for ch in str(value).upper() if ch.isalnum())
 
@@ -46,6 +49,8 @@ def load_cells(cell_ids_file: str, sample: str, default_radius: float) -> pd.Dat
     df = pd.read_csv(cell_ids_file)
     normalized_sample = normalize_sample_id(sample)
     df["_normalized_roi"] = df["Donor.ROI"].map(normalize_sample_id)
+    # Find which Donor.ROI values normalize to the requested sample. Multiple
+    # matches indicate an ambiguous naming collision and are treated as an error.
     matching_rois = df.loc[df["_normalized_roi"] == normalized_sample, "Donor.ROI"].drop_duplicates().tolist()
     if not matching_rois:
         raise ValueError(
@@ -58,6 +63,7 @@ def load_cells(cell_ids_file: str, sample: str, default_radius: float) -> pd.Dat
         )
     matched_roi = matching_rois[0]
     df = df.loc[df["Donor.ROI"] == matched_roi].copy()
+    # radius column is optional in the CSV; fall back to the CLI default when absent or blank.
     if "radius" not in df.columns:
         df["radius"] = default_radius
     else:
@@ -78,6 +84,8 @@ def main():
     print(f"Input:    {zarr_path}")
     print(f"Output:   output/")
 
+    # read_zarr opens the store lazily — array data is not loaded into memory
+    # until accessed. This keeps startup fast even for large whole-sample zarrs.
     with timer("Read zarr"):
         sdata = spatialdata.read_zarr(zarr_path)
 
@@ -85,7 +93,14 @@ def main():
         cells = load_cells(args.cell_ids_file, args.sample, default_radius)
 
     with timer("Load cell circles"):
+        # cell_circles is a GeoDataFrame of Shapely Point geometries, one per cell,
+        # stored in the native Xenium pixel coordinate system. transform() applies
+        # the registered transformation to bring all coordinates into the shared
+        # "global" space, so centroid lookups are consistent across all elements.
         circles = transform(sdata["cell_circles"], to_coordinate_system="global")
+        # Extract the diagonal of the affine matrix to get the pixel→µm scale factor.
+        # The bounding box radius is specified in µm but centroid coordinates are in
+        # pixels, so radius must be converted before computing the query window.
         affine = (
             get_transformation(sdata["cell_circles"], "global")
             .to_affine_matrix(input_axes=("x", "y"), output_axes=("x", "y"))
@@ -96,6 +111,7 @@ def main():
 
     for _, row in cells.iterrows():
         cell_id = row["cell_id"]
+        # Convert radius from µm to pixels using the affine scale factor.
         radius = float(row["radius"]) * radius_scale
 
         with timer(f"Subset {cell_id}"):
@@ -107,6 +123,10 @@ def main():
             min_coordinate = [cx - radius, cy - radius]
             max_coordinate = [cx + radius, cy + radius]
 
+            # bounding_box() returns a new SpatialData object containing only the
+            # elements (images, labels, points, shapes, table rows) that overlap
+            # the query window. Images and labels are spatially cropped; points and
+            # shapes are filtered to those within the box.
             sdata_fov = sdata.query.bounding_box(
                 axes=("x", "y"),
                 min_coordinate=min_coordinate,
@@ -118,10 +138,15 @@ def main():
             out = os.path.join("output", f"{cell_id}.zarr")
             if "table" in sdata_fov.tables:
                 obs = sdata_fov["table"].obs
+                # Tag every cell in this follicle's table with the follicle ID so
+                # downstream notebooks can identify which follicle a cell belongs to.
                 obs["follicle_id"] = cell_id
                 if cell_id not in obs.index:
                     print(f"  WARNING: {cell_id} not in table.obs — per-cell metadata not embedded")
                 else:
+                    # Embed any extra columns from the cell_ids_file (e.g. stage,
+                    # quality score) directly into the index cell's obs row so the
+                    # metadata travels with the zarr artifact.
                     meta = row.drop(labels=["cell_id", "radius"]).to_dict()
                     for col, val in meta.items():
                         obs.loc[cell_id, col] = val
