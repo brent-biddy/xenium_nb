@@ -44,6 +44,7 @@ def main():
     args = parse_args()
 
     output_path = os.path.join("output", f"{args.sample}.zarr")
+    morphology_3d_path = Path(args.path) / "morphology.ome.tif"
 
     with timer("Read Xenium"):
         sdata = spatialdata_io.xenium(
@@ -70,7 +71,6 @@ def main():
     else:
         print("No H&E image found.")
 
-    morphology_3d_path = Path(args.path) / "morphology.ome.tif"
     if morphology_3d_path.exists():
         with timer("Add DAPI z-stack"):
             dapi_3d = dask_imread(str(morphology_3d_path))
