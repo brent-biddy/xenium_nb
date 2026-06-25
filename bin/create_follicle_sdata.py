@@ -39,7 +39,7 @@ def parse_args():
 def load_cells(cell_ids_file: str, sample: str, default_radius: float) -> pd.DataFrame:
     """Read cell_ids_file and return rows matching sample, with radius filled."""
     df = pd.read_csv(cell_ids_file)
-    cells = df.loc[df["Donor.ROI"] == sample].drop(columns=["Donor.ROI"]).copy().reset_index(drop=True)
+    cells = df.loc[df["Donor.ROI"] == sample].copy().reset_index(drop=True)
     if cells.empty:
         raise ValueError(
             f"No follicle cells found for sample '{sample}'. "
