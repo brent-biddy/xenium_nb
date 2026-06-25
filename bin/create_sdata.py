@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 
 import spatialdata_io
+from spatialdata_io import xenium_aligned_image
 from dask_image.imread import imread as dask_imread
 from spatialdata.models import Image3DModel
 from spatialdata.transformations import Identity
@@ -42,24 +43,23 @@ def parse_args():
 def main():
     args = parse_args()
 
-    with timer("Setup"):
-        output_path = os.path.join("output", f"{args.sample}.zarr")
+    output_path = os.path.join("output", f"{args.sample}.zarr")
 
     with timer("Read Xenium"):
         sdata = spatialdata_io.xenium(
             path=args.path,
             n_jobs=args.n_jobs,
-            cells_as_circles=True,
         )
 
     if "he_image" not in sdata.images and args.he_image and args.he_alignment:
-        from spatialdata_io import xenium_aligned_image
         with timer("Load H&E"):
+            # imread reads only the base level of the OME-TIFF pyramid; scale_factors
+            # rebuilds it in the zarr. 4 halvings reaches a screen-sized resolution,
+            # a sensible floor for whole-slide H&E viewing.
             he = xenium_aligned_image(
                 image_path=args.he_image,
                 alignment_file=args.he_alignment,
                 image_models_kwargs={
-                    "chunks": {"y": 2048, "x": 2048, "c": -1},
                     "scale_factors": [2, 2, 2, 2],
                 },
             )
