@@ -12,7 +12,7 @@ Notebook-specific inputs, outputs, and samplesheet contracts are documented in [
 ## Requirements
 
 - [Nextflow](https://www.nextflow.io/) ≥ 25.10.0
-- For default non-container local runs: [Quarto](https://quarto.org/) ≥ 1.4 and the required Python notebook packages, including `papermill`
+- For default non-container local runs: [Quarto](https://quarto.org/) ≥ 1.4 and the required Python notebook packages
 - For containerized local runs: Apptainer
 
 ---
@@ -23,25 +23,26 @@ Notebook-specific inputs, outputs, and samplesheet contracts are documented in [
 xenium_nb/
 ├── create.nf                  # Create workflow: raw Xenium -> sample and follicle artifacts
 ├── analyze.nf                 # Analysis workflow: artifact samplesheet -> notebook reports
-├── lib/                       # (reserved for Nextflow helper classes)
 ├── nextflow.config            # Parameters and profiles
 ├── modules/
-│   ├── create_notebooks.nf        # Create-stage notebook processes (sdata, follicle_sdata)
-│   ├── analyze_notebooks.nf       # Analysis notebook processes
-│   ├── run_notebook.nf            # Shared notebook runner
-│   └── write_quarto_params.nf     # Renders params.yml for notebooks
+│   ├── create_notebooks.nf    # Create-stage process definitions
+│   ├── analyze_notebooks.nf   # Analysis notebook process definitions
+│   └── quarto_params.nf       # Quarto params YAML helper (used by analyze.nf)
 ├── notebooks/
 │   ├── README.md
-│   ├── create/
-│   │   ├── sdata.qmd
-│   │   └── follicle_sdata.qmd
 │   └── analyze/
 │       └── plot_follicle.qmd
 ├── bin/
-│   └── timer.py                   # Timing utilities for notebooks
+│   ├── create_sdata.py              # Convert raw Xenium output to SpatialData zarr
+│   ├── create_follicle_sdata.py     # Subset sample zarr into per-cell follicle zarrs
+│   ├── downsample_xenium.py         # Downsample a full Xenium output directory
+│   ├── downsample_xenium_region.py  # Crop a Xenium output to a bounding box region
+│   ├── check_notebook_registry.py   # CI validator for notebook registry
+│   └── timer.py                     # Timing utilities for scripts and notebooks
 └── assets/
     ├── samplesheet.csv                    # Sample-level samplesheet
-    ├── stage_quality_area_all_rois.csv    # Cell ID reference file
+    ├── test_cell_ids.csv                  # Minimal cell ID file for test runs
+    ├── stage_quality_area_all_rois.csv    # Full cell ID reference file
     └── notebook_registry.json             # Notebook metadata (paths and declared params)
 ```
 
@@ -53,18 +54,19 @@ xenium_nb/
 
 ```bash
 nextflow run create.nf \
-    --samplesheet assets/samplesheet.csv
+    --samplesheet assets/samplesheet.csv \
+    --create all
 ```
 
-By default this runs both producer notebooks:
+This runs both create-stage scripts:
 
-- `create_sdata.qmd`
-- `create_follicle_sdata.qmd`
+- `bin/create_sdata.py` — raw Xenium → sample-level SpatialData zarr
+- `bin/create_follicle_sdata.py` — sample zarr → per-cell follicle zarrs
 
 and writes:
 
 - sample zarrs under `results/<sample>/create_sdata/output/`
-- follicle zarrs under `results/<sample>/create_follicle_sdata/output/`
+- follicle zarrs under `results/<sample>/follicle_sdata/output/`
 - `results/sample_sdata_samplesheet.csv`
 - `results/follicle_sdata_samplesheet.csv`
 
@@ -76,8 +78,7 @@ nextflow run create.nf \
     --create sdata
 ```
 
-This runs only `create_sdata.qmd` and writes `results/sample_sdata_samplesheet.csv`.
-That sheet can be used as input to `--create follicle_sdata`.
+Writes `results/sample_sdata_samplesheet.csv`, which can be used as input to `--create follicle_sdata`.
 
 ### Create follicle sdata only
 
@@ -89,15 +90,7 @@ nextflow run create.nf \
     --create follicle_sdata
 ```
 
-This runs only `create_follicle_sdata.qmd` and writes `results/follicle_sdata_samplesheet.csv`.
-
-### Create with the small test follicle file
-
-```bash
-nextflow run create.nf \
-    --samplesheet assets/samplesheet.csv \
-    --cell_ids_file assets/small_stage_quality_area_all_rois.csv
-```
+Writes `results/follicle_sdata_samplesheet.csv`.
 
 ### Analyze follicle artifacts
 
@@ -105,16 +98,6 @@ nextflow run create.nf \
 nextflow run analyze.nf \
     --samplesheet results/follicle_sdata_samplesheet.csv \
     --analyze plot_follicle
-```
-
-### Analyze sample artifacts
-
-When you add analysis notebooks that only require sample-level artifacts, point `analyze.nf` at the sample artifact sheet:
-
-```bash
-nextflow run analyze.nf \
-    --samplesheet results/sample_sdata_samplesheet.csv \
-    --analyze your_sample_notebook_id
 ```
 
 ---
@@ -125,12 +108,12 @@ Key parameters (set in `nextflow.config` or passed via `--param value`):
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `samplesheet` | `null` | Path to samplesheet CSV |
+| `samplesheet` | *(required)* | Path to samplesheet CSV |
 | `outdir` | `results` | Output directory |
 | `cell_ids_file` | `${projectDir}/assets/stage_quality_area_all_rois.csv` | Cell ID reference file path |
-| `radius` | `250` | Default bounding box radius (µm) |
-| `create` | `all` | Create workflow mode: `sdata`, `follicle_sdata`, or `all` |
-| `analyze` | `all` | Analysis notebook selector: `all` or a comma-separated list of notebook IDs from `assets/notebook_registry.json` |
+| `radius` | `100` | Default bounding box radius (µm) |
+| `create` | *(required)* | Create workflow mode: `sdata`, `follicle_sdata`, or `all` |
+| `analyze` | *(required)* | Analysis notebook selector: `all` or a notebook ID from `assets/notebook_registry.json` |
 
 Analysis notebook IDs and how to add new notebooks are documented in [notebooks/README.md](notebooks/README.md).
 
@@ -139,35 +122,23 @@ Analysis notebook IDs and how to add new notebooks are documented in [notebooks/
 | Profile | Description |
 |---------|-------------|
 | (default) | Local execution, no container (use an activated conda env that provides the notebook kernel). |
-| `test` | Local execution with Apptainer, sized for a laptop / WSL2 box (8 GB default). Build a local `.sif` with `container/build_apptainer.sh` and update `container` in the `test` profile. |
-| `oscer` | SLURM executor on OSCER HPC, Apptainer container, scratch-based work directory and image cache. Memory scales 32→64→96 GB across retries. |
+| `test` | Local execution with Apptainer, sized for a laptop / WSL2 box (2 CPUs, 8 GB). Defaults `samplesheet` and `cell_ids_file` to the test assets. |
+| `oscer` | SLURM executor on OSCER HPC, Apptainer container, scratch-based work directory. Memory scales 32→64→96 GB across retries. |
 
 Activate with `-profile oscer`:
 
 ```bash
 nextflow run create.nf \
     --samplesheet assets/samplesheet.csv \
+    --create all \
     -profile oscer
 ```
 
-For local Apptainer validation:
+For local containerized runs:
 
 ```bash
-conda run -n squidpy nextflow run analyze.nf \
-    -profile test \
-    --samplesheet /path/to/follicle_sdata_samplesheet.csv \
-    --outdir /path/to/outdir \
-    -process.memory '16 GB'
-```
-
-To publish the same runtime for OSCER:
-
-```bash
-./container/build_docker.sh
-docker tag xenium_tools_squidpy:local babiddy755/xenium_nb:<tag>
-docker push babiddy755/xenium_nb:<tag>
-# Update container in the oscer profile in nextflow.config, then:
-nextflow run create.nf --samplesheet assets/samplesheet.csv -profile oscer
+nextflow run create.nf --create all -profile test
+nextflow run analyze.nf --analyze plot_follicle -profile test
 ```
 
 ---
@@ -178,32 +149,26 @@ nextflow run create.nf --samplesheet assets/samplesheet.csv -profile oscer
 results/
 ├── pipeline_info/
 │   ├── timeline.html
-│   ├── report.html
+│   └── report.html
 ├── sample_sdata_samplesheet.csv
 ├── follicle_sdata_samplesheet.csv
-├── ROI1/
+├── ROI1_A/
 │   ├── create_sdata/
-│   │   ├── ROI1_create_sdata.html
 │   │   └── output/
-│   │       └── ROI1.zarr/
-│   ├── create_follicle_sdata/
-│   │   ├── ROI1_create_follicle_sdata.html
+│   │       └── ROI1_A.zarr/
+│   ├── follicle_sdata/
 │   │   └── output/
 │   │       ├── aaaaimck-1.zarr/
-│   │       └── aaaalpdj-1.zarr/
+│   │       └── aaameida-1.zarr/
 │   └── plot_follicle/
-│       ├── ROI1_aaaaimck-1_plot_follicle.pptx
-│       ├── ROI1_aaaaimck-1_plot_follicle.timing.tsv
-│       ├── ROI1_aaaalpdj-1_plot_follicle.pptx
-│       └── ROI1_aaaalpdj-1_plot_follicle.timing.tsv
-└── ROI2/
+│       ├── aaaaimck-1_plot_follicle.pptx
+│       ├── aaaaimck-1_plot_follicle.timing.tsv
+│       ├── aaameida-1_plot_follicle.pptx
+│       └── aaameida-1_plot_follicle.timing.tsv
+└── ROI1_B/
     └── ...
 ```
 
-Analysis outputs also publish under the parent sample directory, so follicle reports for cells like `aaaaimck-1` and `aaaalpdj-1` both land under `results/ROI1/plot_follicle/`.
-For `plot_follicle`, the primary rendered artifact is a `.pptx` deck, with a companion timing TSV.
-
-If `--create sdata` is used, `create_follicle_sdata/` outputs and `results/follicle_sdata_samplesheet.csv` are not created.
+If `--create sdata` is used, `follicle_sdata/` outputs and `results/follicle_sdata_samplesheet.csv` are not created.
 
 The sample-stage sheet is the handoff input for `--create follicle_sdata`.
-
