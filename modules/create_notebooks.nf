@@ -15,19 +15,15 @@ process CREATE_SDATA {
     path "output/**", optional: true, hidden: true, emit: output_tree
 
     script:
-    def heImageArg = he_image    ? "--he_image ${he_image}"       : ""
-    def heAlignArg = he_alignment ? "--he_alignment ${he_alignment}" : ""
+    def sdataArgs = ["--sample ${sample}", "--path ${input_path}", "--n_jobs ${task.cpus}"]
+    if (he_image)     sdataArgs << "--he_image ${he_image}"
+    if (he_alignment) sdataArgs << "--he_alignment ${he_alignment}"
     """
     export XDG_CACHE_HOME="\$PWD/.cache"
     export TMPDIR="\$PWD/tmp"
     mkdir -p "\$XDG_CACHE_HOME" "\$TMPDIR"
 
-    create_sdata.py \
-        --sample ${sample} \
-        --path ${input_path} \
-        --n_jobs ${task.cpus} \
-        ${heImageArg} \
-        ${heAlignArg}
+    create_sdata.py ${sdataArgs.join(' ')}
     """
 
     stub:

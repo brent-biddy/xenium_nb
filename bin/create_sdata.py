@@ -70,7 +70,7 @@ def prepare_xenium_input(path_str: str) -> str:
     return str(compat_root.resolve())
 
 
-def main():
+def parse_args():
     parser = argparse.ArgumentParser(
         description="Convert Xenium output to a SpatialData zarr store"
     )
@@ -80,16 +80,22 @@ def main():
     parser.add_argument("--he_image", default="", help="Path to H&E OME-TIFF (optional)")
     parser.add_argument("--he_alignment", default="", help="Path to H&E alignment CSV (optional)")
     args = parser.parse_args()
+    if bool(args.he_image) != bool(args.he_alignment):
+        parser.error("--he_image and --he_alignment must be provided together")
+    return args
+
+
+def main():
+    args = parse_args()
 
     with timer("Setup"):
-        n_jobs = int(args.n_jobs)
         xenium_path = prepare_xenium_input(args.path)
         output_path = os.path.join("output", f"{args.sample}.zarr")
 
     with timer("Read Xenium"):
         sdata = spatialdata_io.xenium(
             path=xenium_path,
-            n_jobs=n_jobs,
+            n_jobs=args.n_jobs,
             cells_as_circles=True,
         )
 
