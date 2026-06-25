@@ -562,6 +562,7 @@ def crop_he_ome_tiff(src, dst, x0, y0, x1, y1):
 
 
 def crop_ome_tiff(src, dst, x0, y0, x1, y1):
+    import re
     import tifffile
 
     with tifffile.TiffFile(src) as tif:
@@ -606,6 +607,15 @@ def crop_ome_tiff(src, dst, x0, y0, x1, y1):
                 compression="deflate",
                 metadata=None,
             )
+
+    # tifffile auto-generates channel IDs as "Channel:<image_index>:<channel_index>"
+    # (standard OME spec), but spatialdata_io's v4 xenium reader expects Xenium's
+    # native format "Channel:<channel_index>" (no image prefix). Patch the OME-XML
+    # comment in-place after writing so the output is readable without workarounds.
+    ome_xml = tifffile.tiffcomment(str(dst))
+    ome_xml_fixed = re.sub(r'Channel:(\d+):(\d+)', r'Channel:\2', ome_xml)
+    if ome_xml_fixed != ome_xml:
+        tifffile.tiffcomment(str(dst), ome_xml_fixed)
 
 
 def load_he_alignment(alignment_path):
