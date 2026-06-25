@@ -1,7 +1,3 @@
 sample,path
-ROI1,/path/to/ROI1/xenium_output
-ROI2,/path/to/ROI2/xenium_output
-ROI3,/path/to/ROI3/xenium_output
-ROI4,/path/to/ROI4/xenium_output
-ROI5,/path/to/ROI5/xenium_output
-ROI6,/path/to/ROI6/xenium_output
+ROI1_A,/home/babiddy/xenium_nb_test_inputs/raw_data/roi_1_downsampled/ROI1_A
+ROI1_B,/home/babiddy/xenium_nb_test_inputs/raw_data/roi_1_downsampled/ROI1_B
