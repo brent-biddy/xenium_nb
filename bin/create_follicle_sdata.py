@@ -16,7 +16,6 @@ import os
 
 import pandas as pd
 import spatialdata
-from spatialdata import transform
 import session_info
 
 from timer import timer, timing_summary
@@ -75,15 +74,12 @@ def main():
     with timer("Load cell IDs"):
         cells = load_cells(args.cell_ids_file, args.sample, default_radius)
 
-    with timer("Load cell circles"):
-        # cell_circles is a GeoDataFrame of Shapely Point geometries, one per cell,
-        # stored in the native Xenium coordinate system (µm). transform() applies
-        # the registered transformation to bring all coordinates into the shared
-        # "global" space (pixels), so centroid lookups are consistent across all elements.
-        circles = transform(sdata["cell_circles"], to_coordinate_system="global")
-        # Global coordinates are in pixels; radius is in µm. Convert using the fixed
-        # Xenium pixel size so the bounding box window has the correct physical size.
-        radius_px_per_um = 1.0 / XENIUM_PIXEL_SIZE_UM
+    # cell_circles is a GeoDataFrame of Shapely Point geometries, one per cell,
+    # with coordinates in the native Xenium coordinate system (µm).
+    circles = sdata["cell_circles"]
+    # The bounding box query runs in "global" (pixel) space, so both the centroid
+    # coordinates and the radius must be converted from µm to pixels.
+    radius_px_per_um = 1.0 / XENIUM_PIXEL_SIZE_UM
 
     os.makedirs("output", exist_ok=True)
 
@@ -96,7 +92,8 @@ def main():
                 print(f"  WARNING: {cell_id} not found in cell_circles — skipping")
                 continue
             centroid = circles.loc[cell_id, "geometry"]
-            cx, cy = centroid.x, centroid.y
+            cx = centroid.x * radius_px_per_um
+            cy = centroid.y * radius_px_per_um
             min_coordinate = [cx - radius, cy - radius]
             max_coordinate = [cx + radius, cy + radius]
 
