@@ -5,7 +5,8 @@ process DOWNSAMPLE_XENIUM_REGION {
     tag "${sample}/${region_name}"
 
     publishDir { "${params.outdir}/${sample}/downsample_xenium_region" },
-        mode: 'copy'
+        mode: 'copy',
+        saveAs: { it.replaceFirst('output/', '') }
 
     input:
     tuple val(sample), path(input_path), val(xmin), val(ymin), val(xmax), val(ymax), val(region_name), val(he_image), val(he_alignment)

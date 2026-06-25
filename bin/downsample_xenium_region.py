@@ -672,9 +672,18 @@ def process_cells_zarr_region(input_dir, output_dir, selected_indices, n_total, 
     """Crop cells.zarr.zip to the selected cells and region pixel bounds.
 
     Writes cell_id, cell_summary (rebased), segmentation masks (cropped and
-    zeroed for excluded cells), and polygon_sets (filtered and rebased) to a
+    filtered to selected cells), and polygon_sets (filtered and rebased) to a
     new cells.zarr.zip. The homogeneous_transform is updated so that the
     cropped zarr's coordinate system aligns with the rebased cell coordinates.
+
+    Xenium mask values are global cell IDs (not 1-based local indices). The
+    global-to-local mapping is derived from the sorted unique mask values: the
+    i-th sorted unique value corresponds to the i-th cell in the cell_id array.
+    This matches the convention spatialdata_io uses when building its indices
+    mapping. For masks where the count of unique labels equals n_total (the cell
+    mask), extra pixels from cells whose centroids fall outside the bbox are
+    zeroed out. For masks with fewer unique labels (e.g. the nucleus mask),
+    spatial cropping alone is used — spatialdata_io does not cell-match nuclei.
     """
     store_in = open_zip_read_store(input_dir / "cells.zarr.zip", mode="r")
     z_in = zarr.open(store_in, mode="r")
@@ -704,12 +713,6 @@ def process_cells_zarr_region(input_dir, output_dir, selected_indices, n_total, 
         create_zarr_dataset(z_out, "cell_summary", data=cell_summary)
         z_out["cell_summary"].attrs.update(summary_attrs)
 
-        # Segmentation mask values are 1-based cell label IDs (index + 1).
-        # Build a boolean lookup so mask pixels for excluded cells can be zeroed.
-        selected_label_ids = selected_indices + 1
-        lookup = np.zeros(n_total + 1, dtype=bool)
-        lookup[selected_label_ids] = True
-
         masks_out = z_out.create_group("masks")
         transform = np.asarray(z_in["masks/homogeneous_transform"][:], dtype=float)
         if transform.shape[0] >= 2 and transform.shape[1] >= 3:
@@ -723,14 +726,20 @@ def process_cells_zarr_region(input_dir, output_dir, selected_indices, n_total, 
         for mask_name in ["0", "1"]:
             print(f"    mask {mask_name} crop...")
             mask_in = z_in[f"masks/{mask_name}"]
-            crop = np.asarray(mask_in[y0:min(y1, mask_in.shape[0]), x0:min(x1, mask_in.shape[1])])
-            nonzero = crop > 0
-            if nonzero.any():
-                in_range = crop <= n_total
-                keep = np.zeros_like(crop, dtype=bool)
-                valid = nonzero & in_range
-                keep[valid] = lookup[crop[valid]]
-                crop[nonzero & ~keep] = 0
+            full_mask = np.asarray(mask_in)
+            crop = full_mask[y0:min(y1, mask_in.shape[0]), x0:min(x1, mask_in.shape[1])].copy()
+
+            # Derive selected global label IDs when the mask has exactly one
+            # unique label per cell (n_total). This is true for the cell mask
+            # (masks/1) but not always for the nucleus mask (masks/0).
+            all_unique = np.sort(np.unique(full_mask[full_mask > 0]))
+            if len(all_unique) == n_total:
+                selected_global_labels = set(all_unique[selected_indices].tolist())
+                nonzero = crop > 0
+                if nonzero.any():
+                    keep = np.isin(crop[nonzero], list(selected_global_labels))
+                    crop[nonzero] = np.where(keep, crop[nonzero], 0)
+
             create_zarr_dataset(masks_out, mask_name, data=crop, chunks=mask_in.chunks)
 
         # Remap cell_index values in polygon_sets from original indices to the
