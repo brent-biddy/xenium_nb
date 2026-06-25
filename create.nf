@@ -2,7 +2,7 @@
 
 // Builds Xenium SpatialData artifacts and the samplesheets that downstream
 // workflows (analyze.nf) consume. Modes:
-//   sdata           - render create_sdata.qmd per ROI from raw Xenium output
+//   sdata           - run create_sdata.py per ROI from raw Xenium output
 //   follicle_sdata  - render create_follicle_sdata.qmd per cell ID from existing sample zarrs
 //   all             - run both, chaining sdata outputs into the follicle step
 
@@ -24,7 +24,6 @@ workflow {
     def follicleSourceArtifacts = null
     def timerScript = file("${projectDir}/bin/timer.py")
     def cellIdsFile = file(params.cell_ids_file)
-    def sdataNotebook = file("${projectDir}/notebooks/create/sdata.qmd")
     def follicleSdataNotebook = file("${projectDir}/notebooks/create/follicle_sdata.qmd")
 
     Channel
@@ -42,11 +41,13 @@ workflow {
 
         sampleRowsList
             .map { sample, stagedPath, rowMap ->
-                tuple(sample, stagedPath, paramsFile(sample, sdataNotebook, rowMap))
+                def heImage = rowMap.he_image    ? new File(rowMap.he_image    as String).absolutePath : ""
+                def heAlign = rowMap.he_alignment ? new File(rowMap.he_alignment as String).absolutePath : ""
+                tuple(sample, stagedPath, heImage, heAlign)
             }
-            .set { createSdataInputs } // tuple(sample, staged_path, params_yml)
+            .set { createSdataInputs } // tuple(sample, staged_path, he_image, he_alignment)
 
-        CREATE_SDATA(createSdataInputs, sdataNotebook, timerScript) | set { createSdataRun }
+        CREATE_SDATA(createSdataInputs) | set { createSdataRun }
         // createSdataRun.artifacts: tuple(sample, zarr)
 
         follicleSourceArtifacts = createSdataRun.artifacts
