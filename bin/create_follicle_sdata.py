@@ -13,7 +13,6 @@ Usage:
 
 import argparse
 import os
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -23,13 +22,6 @@ from spatialdata.transformations import get_transformation
 import session_info
 
 from timer import timer, timing_summary
-
-
-# Normalize sample IDs to alphanumeric uppercase for fuzzy matching between the
-# samplesheet (e.g. "ROI1_A") and the cell_ids_file Donor.ROI column (e.g. "ROI1-A"),
-# which may use different separators or capitalisation conventions.
-def normalize_sample_id(value: str) -> str:
-    return "".join(ch for ch in str(value).upper() if ch.isalnum())
 
 
 def parse_args():
@@ -47,29 +39,18 @@ def parse_args():
 def load_cells(cell_ids_file: str, sample: str, default_radius: float) -> pd.DataFrame:
     """Read cell_ids_file and return rows matching sample, with radius filled."""
     df = pd.read_csv(cell_ids_file)
-    normalized_sample = normalize_sample_id(sample)
-    df["_normalized_roi"] = df["Donor.ROI"].map(normalize_sample_id)
-    # Find which Donor.ROI values normalize to the requested sample. Multiple
-    # matches indicate an ambiguous naming collision and are treated as an error.
-    matching_rois = df.loc[df["_normalized_roi"] == normalized_sample, "Donor.ROI"].drop_duplicates().tolist()
-    if not matching_rois:
+    cells = df.loc[df["Donor.ROI"] == sample].drop(columns=["Donor.ROI"]).copy().reset_index(drop=True)
+    if cells.empty:
         raise ValueError(
             f"No follicle cells found for sample '{sample}'. "
             "Check naming in the samplesheet and cell_ids_file Donor.ROI column."
         )
-    if len(matching_rois) > 1:
-        raise ValueError(
-            f"Sample '{sample}' matched multiple Donor.ROI values after normalization: {matching_rois}"
-        )
-    matched_roi = matching_rois[0]
-    df = df.loc[df["Donor.ROI"] == matched_roi].copy()
     # radius column is optional in the CSV; fall back to the CLI default when absent or blank.
-    if "radius" not in df.columns:
-        df["radius"] = default_radius
+    if "radius" not in cells.columns:
+        cells["radius"] = default_radius
     else:
-        df["radius"] = df["radius"].fillna(default_radius)
-    cells = df.drop(columns=["Donor.ROI", "_normalized_roi"]).reset_index(drop=True)
-    print(f"{len(cells)} cell(s) found for sample '{sample}' (matched Donor.ROI='{matched_roi}'):")
+        cells["radius"] = cells["radius"].fillna(default_radius)
+    print(f"{len(cells)} cell(s) found for sample '{sample}':")
     print(cells[["cell_id", "radius"]].to_string(index=False))
     return cells
 
