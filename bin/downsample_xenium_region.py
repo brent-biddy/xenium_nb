@@ -20,12 +20,10 @@ regions.csv must contain: region,xmin,ymin,xmax,ymax
 import argparse
 import gc
 import gzip
-import json
 import shutil
 import sys
 import tempfile
 import time
-import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -36,6 +34,10 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 import zarr
+
+# Xenium pixel size in µm/pixel — a fixed instrument constant used to convert
+# bounding box coordinates from µm (user-facing) to pixels (image space).
+XENIUM_PIXEL_SIZE_UM = 0.2125
 
 from downsample_xenium import (
     archive_directory_as_zip,
@@ -319,68 +321,6 @@ def process_transcripts_in_region(input_dir, output_dir, selected_ids, region, p
 # ---------------------------------------------------------------------------
 # Image cropping
 # ---------------------------------------------------------------------------
-
-def infer_pixel_size(input_dir):
-    def pixel_size_from_transform(transform):
-        if transform.shape[0] >= 2 and transform.shape[1] >= 2:
-            pixels_per_unit = float(np.mean(np.abs([transform[0, 0], transform[1, 1]])))
-            if np.isfinite(pixels_per_unit) and pixels_per_unit > 0:
-                return 1.0 / pixels_per_unit
-        return None
-
-    try:
-        import numcodecs
-
-        with zipfile.ZipFile(input_dir / "cells.zarr.zip") as zf:
-            meta = json.loads(zf.read("masks/homogeneous_transform/.zarray"))
-            raw = zf.read("masks/homogeneous_transform/0.0")
-            compressor = meta.get("compressor")
-            if compressor and compressor.get("id") == "blosc":
-                raw = numcodecs.Blosc().decode(raw)
-            transform = np.frombuffer(raw, dtype=np.dtype(meta["dtype"])).reshape(meta["shape"])
-            pixel_size = pixel_size_from_transform(transform)
-            if pixel_size:
-                return pixel_size
-    except Exception:
-        pass
-
-    try:
-        store = open_zip_read_store(input_dir / "cells.zarr.zip", mode="r")
-        z = zarr.open(store, mode="r")
-        transform = np.asarray(z["masks/homogeneous_transform"][:], dtype=float)
-        store.close()
-        pixel_size = pixel_size_from_transform(transform)
-        if pixel_size:
-            return pixel_size
-    except Exception:
-        pass
-
-    exp = input_dir / "experiment.xenium"
-    if exp.exists():
-        try:
-            data = json.loads(exp.read_text())
-            candidates = []
-
-            def walk(obj):
-                if isinstance(obj, dict):
-                    for key, value in obj.items():
-                        lowered = str(key).lower()
-                        if "pixel" in lowered and isinstance(value, (int, float)):
-                            candidates.append(float(value))
-                        walk(value)
-                elif isinstance(obj, list):
-                    for value in obj:
-                        walk(value)
-
-            walk(data)
-            candidates = [v for v in candidates if np.isfinite(v) and v > 0]
-            if candidates:
-                return candidates[0]
-        except Exception:
-            pass
-
-    return 1.0
-
 
 def crop_bounds_pixels(region, pixel_size):
     x0 = max(0, int(np.floor(region.xmin / pixel_size)))
@@ -886,7 +826,7 @@ def main():
         else input_dir.parent / f"{input_dir.name}_region_downsampled"
     )
     regions = load_regions(args)
-    pixel_size = args.pixel_size if args.pixel_size else infer_pixel_size(input_dir)
+    pixel_size = args.pixel_size if args.pixel_size else XENIUM_PIXEL_SIZE_UM
     he_image = args.he_image.resolve() if args.he_image else None
     he_alignment = load_he_alignment(args.he_alignment) if args.he_alignment else None
 
