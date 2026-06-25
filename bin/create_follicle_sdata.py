@@ -56,6 +56,27 @@ def load_cells(cell_ids_file: str, sample: str, default_radius: float) -> pd.Dat
     return cells
 
 
+def embed_metadata(sdata_fov, cell_id, row):
+    """Tag all cells with follicle_id and embed CSV metadata on the index cell."""
+    if "table" not in sdata_fov.tables:
+        return
+    obs = sdata_fov["table"].obs
+    # Tag every cell in this follicle's table with the follicle ID so
+    # downstream notebooks can identify which follicle a cell belongs to.
+    obs["follicle_id"] = cell_id
+    # obs is indexed by integers; cell IDs are in the cell_id column.
+    mask = obs["cell_id"] == cell_id
+    if not mask.any():
+        print(f"  WARNING: {cell_id} not in table.obs — per-cell metadata not embedded")
+        return
+    # Embed any extra columns from the cell_ids_file (e.g. stage,
+    # quality score) into the follicle cell's obs row so the
+    # metadata travels with the zarr artifact.
+    meta = row.drop(labels=["cell_id", "radius"]).to_dict()
+    for col, val in meta.items():
+        obs.loc[mask, col] = val
+
+
 def main():
     args = parse_args()
 
@@ -110,22 +131,7 @@ def main():
 
         with timer(f"Write {cell_id}"):
             out = os.path.join("output", f"{cell_id}.zarr")
-            if "table" in sdata_fov.tables:
-                obs = sdata_fov["table"].obs
-                # Tag every cell in this follicle's table with the follicle ID so
-                # downstream notebooks can identify which follicle a cell belongs to.
-                obs["follicle_id"] = cell_id
-                # obs is indexed by integers; cell IDs are in the cell_id column.
-                mask = obs["cell_id"] == cell_id
-                if not mask.any():
-                    print(f"  WARNING: {cell_id} not in table.obs — per-cell metadata not embedded")
-                else:
-                    # Embed any extra columns from the cell_ids_file (e.g. stage,
-                    # quality score) into the follicle cell's obs row so the
-                    # metadata travels with the zarr artifact.
-                    meta = row.drop(labels=["cell_id", "radius"]).to_dict()
-                    for col, val in meta.items():
-                        obs.loc[mask, col] = val
+            embed_metadata(sdata_fov, cell_id, row)
             sdata_fov.write(out, overwrite=True)
 
         print(f"  {cell_id}: centroid=({cx:.1f}, {cy:.1f})  radius={radius:.1f}  →  {out}")
