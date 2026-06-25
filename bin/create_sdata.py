@@ -46,6 +46,10 @@ def main():
     output_path = os.path.join("output", f"{args.sample}.zarr")
     morphology_3d_path = Path(args.path) / "morphology.ome.tif"
 
+    print(f"Sample:  {args.sample}")
+    print(f"Input:   {args.path}")
+    print(f"Output:  {output_path}")
+
     with timer("Read Xenium"):
         sdata = spatialdata_io.xenium(
             path=args.path,
@@ -93,9 +97,6 @@ def main():
         sdata.write(output_path, overwrite=True)
     print(f"Written to {output_path}")
 
-    print(f"\nSample:      {args.sample}")
-    print(f"Input path:  {args.path}")
-    print(f"Output zarr: {output_path}")
     print("\nElements:")
     for group_name in ("images", "labels", "points", "shapes", "tables"):
         group = getattr(sdata, group_name, {})
