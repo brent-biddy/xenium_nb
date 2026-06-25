@@ -121,8 +121,7 @@ def main():
     timing_summary(path=f"output/{args.sample}_timing.tsv")
 
     session_info_path = f"output/{args.sample}_session_info.txt"
-    with open(session_info_path, "w") as f:
-        session_info.show(fid=f)
+    session_info.show(write_req_file=True, req_file_name=session_info_path)
     print(f"Session info written to {session_info_path}")
 
 
