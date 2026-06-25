@@ -74,8 +74,7 @@ def main():
     if "he_image" not in sdata.images and args.he_image and args.he_alignment:
         with timer("Load H&E"):
             # imread reads only the base level of the OME-TIFF pyramid; scale_factors
-            # rebuilds it in the zarr. 4 halvings reaches a screen-sized resolution,
-            # a sensible floor for whole-slide H&E viewing.
+            # rebuilds it in the zarr. 4 halvings reaches a screen-sized resolution.
             he = xenium_aligned_image(
                 image_path=args.he_image,
                 alignment_file=args.he_alignment,
@@ -101,8 +100,7 @@ def main():
                 c_coords=["DAPI"],
                 transformations={"global": Identity()},
                 # imread reads only the base level; scale_factors rebuilds the pyramid.
-                # y/x only — z is not downsampled. 4 halvings reaches a screen-sized
-                # resolution, a sensible floor for whole-slide viewing.
+                # y/x only — z is not downsampled. 4 halvings reaches a screen-sized resolution.
                 scale_factors=[{"y": 2, "x": 2}, {"y": 2, "x": 2}, {"y": 2, "x": 2}, {"y": 2, "x": 2}],
             )
         print(f"Loaded DAPI z-stack from {morphology_3d_path}")
