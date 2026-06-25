@@ -84,7 +84,7 @@ def main():
                 # resolution, a sensible floor for whole-slide viewing.
                 scale_factors=[{"y": 2, "x": 2}, {"y": 2, "x": 2}, {"y": 2, "x": 2}, {"y": 2, "x": 2}],
             )
-        print(sdata.images["dapi_3d"])
+        print(f"Loaded DAPI z-stack from {morphology_3d_path}")
     else:
         print("Skipping DAPI z-stack (morphology.ome.tif not found).")
 
