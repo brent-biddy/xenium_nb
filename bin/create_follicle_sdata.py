@@ -87,7 +87,7 @@ def main():
 
     os.makedirs("output", exist_ok=True)
 
-    for _, row in cells.iterrows():
+    for idx, row in cells.iterrows():
         cell_id = row["cell_id"]
         radius = float(row["radius"]) * radius_px_per_um
 
@@ -132,7 +132,7 @@ def main():
         print(f"  {cell_id}: centroid=({cx:.1f}, {cy:.1f})  radius={radius:.1f}  →  {out}")
 
     print(f"\nCells written: {len(cells)}")
-    for _, row in cells.iterrows():
+    for idx, row in cells.iterrows():
         print(f"  output/{row['cell_id']}.zarr  (radius={row['radius']}µm)")
 
     timing_summary(path=f"output/{args.sample}_timing.tsv")
