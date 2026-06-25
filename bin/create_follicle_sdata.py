@@ -14,14 +14,16 @@ Usage:
 import argparse
 import os
 
-import numpy as np
 import pandas as pd
 import spatialdata
 from spatialdata import transform
-from spatialdata.transformations import get_transformation
 import session_info
 
 from timer import timer, timing_summary
+
+# Xenium pixel size in µm/pixel — a fixed instrument constant used to convert
+# the bounding box radius from µm (user-facing) to pixels (coordinate system units).
+XENIUM_PIXEL_SIZE_UM = 0.2125
 
 
 def parse_args():
@@ -75,25 +77,19 @@ def main():
 
     with timer("Load cell circles"):
         # cell_circles is a GeoDataFrame of Shapely Point geometries, one per cell,
-        # stored in the native Xenium pixel coordinate system. transform() applies
+        # stored in the native Xenium coordinate system (µm). transform() applies
         # the registered transformation to bring all coordinates into the shared
-        # "global" space, so centroid lookups are consistent across all elements.
+        # "global" space (pixels), so centroid lookups are consistent across all elements.
         circles = transform(sdata["cell_circles"], to_coordinate_system="global")
-        # Extract the diagonal of the affine matrix to get the pixel→µm scale factor.
-        # The bounding box radius is specified in µm but centroid coordinates are in
-        # pixels, so radius must be converted before computing the query window.
-        affine = (
-            get_transformation(sdata["cell_circles"], "global")
-            .to_affine_matrix(input_axes=("x", "y"), output_axes=("x", "y"))
-        )
-        radius_scale = float(np.mean(np.abs([affine[0, 0], affine[1, 1]])))
+        # Global coordinates are in pixels; radius is in µm. Convert using the fixed
+        # Xenium pixel size so the bounding box window has the correct physical size.
+        radius_px_per_um = 1.0 / XENIUM_PIXEL_SIZE_UM
 
     os.makedirs("output", exist_ok=True)
 
     for _, row in cells.iterrows():
         cell_id = row["cell_id"]
-        # Convert radius from µm to pixels using the affine scale factor.
-        radius = float(row["radius"]) * radius_scale
+        radius = float(row["radius"]) * radius_px_per_um
 
         with timer(f"Subset {cell_id}"):
             if cell_id not in circles.index:
