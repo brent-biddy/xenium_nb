@@ -131,10 +131,6 @@ def main():
 
         print(f"  {cell_id}: centroid=({cx:.1f}, {cy:.1f})  radius={radius:.1f}  →  {out}")
 
-    print(f"\nCells written: {len(cells)}")
-    for idx, row in cells.iterrows():
-        print(f"  output/{row['cell_id']}.zarr  (radius={row['radius']}µm)")
-
     timing_summary(path=f"output/{args.sample}_timing.tsv")
 
     session_info_path = f"output/{args.sample}_session_info.txt"
