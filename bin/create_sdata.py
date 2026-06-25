@@ -103,7 +103,7 @@ def main():
         for name, element in group.items():
             print(f"  {name}: {type(element).__name__} [{group_name}]")
 
-    timing_summary()
+    timing_summary(path=f"output/{args.sample}_timing.tsv")
 
     session_info_path = f"output/{args.sample}_session_info.txt"
     with open(session_info_path, "w") as f:
