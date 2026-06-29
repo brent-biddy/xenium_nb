@@ -72,6 +72,38 @@ process CREATE_SDATA {
     """
 }
 
+process CONCAT_SDATA {
+    tag "${output_name}"
+
+    publishDir { "${params.outdir}/concat_sdata" },
+        mode: 'copy'
+
+    input:
+    path input_paths
+    val output_name
+
+    output:
+    path 'output/*.zarr', emit: artifacts
+    path "output/**", optional: true, hidden: true, emit: output_tree
+
+    script:
+    """
+    export XDG_CACHE_HOME="\$PWD/.cache"
+    export TMPDIR="\$PWD/tmp"
+    mkdir -p "\$XDG_CACHE_HOME" "\$TMPDIR"
+
+    concat_sdata.py --output_name ${output_name} --paths ${input_paths}
+    """
+
+    stub:
+    """
+    mkdir -p output/${output_name}.zarr
+    touch output/${output_name}.zarr/.zgroup
+    touch output/${output_name}.zarr/.zattrs
+    touch output/${output_name}.zarr/.zmetadata
+    """
+}
+
 process CREATE_FOLLICLE_SDATA {
     tag "${sample}"
 
