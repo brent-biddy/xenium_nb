@@ -9,7 +9,7 @@
 nextflow.enable.dsl = 2
 
 include { paramsFile } from './modules/quarto_params'
-include { PLOT_FOLLICLE } from './modules/analyze_notebooks'
+include { PLOT_FOLLICLE; CLUSTER_SDATA } from './modules/analyze_notebooks'
 
 workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"
@@ -17,8 +17,8 @@ workflow {
 
     def analyzeMode = params.analyze.toLowerCase()
 
-    if (!(analyzeMode in ['plot_follicle', 'all'])) {
-        error "Invalid --analyze '${analyzeMode}'. Valid values are: plot_follicle, all"
+    if (!(analyzeMode in ['plot_follicle', 'cluster_sdata', 'all'])) {
+        error "Invalid --analyze '${analyzeMode}'. Valid values are: plot_follicle, cluster_sdata, all"
     }
 
     def timerScript = file("${projectDir}/bin/timer.py")
@@ -33,6 +33,19 @@ workflow {
             tuple(row.sample, file(row.path), row)
         }
         .set { rowsList } // tuple(sample, staged_path, row_map)
+
+    // ---- cluster_sdata: QC, normalize, PCA, UMAP, Leiden, spatial stats ----
+    if (analyzeMode == 'cluster_sdata' || analyzeMode == 'all') {
+        def clusterNotebook = file("${projectDir}/notebooks/analyze/cluster_sdata.qmd")
+
+        rowsList
+            .map { sample, stagedPath, rowMap ->
+                tuple(sample, stagedPath, paramsFile(sample, clusterNotebook, rowMap))
+            }
+            .set { clusterInputs } // tuple(sample, staged_path, params_yml)
+
+        CLUSTER_SDATA(clusterInputs, clusterNotebook, timerScript)
+    }
 
     // ---- plot_follicle: per-cell follicle plots ----
     if (analyzeMode == 'plot_follicle' || analyzeMode == 'all') {

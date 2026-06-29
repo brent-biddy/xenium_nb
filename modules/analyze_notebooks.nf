@@ -1,6 +1,38 @@
 // Quarto notebook processes for analyze.nf. Each process renders one notebook
 // against a pre-built SpatialData artifact and publishes the resulting reports.
 
+process CLUSTER_SDATA {
+    tag "${sample}"
+
+    publishDir { "${params.outdir}/${sample}/cluster_sdata" },
+        mode: 'copy',
+        saveAs: { fn -> fn.startsWith('output/') ? fn : fn }
+
+    input:
+    tuple val(sample), path(input_path), path('params.yml')
+    path notebook
+    path 'timer.py'
+
+    output:
+    path "cluster_sdata.*", emit: reports
+    path "output/**", optional: true, hidden: true, emit: output_tree
+
+    script:
+    """
+    export XDG_CACHE_HOME="\$PWD/.cache"
+    export TMPDIR="\$PWD/tmp"
+    mkdir -p "\$XDG_CACHE_HOME" "\$TMPDIR"
+
+    quarto render ${notebook} --execute-params params.yml --output-dir .
+    """
+
+    stub:
+    """
+    touch cluster_sdata.html
+    touch cluster_sdata.timing.tsv
+    """
+}
+
 process PLOT_FOLLICLE {
     tag "${follicle_id}"
 
