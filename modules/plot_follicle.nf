@@ -1,3 +1,25 @@
+include { paramsFile } from './quarto_params'
+
+workflow {
+    if (!params.samplesheet) error "Please provide --samplesheet"
+
+    def plotFollicleNotebook = file("${projectDir}/notebooks/analyze/plot_follicle.qmd")
+    def timerScript          = file("${projectDir}/bin/timer.py")
+
+    Channel
+        .fromPath(params.samplesheet)
+        .splitCsv(header: true)
+        .map { row ->
+            if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
+            if (!row.path)   error "Samplesheet row missing 'path': ${row}"
+            def follicleId = "${row.sample}_${row.cell}"
+            tuple(follicleId, row.sample, file(row.path), paramsFile(follicleId, plotFollicleNotebook, row))
+        }
+        .set { plotInputs } // tuple(follicle_id, sample, staged_path, params_yml)
+
+    PLOT_FOLLICLE(plotInputs, plotFollicleNotebook, timerScript)
+}
+
 process PLOT_FOLLICLE {
     tag "${follicle_id}"
 

@@ -4,8 +4,10 @@
 // on compute nodes.
 def paramsFile(String id, Path notebook, Map rowParams) {
     def notebookName = notebook.fileName.toString().replaceAll('\\.qmd$', '')
-    def registry = new groovy.json.JsonSlurper()
-        .parse(new File("${projectDir}/assets/notebook_registry.json"))
+    // When a module is the entry point, projectDir is the modules/ dir; fall back one level.
+    def registryFile = new File("${projectDir}/assets/notebook_registry.json")
+    if (!registryFile.exists()) registryFile = new File("${projectDir}/../assets/notebook_registry.json")
+    def registry = new groovy.json.JsonSlurper().parse(registryFile)
     def entry = registry[notebookName]
     if (!entry) throw new IllegalArgumentException("Notebook '${notebookName}' not found in registry")
     def paramsDir = new File("${params.outdir}/.quarto_params/${notebookName}")

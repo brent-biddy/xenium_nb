@@ -1,3 +1,19 @@
+workflow {
+    if (!params.samplesheet) error "Please provide --samplesheet"
+
+    Channel
+        .fromPath(params.samplesheet)
+        .splitCsv(header: true)
+        .map { row ->
+            if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
+            if (!row.path)   error "Samplesheet row missing 'path': ${row}"
+            def heImage = row.he_image     ? new File(row.he_image     as String).absolutePath : ""
+            def heAlign = row.he_alignment ? new File(row.he_alignment as String).absolutePath : ""
+            tuple(row.sample, file(row.path), heImage, heAlign)
+        }
+        | CREATE_SDATA
+}
+
 process CREATE_SDATA {
     tag "${sample}"
 

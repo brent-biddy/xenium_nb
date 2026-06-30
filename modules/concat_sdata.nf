@@ -1,3 +1,17 @@
+workflow {
+    if (!params.samplesheet) error "Please provide --samplesheet"
+
+    Channel
+        .fromPath(params.samplesheet)
+        .splitCsv(header: true)
+        .map { row ->
+            if (!row.path) error "Samplesheet row missing 'path': ${row}"
+            file(row.path)
+        }
+        .collect()
+        | CONCAT_SDATA
+}
+
 process CONCAT_SDATA {
 
     publishDir { "${params.outdir}/concat_sdata" },
