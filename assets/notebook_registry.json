@@ -2,9 +2,5 @@
   "plot_follicle": {
     "path": "notebooks/analyze/plot_follicle.qmd",
     "params": ["sample", "cell", "path"]
-  },
-  "cluster_sdata": {
-    "path": "notebooks/analyze/cluster_sdata.qmd",
-    "params": ["sample", "path"]
   }
 }

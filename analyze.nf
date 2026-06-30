@@ -36,15 +36,11 @@ workflow {
 
     // ---- cluster_sdata: QC, normalize, PCA, UMAP, Leiden, spatial stats ----
     if (analyzeMode == 'cluster_sdata' || analyzeMode == 'all') {
-        def clusterNotebook = file("${projectDir}/notebooks/analyze/cluster_sdata.qmd")
-
         rowsList
-            .map { sample, stagedPath, rowMap ->
-                tuple(sample, stagedPath, paramsFile(sample, clusterNotebook, rowMap))
-            }
-            .set { clusterInputs } // tuple(sample, staged_path, params_yml)
+            .map { sample, stagedPath, rowMap -> tuple(sample, stagedPath) }
+            .set { clusterInputs } // tuple(sample, path)
 
-        CLUSTER_SDATA(clusterInputs, clusterNotebook, timerScript)
+        CLUSTER_SDATA(clusterInputs)
     }
 
     // ---- plot_follicle: per-cell follicle plots ----

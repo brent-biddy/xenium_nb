@@ -5,17 +5,14 @@ process CLUSTER_SDATA {
     tag "${sample}"
 
     publishDir { "${params.outdir}/${sample}/cluster_sdata" },
-        mode: 'copy',
-        saveAs: { fn -> fn.startsWith('output/') ? fn : fn }
+        mode: 'copy'
 
     input:
-    tuple val(sample), path(input_path), path('params.yml')
-    path notebook
-    path 'timer.py'
+    tuple val(sample), path(input_path)
 
     output:
-    path "cluster_sdata.*", emit: reports
-    path "output/**", optional: true, hidden: true, emit: output_tree
+    tuple val(sample), path("clustered.zarr"), emit: zarr
+    path "cluster_sdata_timing.tsv", emit: timing
 
     script:
     """
@@ -23,13 +20,14 @@ process CLUSTER_SDATA {
     export TMPDIR="\$PWD/tmp"
     mkdir -p "\$XDG_CACHE_HOME" "\$TMPDIR"
 
-    quarto render ${notebook} --execute-params params.yml --output-dir .
+    cluster_sdata.py --sample ${sample} --path ${input_path}
     """
 
     stub:
     """
-    touch cluster_sdata.html
-    touch cluster_sdata.timing.tsv
+    mkdir -p clustered.zarr
+    touch clustered.zarr/.zgroup
+    touch cluster_sdata_timing.tsv
     """
 }
 
