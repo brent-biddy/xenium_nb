@@ -11,7 +11,6 @@ Usage:
 
 import argparse
 import os
-from pathlib import Path
 
 import spatialdata
 import session_info
@@ -41,9 +40,10 @@ def main():
     # (e.g. morphology_focus, cell_labels) don't collide.
     sdata_dict = {}
     for path in args.paths:
-        key = Path(path).stem
         with timer(f"Read {path}"):
-            sdata_dict[key] = spatialdata.read_zarr(path)
+            sdata = spatialdata.read_zarr(path)
+        key = sdata.tables["table"].obs["sample"].iloc[0]
+        sdata_dict[key] = sdata
 
     with timer("Concatenate"):
         merged = spatialdata.concatenate(sdata_dict)
