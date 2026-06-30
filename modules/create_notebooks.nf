@@ -81,8 +81,9 @@ process CONCAT_SDATA {
     path input_paths
 
     output:
-    path 'output/merged.zarr', emit: artifacts
-    path "output/**", optional: true, hidden: true, emit: output_tree
+    path 'merged.zarr', emit: artifacts
+    path "concat_sdata_timing.tsv", emit: timing
+    path "concat_sdata_session_info.txt", emit: session_info
 
     script:
     """
@@ -95,10 +96,12 @@ process CONCAT_SDATA {
 
     stub:
     """
-    mkdir -p output/merged.zarr
-    touch output/merged.zarr/.zgroup
-    touch output/merged.zarr/.zattrs
-    touch output/merged.zarr/.zmetadata
+    mkdir -p merged.zarr
+    touch merged.zarr/.zgroup
+    touch merged.zarr/.zattrs
+    touch merged.zarr/.zmetadata
+    touch concat_sdata_timing.tsv
+    touch concat_sdata_session_info.txt
     """
 }
 

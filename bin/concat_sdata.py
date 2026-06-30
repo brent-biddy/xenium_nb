@@ -3,8 +3,7 @@
 concat_sdata.py - Concatenate multiple SpatialData zarr stores into one.
 
 Reads each input zarr with spatialdata.read_zarr(), merges them with
-spatialdata.concatenate(), and writes the result to output/merged.zarr.
-Timing and session info are written to output/ alongside the zarr.
+spatialdata.concatenate(), and writes the result to merged.zarr.
 
 Usage:
     concat_sdata.py --paths ROI1_A.zarr ROI1_B.zarr ROI2_A.zarr
@@ -31,7 +30,7 @@ def parse_args():
 def main():
     args = parse_args()
 
-    output_path = os.path.join("output", "merged.zarr")
+    output_path = "merged.zarr"
 
     print(f"Output:      {output_path}")
     print(f"Inputs ({len(args.paths)}):")
@@ -50,7 +49,6 @@ def main():
         merged = spatialdata.concatenate(sdata_dict)
 
     with timer("Write zarr"):
-        os.makedirs("output", exist_ok=True)
         merged.write(output_path, overwrite=True)
     print(f"Written to {output_path}")
 
@@ -60,9 +58,9 @@ def main():
         for name, element in group.items():
             print(f"  {name}: {type(element).__name__} [{group_name}]")
 
-    timing_summary(path="output/concat_sdata_timing.tsv")
+    timing_summary(path="concat_sdata_timing.tsv")
 
-    session_info_path = "output/concat_sdata_session_info.txt"
+    session_info_path = "concat_sdata_session_info.txt"
     session_info.show(write_req_file=True, req_file_name=session_info_path)
     print(f"Session info written to {session_info_path}")
 
