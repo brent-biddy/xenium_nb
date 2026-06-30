@@ -10,7 +10,10 @@
 
 nextflow.enable.dsl = 2
 
-include { DOWNSAMPLE_XENIUM_REGION; CREATE_SDATA; CREATE_FOLLICLE_SDATA; CONCAT_SDATA } from './modules/create_notebooks'
+include { DOWNSAMPLE_XENIUM_REGION } from './modules/downsample_xenium_region'
+include { CREATE_SDATA }             from './modules/create_sdata'
+include { CREATE_FOLLICLE_SDATA }    from './modules/create_follicle_sdata'
+include { CONCAT_SDATA }             from './modules/concat_sdata'
 
 workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"

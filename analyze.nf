@@ -9,7 +9,8 @@
 nextflow.enable.dsl = 2
 
 include { paramsFile } from './modules/quarto_params'
-include { PLOT_FOLLICLE; CLUSTER_SDATA } from './modules/analyze_notebooks'
+include { CLUSTER_SDATA } from './modules/cluster_sdata'
+include { PLOT_FOLLICLE } from './modules/plot_follicle'
 
 workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"
