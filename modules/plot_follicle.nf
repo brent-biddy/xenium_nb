@@ -1,35 +1,4 @@
-// Quarto notebook processes for analyze.nf. Each process renders one notebook
-// against a pre-built SpatialData artifact and publishes the resulting reports.
-
-process CLUSTER_SDATA {
-    tag "${sample}"
-
-    publishDir { "${params.outdir}/${sample}/cluster_sdata" },
-        mode: 'copy'
-
-    input:
-    tuple val(sample), path(input_path)
-
-    output:
-    tuple val(sample), path("clustered.zarr"), emit: zarr
-    path "cluster_sdata_timing.tsv", emit: timing
-
-    script:
-    """
-    export XDG_CACHE_HOME="\$PWD/.cache"
-    export TMPDIR="\$PWD/tmp"
-    mkdir -p "\$XDG_CACHE_HOME" "\$TMPDIR"
-
-    cluster_sdata.py --sample ${sample} --path ${input_path}
-    """
-
-    stub:
-    """
-    mkdir -p clustered.zarr
-    touch clustered.zarr/.zgroup
-    touch cluster_sdata_timing.tsv
-    """
-}
+include { paramsFile } from './quarto_params'
 
 process PLOT_FOLLICLE {
     tag "${follicle_id}"
@@ -63,4 +32,24 @@ process PLOT_FOLLICLE {
     touch plot_follicle.pptx
     touch plot_follicle.timing.tsv
     """
+}
+
+workflow {
+    if (!params.samplesheet) error "Please provide --samplesheet"
+
+    def plotFollicleNotebook = file("${projectDir}/notebooks/analyze/plot_follicle.qmd")
+    def timerScript          = file("${projectDir}/bin/timer.py")
+
+    Channel
+        .fromPath(params.samplesheet)
+        .splitCsv(header: true)        // Map(sample, cell, path)
+        .map { row ->
+            if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
+            if (!row.path)   error "Samplesheet row missing 'path': ${row}"
+            def follicleId = "${row.sample}_${row.cell}"
+            tuple(follicleId, row.sample, file(row.path), paramsFile(follicleId, plotFollicleNotebook, row))
+        }
+        .set { plotInputs }            // tuple(follicle_id, sample, path, params_yml)
+
+    PLOT_FOLLICLE(plotInputs, plotFollicleNotebook, timerScript)
 }
