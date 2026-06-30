@@ -67,16 +67,16 @@ def main():
         sc.pp.log1p(adata)
 
     with timer("PCA"):
-        sc.pp.pca(adata)
+        sc.pp.pca(adata, random_state=0)
 
     with timer("Neighbors"):
-        sc.pp.neighbors(adata)
+        sc.pp.neighbors(adata, random_state=0)
 
     with timer("UMAP"):
-        sc.tl.umap(adata)
+        sc.tl.umap(adata, random_state=0)
 
     with timer("Leiden"):
-        sc.tl.leiden(adata)
+        sc.tl.leiden(adata, random_state=0)
 
     print(f"Leiden clustering: {adata.obs['leiden'].nunique()} clusters")
 
