@@ -40,7 +40,7 @@ workflow {
 
     Channel
         .fromPath(params.samplesheet)
-        .splitCsv(header: true)
+        .splitCsv(header: true)        // Map(sample, path, xmin, ymin, xmax, ymax[, region_name, he_image, he_alignment])
         .map { row ->
             if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
@@ -48,6 +48,6 @@ workflow {
             def heAlign = row.he_alignment ? new File(row.he_alignment as String).absolutePath : ""
             def regionName = row.region_name ?: row.sample
             tuple(row.sample, file(row.path), row.xmin, row.ymin, row.xmax, row.ymax, regionName, heImage, heAlign)
-        }
+        }                              // tuple(sample, path, xmin, ymin, xmax, ymax, region_name, he_image, he_alignment)
         | DOWNSAMPLE_XENIUM_REGION
 }

@@ -36,11 +36,11 @@ workflow {
 
     Channel
         .fromPath(params.samplesheet)
-        .splitCsv(header: true)
+        .splitCsv(header: true)  // Map(path, ...)
         .map { row ->
             if (!row.path) error "Samplesheet row missing 'path': ${row}"
             file(row.path)
-        }
-        .collect()
+        }                        // path
+        .collect()               // List<path>
         | CONCAT_SDATA
 }

@@ -37,13 +37,13 @@ workflow {
 
     Channel
         .fromPath(params.samplesheet)
-        .splitCsv(header: true)
+        .splitCsv(header: true)        // Map(sample, path[, he_image, he_alignment])
         .map { row ->
             if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
             def heImage = row.he_image     ? new File(row.he_image     as String).absolutePath : ""
             def heAlign = row.he_alignment ? new File(row.he_alignment as String).absolutePath : ""
             tuple(row.sample, file(row.path), heImage, heAlign)
-        }
+        }                              // tuple(sample, path, he_image, he_alignment)
         | CREATE_SDATA
 }

@@ -42,14 +42,14 @@ workflow {
 
     Channel
         .fromPath(params.samplesheet)
-        .splitCsv(header: true)
+        .splitCsv(header: true)        // Map(sample, cell, path)
         .map { row ->
             if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
             def follicleId = "${row.sample}_${row.cell}"
             tuple(follicleId, row.sample, file(row.path), paramsFile(follicleId, plotFollicleNotebook, row))
         }
-        .set { plotInputs } // tuple(follicle_id, sample, staged_path, params_yml)
+        .set { plotInputs }            // tuple(follicle_id, sample, path, params_yml)
 
     PLOT_FOLLICLE(plotInputs, plotFollicleNotebook, timerScript)
 }

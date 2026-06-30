@@ -45,13 +45,13 @@ workflow {
 
     Channel
         .fromPath(params.samplesheet)
-        .splitCsv(header: true)
+        .splitCsv(header: true)      // Map(sample, path)
         .map { row ->
             if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
             tuple(row.sample, file(row.path))
         }
-        .set { inputs }
+        .set { inputs }              // tuple(sample, path)
 
     CREATE_FOLLICLE_SDATA(inputs, cellIdsFile, params.radius)
 }
