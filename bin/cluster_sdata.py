@@ -44,9 +44,7 @@ def main():
     with timer("Read zarr"):
         sdata = spatialdata.read_zarr(args.path)
 
-    # xenium() names the table "table"; concatenated objects may rename it.
-    # Fall back to the first available table if "table" is absent.
-    table_key = "table" if "table" in sdata.tables else next(iter(sdata.tables))
+    table_key = "table"
     with timer("Extract table"):
         adata = sdata.tables[table_key].copy()
 
