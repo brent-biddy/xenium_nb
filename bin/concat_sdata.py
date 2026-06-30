@@ -3,11 +3,11 @@
 concat_sdata.py - Concatenate multiple SpatialData zarr stores into one.
 
 Reads each input zarr with spatialdata.read_zarr(), merges them with
-spatialdata.concatenate(), and writes the result to output/<output_name>.zarr.
+spatialdata.concatenate(), and writes the result to output/merged.zarr.
 Timing and session info are written to output/ alongside the zarr.
 
 Usage:
-    concat_sdata.py --output_name merged --paths ROI1_A.zarr ROI1_B.zarr ROI2_A.zarr
+    concat_sdata.py --paths ROI1_A.zarr ROI1_B.zarr ROI2_A.zarr
 """
 
 import argparse
@@ -24,7 +24,6 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Concatenate multiple SpatialData zarr stores into one"
     )
-    parser.add_argument("--output_name", required=True, help="Base name for the output zarr")
     parser.add_argument("--paths", required=True, nargs="+", help="Input zarr store paths")
     return parser.parse_args()
 
@@ -32,9 +31,8 @@ def parse_args():
 def main():
     args = parse_args()
 
-    output_path = os.path.join("output", f"{args.output_name}.zarr")
+    output_path = os.path.join("output", "merged.zarr")
 
-    print(f"Output name: {args.output_name}")
     print(f"Output:      {output_path}")
     print(f"Inputs ({len(args.paths)}):")
     for p in args.paths:
@@ -62,9 +60,9 @@ def main():
         for name, element in group.items():
             print(f"  {name}: {type(element).__name__} [{group_name}]")
 
-    timing_summary(path=f"output/{args.output_name}_timing.tsv")
+    timing_summary(path="output/concat_sdata_timing.tsv")
 
-    session_info_path = f"output/{args.output_name}_session_info.txt"
+    session_info_path = "output/concat_sdata_session_info.txt"
     session_info.show(write_req_file=True, req_file_name=session_info_path)
     print(f"Session info written to {session_info_path}")
 

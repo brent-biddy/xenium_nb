@@ -22,10 +22,6 @@ workflow {
         error "Invalid --create '${createMode}'. Valid values are: downsample, sdata, follicle_sdata, all, concat"
     }
 
-    if (createMode == 'concat' && !params.output_name) {
-        error "--output_name is required for concat mode"
-    }
-
     def follicleSourceArtifacts = null
     def cellIdsFile = file(params.cell_ids_file)
 
@@ -129,6 +125,6 @@ workflow {
             .collect()
             .set { allZarrs } // List<Path>
 
-        CONCAT_SDATA(allZarrs, params.output_name)
+        CONCAT_SDATA(allZarrs)
     }
 }
