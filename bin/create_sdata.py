@@ -67,6 +67,8 @@ def main():
             n_jobs=args.n_jobs,
         )
 
+    sdata.tables["table"].obs["sample"] = args.sample
+
     # spatialdata_io auto-detects an H&E image if one is named with the expected
     # Xenium suffix alongside the data. If not auto-detected, load it explicitly
     # using the provided image path and alignment matrix.

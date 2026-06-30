@@ -6,10 +6,11 @@
 //   sdata           - run create_sdata.py per ROI from raw Xenium output
 //   follicle_sdata  - run create_follicle_sdata.py per cell ID from existing sample zarrs
 //   all             - run sdata + follicle_sdata, chaining outputs
+//   concat          - concatenate existing SpatialData zarrs into one (requires --output_name)
 
 nextflow.enable.dsl = 2
 
-include { DOWNSAMPLE_XENIUM_REGION; CREATE_SDATA; CREATE_FOLLICLE_SDATA } from './modules/create_notebooks'
+include { DOWNSAMPLE_XENIUM_REGION; CREATE_SDATA; CREATE_FOLLICLE_SDATA; CONCAT_SDATA } from './modules/create_notebooks'
 
 workflow {
     if (!params.samplesheet) error "Please provide --samplesheet"
@@ -17,8 +18,8 @@ workflow {
 
     def createMode = params.create.toLowerCase()
 
-    if (!(createMode in ['downsample', 'sdata', 'follicle_sdata', 'all'])) {
-        error "Invalid --create '${createMode}'. Valid values are: downsample, sdata, follicle_sdata, all"
+    if (!(createMode in ['downsample', 'sdata', 'follicle_sdata', 'all', 'concat'])) {
+        error "Invalid --create '${createMode}'. Valid values are: downsample, sdata, follicle_sdata, all, concat"
     }
 
     def follicleSourceArtifacts = null
@@ -114,5 +115,16 @@ workflow {
         Channel.of('sample,cell,path')
             .concat(follicleArtifactRows.map { row -> "${row.sample},${row.cell},${row.path}" })
             .collectFile(name: 'follicle_sdata_samplesheet.csv', newLine: true, storeDir: params.outdir, sort: false)
+    }
+
+    // ---- concat: merge all input SpatialData zarrs into a single zarr ----
+    if (createMode == 'concat') {
+
+        sampleRowsList
+            .map { sample, stagedPath, rowMap -> stagedPath }
+            .collect()
+            .set { concatInputs } // List<Path>
+
+        CONCAT_SDATA(concatInputs)
     }
 }
