@@ -121,13 +121,9 @@ workflow {
     if (createMode == 'concat') {
 
         sampleRowsList
+            .map { sample, stagedPath, rowMap -> stagedPath }
             .collect()
-            .map { rows ->
-                def sampleId = rows.collect { it[0] }.join('_')
-                def zarrs    = rows.collect { it[1] }
-                tuple(sampleId, zarrs)
-            }
-            .set { concatInputs } // tuple(sample_id, List<Path>)
+            .set { concatInputs } // List<Path>
 
         CONCAT_SDATA(concatInputs)
     }

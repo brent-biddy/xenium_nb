@@ -73,14 +73,12 @@ process CREATE_SDATA {
 }
 
 process CONCAT_SDATA {
-    tag "${sample_id}"
 
     publishDir { "${params.outdir}/concat_sdata" },
-        mode: 'copy',
-        saveAs: { fn -> fn == 'merged.zarr' ? "${sample_id}.zarr" : fn }
+        mode: 'copy'
 
     input:
-    tuple val(sample_id), path(input_paths)
+    path input_paths
 
     output:
     path 'merged.zarr', emit: artifacts
