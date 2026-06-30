@@ -121,10 +121,11 @@ workflow {
     if (createMode == 'concat') {
 
         sampleRowsList
-            .map { sample, stagedPath, rowMap -> stagedPath }
+            .map { sample, stagedPath, rowMap -> tuple(sample, stagedPath) }
             .collect()
-            .set { allZarrs } // List<Path>
+            .map { pairs -> tuple(pairs.collect { it[0] }.join('_'), pairs.collect { it[1] }) }
+            .set { concatInputs } // tuple(sample_id, List<Path>)
 
-        CONCAT_SDATA(allZarrs)
+        CONCAT_SDATA(concatInputs)
     }
 }
