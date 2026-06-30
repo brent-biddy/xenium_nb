@@ -52,12 +52,6 @@ def main():
         merged.write(output_path, overwrite=True)
     print(f"Written to {output_path}")
 
-    print("\nElements:")
-    for group_name in ("images", "labels", "points", "shapes", "tables"):
-        group = getattr(merged, group_name, {})
-        for name, element in group.items():
-            print(f"  {name}: {type(element).__name__} [{group_name}]")
-
     timing_summary(path="concat_sdata_timing.tsv")
 
     session_info_path = "concat_sdata_session_info.txt"
