@@ -18,7 +18,6 @@ import argparse
 import os
 
 import scanpy as sc
-import squidpy as sq
 import spatialdata
 
 from timer import timer, timing_summary
@@ -80,12 +79,6 @@ def main():
         sc.tl.leiden(adata)
 
     print(f"Leiden clustering: {adata.obs['leiden'].nunique()} clusters")
-
-    with timer("Spatial neighbors"):
-        sq.gr.spatial_neighbors(adata, coord_type="generic", delaunay=True)
-
-    with timer("Nhood enrichment"):
-        sq.gr.nhood_enrichment(adata, cluster_key="leiden")
 
     with timer("Write zarr"):
         sdata.tables[table_key] = adata
