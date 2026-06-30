@@ -1,20 +1,3 @@
-workflow {
-    if (!params.samplesheet) error "Please provide --samplesheet"
-
-    Channel
-        .fromPath(params.samplesheet)
-        .splitCsv(header: true)
-        .map { row ->
-            if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
-            if (!row.path)   error "Samplesheet row missing 'path': ${row}"
-            def heImage = row.he_image     ? new File(row.he_image     as String).absolutePath : ""
-            def heAlign = row.he_alignment ? new File(row.he_alignment as String).absolutePath : ""
-            def regionName = row.region_name ?: row.sample
-            tuple(row.sample, file(row.path), row.xmin, row.ymin, row.xmax, row.ymax, regionName, heImage, heAlign)
-        }
-        | DOWNSAMPLE_XENIUM_REGION
-}
-
 process DOWNSAMPLE_XENIUM_REGION {
     tag "${sample}/${region_name}"
 
@@ -50,4 +33,21 @@ process DOWNSAMPLE_XENIUM_REGION {
     mkdir -p output/${region_name}
     touch output/${region_name}/experiment.xenium
     """
+}
+
+workflow {
+    if (!params.samplesheet) error "Please provide --samplesheet"
+
+    Channel
+        .fromPath(params.samplesheet)
+        .splitCsv(header: true)
+        .map { row ->
+            if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
+            if (!row.path)   error "Samplesheet row missing 'path': ${row}"
+            def heImage = row.he_image     ? new File(row.he_image     as String).absolutePath : ""
+            def heAlign = row.he_alignment ? new File(row.he_alignment as String).absolutePath : ""
+            def regionName = row.region_name ?: row.sample
+            tuple(row.sample, file(row.path), row.xmin, row.ymin, row.xmax, row.ymax, regionName, heImage, heAlign)
+        }
+        | DOWNSAMPLE_XENIUM_REGION
 }
