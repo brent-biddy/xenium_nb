@@ -3,8 +3,8 @@
 cluster_sdata_gpu.py - GPU-accelerated QC, normalize, and cluster a SpatialData zarr.
 
 Mirrors cluster_sdata.py but uses rapids-singlecell for the compute-heavy steps
-(QC, normalization, PCA, neighbors, UMAP, Leiden). After clustering, data is moved
-back to CPU for squidpy spatial steps and zarr I/O.
+(QC, normalization, PCA, neighbors, UMAP, Leiden). Data is moved back to CPU
+before zarr I/O.
 
 Requires an Apptainer/Docker image with rapids-singlecell and a CUDA-capable GPU.
 
@@ -17,8 +17,6 @@ Usage:
 import argparse
 
 import rapids_singlecell as rsc
-import scanpy as sc
-import squidpy as sq
 import spatialdata
 
 from timer import timer, timing_summary
@@ -69,29 +67,22 @@ def main():
         rsc.pp.log1p(adata)
 
     with timer("PCA"):
-        rsc.pp.pca(adata)
+        rsc.pp.pca(adata, random_state=0)
 
     with timer("Neighbors"):
-        rsc.pp.neighbors(adata)
+        rsc.pp.neighbors(adata, random_state=0)
 
     with timer("UMAP"):
-        rsc.tl.umap(adata)
+        rsc.tl.umap(adata, random_state=0)
 
     with timer("Leiden"):
-        rsc.tl.leiden(adata)
+        rsc.tl.leiden(adata, random_state=0)
 
     print(f"Leiden clustering: {adata.obs['leiden'].nunique()} clusters")
 
-    # Move back to CPU before squidpy spatial steps and zarr I/O —
-    # sq.gr has no GPU-accelerated equivalents.
+    # Move back to CPU for zarr I/O — rapids-singlecell keeps arrays on GPU.
     with timer("Move to CPU"):
         rsc.get.anndata_to_CPU(adata)
-
-    with timer("Spatial neighbors"):
-        sq.gr.spatial_neighbors(adata, coord_type="generic", delaunay=True)
-
-    with timer("Nhood enrichment"):
-        sq.gr.nhood_enrichment(adata, cluster_key="leiden")
 
     with timer("Write zarr"):
         sdata.tables[table_key] = adata
