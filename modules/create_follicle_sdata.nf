@@ -36,22 +36,3 @@ process CREATE_FOLLICLE_SDATA {
     touch output/${sample}.zarr/.zmetadata
     """
 }
-
-workflow {
-    if (!params.samplesheet)   error "Please provide --samplesheet"
-    if (!params.cell_ids_file) error "Please provide --cell_ids_file"
-
-    def cellIdsFile = file(params.cell_ids_file)
-
-    Channel
-        .fromPath(params.samplesheet)
-        .splitCsv(header: true)      // Map(sample, path)
-        .map { row ->
-            if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
-            if (!row.path)   error "Samplesheet row missing 'path': ${row}"
-            tuple(row.sample, file(row.path))
-        }
-        .set { inputs }              // tuple(sample, path)
-
-    CREATE_FOLLICLE_SDATA(inputs, cellIdsFile, params.radius)
-}

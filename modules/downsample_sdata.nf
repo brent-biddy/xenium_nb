@@ -30,18 +30,3 @@ process DOWNSAMPLE_SDATA {
     touch downsample_sdata_timing.tsv
     """
 }
-
-workflow {
-    if (!params.samplesheet) error "Please provide --samplesheet"
-    if (!params.fraction && !params.n_cells) error "Please provide --fraction or --n_cells"
-
-    Channel
-        .fromPath(params.samplesheet)
-        .splitCsv(header: true)      // Map(sample, path)
-        .map { row ->
-            if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
-            if (!row.path)   error "Samplesheet row missing 'path': ${row}"
-            tuple(row.sample, file(row.path))
-        }                            // tuple(sample, path)
-        | DOWNSAMPLE_SDATA
-}

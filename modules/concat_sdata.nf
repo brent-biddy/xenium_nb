@@ -30,17 +30,3 @@ process CONCAT_SDATA {
     touch concat_sdata_session_info.txt
     """
 }
-
-workflow {
-    if (!params.samplesheet) error "Please provide --samplesheet"
-
-    Channel
-        .fromPath(params.samplesheet)
-        .splitCsv(header: true)  // Map(path, ...)
-        .map { row ->
-            if (!row.path) error "Samplesheet row missing 'path': ${row}"
-            file(row.path)
-        }                        // path
-        .collect()               // List<path>
-        | CONCAT_SDATA
-}
