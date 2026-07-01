@@ -2,10 +2,9 @@
 """
 downsample_xenium_region.py - Crop a Xenium output directory to one or more regions.
 
-The original downsample_xenium.py keeps the full morphology field of view. This
-utility instead selects cells inside a bounding box, keeps transcripts inside the
-same box, rebases spatial coordinates to the crop origin, and crops morphology
-images and cells.zarr masks so the output is physically smaller.
+Selects cells inside a bounding box, keeps transcripts inside the same box,
+rebases spatial coordinates to the crop origin, and crops morphology images
+and cells.zarr masks so the output is physically smaller.
 
 Usage:
     python bin/downsample_xenium_region.py /path/to/xenium_output \
@@ -20,10 +19,13 @@ regions.csv must contain: region,xmin,ymin,xmax,ymax
 import argparse
 import gc
 import gzip
+import os
 import shutil
 import sys
+import tarfile
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -34,25 +36,47 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 import zarr
+from scipy.io import mmread, mmwrite
+from scipy.sparse import csc_matrix
 
 # Xenium pixel size in µm/pixel — a fixed instrument constant used to convert
 # bounding box coordinates from µm (user-facing) to pixels (image space).
 XENIUM_PIXEL_SIZE_UM = 0.2125
 
-from downsample_xenium import (
-    archive_directory_as_zip,
-    close_zarr_group,
-    create_zarr_dataset,
-    open_directory_group,
-    open_zip_read_store,
-    process_analysis,
-    process_analysis_zarr,
-    process_cell_feature_matrix_dir,
-    process_cell_feature_matrix_h5,
-    process_cell_feature_matrix_tar,
-    process_cfm_zarr,
-    validate_output,
-)
+
+# ---------------------------------------------------------------------------
+# Zarr utilities
+# ---------------------------------------------------------------------------
+
+def open_zip_read_store(path, mode):
+    return zarr.storage.ZipStore(str(path), mode=mode)
+
+
+def create_zarr_dataset(group, name, data=None, **kwargs):
+    if data is not None:
+        kwargs.setdefault("shape", np.shape(data))
+        kwargs.setdefault("dtype", getattr(data, "dtype", np.asarray(data).dtype))
+        return group.create_dataset(name, data=data, **kwargs)
+    return group.create_dataset(name, **kwargs)
+
+
+def open_directory_group(path, mode):
+    open_group = getattr(zarr, "open_group", None)
+    if open_group is not None:
+        return open_group(store=str(path), mode=mode)
+    return zarr.open(str(path), mode=mode)
+
+
+def archive_directory_as_zip(source_dir, output_zip_path):
+    archive_base = output_zip_path.with_suffix("")
+    shutil.make_archive(str(archive_base), "zip", root_dir=str(source_dir))
+
+
+def close_zarr_group(group):
+    store = getattr(group, "store", None)
+    close = getattr(store, "close", None)
+    if callable(close):
+        close()
 
 
 # Region is immutable so it can be freely passed between functions without risk
@@ -103,22 +127,16 @@ def parse_args():
         help="CSV with columns region,xmin,ymin,xmax,ymax for multiple crops.",
     )
     parser.add_argument(
-        "--proportion",
-        type=float,
-        default=1.0,
-        help="Fraction of in-region cells to keep after cropping (default: 1.0).",
-    )
-    parser.add_argument(
-        "--grid_size",
-        type=float,
-        default=100.0,
-        help="Grid size for optional spatial cell downsampling (default: 100.0).",
-    )
-    parser.add_argument(
         "--pixel_size",
         type=float,
         default=None,
         help="Coordinate units per image pixel. Defaults to XENIUM_PIXEL_SIZE_UM (0.2125).",
+    )
+    parser.add_argument(
+        "--threads",
+        type=int,
+        default=None,
+        help="Worker threads for the transcript scan. Defaults to all CPUs.",
     )
     parser.add_argument(
         "--skip_validation",
@@ -143,8 +161,6 @@ def parse_args():
         parser.error("Provide exactly one of --bbox or --regions_csv.")
     if bool(args.he_image) != bool(args.he_alignment):
         parser.error("--he_image and --he_alignment must be provided together.")
-    if args.proportion <= 0 or args.proportion > 1:
-        parser.error("--proportion must be > 0 and <= 1.")
     return args
 
 
@@ -189,16 +205,11 @@ def bbox_mask(x, y, region):
     )
 
 
-def select_cells_in_region(input_dir, region, proportion, grid_size):
+def select_cells_in_region(input_dir, region):
     """Return (selected_indices, selected_ids, n_total) for cells inside region.
 
-    When proportion < 1, cells are spatially downsampled: the region is divided
-    into a grid and `proportion` of cells are randomly kept per grid cell. This
-    preserves spatial coverage better than random global subsampling.
-    Seed is fixed (42) for reproducibility.
+    Selects every cell whose centroid falls within the region bbox.
     """
-    rng = np.random.default_rng(42)
-
     cells_table = pq.read_table(
         input_dir / "cells.parquet", columns=["cell_id", "x_centroid", "y_centroid"]
     )
@@ -208,22 +219,7 @@ def select_cells_in_region(input_dir, region, proportion, grid_size):
     y = cells_table.column("y_centroid").to_numpy()
     in_region = bbox_mask(x, y, region)
 
-    if proportion < 1.0 and in_region.any():
-        # Divide the region into grid cells and sample `proportion` of cells
-        # from each grid cell independently to preserve spatial coverage.
-        grid_x = ((x - region.xmin) / grid_size).astype(int)
-        grid_y = ((y - region.ymin) / grid_size).astype(int)
-        selected_mask = np.zeros(len(x), dtype=bool)
-        grid_dict = {}
-        for i in np.where(in_region)[0]:
-            grid_dict.setdefault((int(grid_x[i]), int(grid_y[i])), []).append(i)
-        for indices in grid_dict.values():
-            n = max(1, round(len(indices) * proportion))
-            selected_mask[rng.choice(indices, size=n, replace=False)] = True
-    else:
-        selected_mask = in_region
-
-    selected_indices = np.where(selected_mask)[0]
+    selected_indices = np.where(in_region)[0]
     selected_ids = {cell_ids[i] for i in selected_indices}
     del cells_table
     gc.collect()
@@ -266,84 +262,111 @@ def shift_spatial_columns(df, region):
     return df
 
 
-def subset_spatial_parquet_and_csv(input_dir, output_dir, filename, selected_ids, region):
-    """Filter a parquet file to selected_ids, rebase coordinates, write parquet + csv.gz."""
+def subset_spatial_parquet_and_csv(input_dir, output_dir, filename, selected_ids, region,
+                                    label_id_remap=None):
+    """Filter a parquet file to selected_ids, rebase coordinates, write parquet + csv.gz.
+
+    label_id_remap: when provided and the file has a 'label_id' column, renumber
+    label_id values according to the dict (old_label -> new_label). Used to keep
+    boundary parquets consistent with the cropped cells.zarr.zip polygon_sets, which
+    spatialdata-io 0.7.0 requires to be sequential 1..M.
+    """
     table = pq.read_table(input_dir / f"{filename}.parquet")
-    mask = pc.is_in(table.column("cell_id"), value_set=pa.array(list(selected_ids)))
-    sub = table.filter(mask).to_pandas()
+    cell_mask = pc.is_in(table.column("cell_id"), value_set=pa.array(list(selected_ids)))
+    sub = table.filter(cell_mask).to_pandas()
+    if label_id_remap is not None and "label_id" in sub.columns:
+        sub["label_id"] = sub["label_id"].map(label_id_remap).astype(sub["label_id"].dtype)
     sub = shift_spatial_columns(sub, region)
     sub.to_parquet(output_dir / f"{filename}.parquet", index=False)
     sub.to_csv(output_dir / f"{filename}.csv.gz", index=False, compression="gzip")
     n = len(sub)
-    del table, sub, mask
+    del table, sub
     gc.collect()
     return n
 
 
-def process_transcripts_in_region(input_dir, output_dir, selected_ids, region, proportion):
+def _filter_transcript_row_group(input_path, row_group, selected_ids_arrow, region):
+    """Filter one transcripts row group to the region and rebase its coordinates.
+
+    Runs in a worker thread. PyArrow's parquet decode and compute kernels
+    release the GIL, so row groups are filtered in parallel. Column-level
+    threading is disabled (use_threads=False) to avoid nested thread pools —
+    parallelism comes from running many row groups at once. Returns a rebased
+    pandas DataFrame of the kept rows, or None if none were kept.
+
+    Keep rule: inside the region bbox AND (cell in selected_ids OR unassigned).
+    """
+    table = pq.ParquetFile(input_path).read_row_group(row_group, use_threads=False)
+    x = table.column("x_location")
+    y = table.column("y_location")
+    region_mask = pc.and_(
+        pc.and_(pc.greater_equal(x, region.xmin), pc.less(x, region.xmax)),
+        pc.and_(pc.greater_equal(y, region.ymin), pc.less(y, region.ymax)),
+    )
+    cell_id_col = table.column("cell_id")
+    assigned_keep = pc.is_in(cell_id_col, value_set=selected_ids_arrow)
+    unassigned = pc.equal(cell_id_col, "UNASSIGNED")
+    keep = pc.and_(region_mask, pc.or_(assigned_keep, unassigned))
+
+    chunk_sub = table.filter(keep)
+    if len(chunk_sub) == 0:
+        return None
+    return shift_spatial_columns(chunk_sub.to_pandas(), region)
+
+
+def process_transcripts_in_region(input_dir, output_dir, selected_ids, region, threads=None):
     """Filter transcripts.parquet to the region, writing parquet + csv.gz.
 
-    Reads in 1M-row batches to avoid loading the full transcript table into
-    memory (whole-slide transcript files can exceed several GB).
+    transcripts.parquet has no spatial index or row-group statistics, so finding
+    the in-region rows requires scanning every row group. The scan is the
+    dominant cost of a crop, so row groups are filtered concurrently across
+    `threads` workers (default: all CPUs).
 
-    Assigned transcripts (cell_id != UNASSIGNED) are kept only if their cell
-    is in selected_ids. Unassigned transcripts are kept if they fall inside
-    the region bbox; if proportion < 1 they are additionally randomly thinned
-    to match the cell downsampling rate.
+    Determinism: results are collected per row group and concatenated in
+    row-group order, so the output row order is identical to a serial scan and
+    stable run-to-run regardless of thread scheduling. The keep rule is a pure
+    per-row predicate (no sampling), so the set of kept rows is thread-independent.
+
+    Keeps every transcript inside the region bbox whose cell is in selected_ids,
+    plus all unassigned (extracellular) transcripts inside the bbox. Assigned
+    transcripts whose parent cell was cropped out are dropped so the output
+    contains no dangling cell_id references.
     """
-    rng = np.random.default_rng(42)
+    input_path = str(input_dir / "transcripts.parquet")
+    parquet_file = pq.ParquetFile(input_path)
+    n_row_groups = parquet_file.metadata.num_row_groups
     selected_ids_arrow = pa.array(list(selected_ids))
-    parquet_file = pq.ParquetFile(input_dir / "transcripts.parquet")
-    writer = None
+    max_workers = max(1, min(threads or os.cpu_count() or 1, n_row_groups))
+
+    # Kept memory scales with the region's transcript count (small for a crop),
+    # not the whole slide, since only filtered rows are retained per row group.
+    frames = [None] * n_row_groups
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {
+            pool.submit(
+                _filter_transcript_row_group, input_path, rg, selected_ids_arrow, region
+            ): rg
+            for rg in range(n_row_groups)
+        }
+        for future in futures:
+            frames[futures[future]] = future.result()
+
+    # Concatenate in row-group order for a deterministic, serial-equivalent order.
+    kept = [frame for frame in frames if frame is not None]
     csv_path = output_dir / "transcripts.csv"
-    first_chunk = True
-    total_kept = 0
-
-    for batch in parquet_file.iter_batches(batch_size=1_000_000):
-        table = pa.Table.from_batches([batch])
-        x = table.column("x_location")
-        y = table.column("y_location")
-        region_mask = pc.and_(
-            pc.and_(pc.greater_equal(x, region.xmin), pc.less(x, region.xmax)),
-            pc.and_(pc.greater_equal(y, region.ymin), pc.less(y, region.ymax)),
-        )
-
-        cell_id_col = table.column("cell_id")
-        assigned_keep = pc.is_in(cell_id_col, value_set=selected_ids_arrow)
-        unassigned = pc.equal(cell_id_col, "UNASSIGNED")
-        if proportion < 1.0:
-            sampled = pa.array(rng.random(len(table)) < proportion)
-            unassigned = pc.and_(unassigned, sampled)
-
-        keep = pc.and_(region_mask, pc.or_(assigned_keep, unassigned))
-        chunk_sub = table.filter(keep)
-
-        if len(chunk_sub) > 0:
-            df = shift_spatial_columns(chunk_sub.to_pandas(), region)
-            out_table = pa.Table.from_pandas(df, preserve_index=False)
-            if writer is None:
-                writer = pq.ParquetWriter(output_dir / "transcripts.parquet", out_table.schema)
-            writer.write_table(out_table)
-            df.to_csv(csv_path, mode="a", index=False, header=first_chunk)
-            first_chunk = False
-            total_kept += len(df)
-
-        del table, chunk_sub
-        gc.collect()
-
-    if writer:
-        writer.close()
+    if kept:
+        out_df = pd.concat(kept, ignore_index=True)
     else:
         # Keep the expected files present even if the region has no transcripts.
-        empty = parquet_file.schema_arrow.empty_table().to_pandas()
-        empty.to_parquet(output_dir / "transcripts.parquet", index=False)
-        empty.to_csv(csv_path, index=False)
+        out_df = parquet_file.schema_arrow.empty_table().to_pandas()
+    out_df.to_parquet(output_dir / "transcripts.parquet", index=False)
+    out_df.to_csv(csv_path, index=False)
 
     with open(csv_path, "rb") as f_in:
         with gzip.open(output_dir / "transcripts.csv.gz", "wb") as f_out:
             shutil.copyfileobj(f_in, f_out)
     csv_path.unlink()
-    return total_kept
+    return len(out_df)
 
 
 # ---------------------------------------------------------------------------
@@ -383,6 +406,26 @@ def scaled_crop_bounds(base_shape, level_shape, x0, y0, x1, y1):
     lx1 = min(level_x, max(lx0 + 1, int(np.ceil(x1 / scale_x))))
     ly1 = min(level_y, max(ly0 + 1, int(np.ceil(y1 / scale_y))))
     return lx0, ly0, lx1, ly1
+
+
+def tile_crop_slices(crop_y0, crop_x0, crop_y1, crop_x1, src_y0, src_x0, src_y1, src_x1):
+    """Compute the (dst, src) slice pair for a tile's overlap with a crop window.
+
+    All bounds are in level pixel coordinates: the crop window (crop_*) and the
+    tile's actual extent (src_*). Returns ((out_y, out_x), (in_y, in_x)) where
+    out slices are relative to the crop origin and in slices to the tile origin,
+    so `output[out_y, out_x] = tile[in_y, in_x]` copies the overlap. Returns None
+    if the tile does not intersect the crop window.
+    """
+    oy0 = max(crop_y0, src_y0)
+    ox0 = max(crop_x0, src_x0)
+    oy1 = min(crop_y1, src_y1)
+    ox1 = min(crop_x1, src_x1)
+    if oy0 >= oy1 or ox0 >= ox1:
+        return None
+    dst = (slice(oy0 - crop_y0, oy1 - crop_y0), slice(ox0 - crop_x0, ox1 - crop_x0))
+    src = (slice(oy0 - src_y0, oy1 - src_y0), slice(ox0 - src_x0, ox1 - src_x0))
+    return dst, src
 
 
 def crop_tiff_level(level, base_shape, x0, y0, x1, y1):
@@ -426,27 +469,12 @@ def crop_tiff_level(level, base_shape, x0, y0, x1, y1):
                 src_x1 = min(src_x0 + tile.shape[-1], page_width)
                 src_y1 = min(src_y0 + tile.shape[-2], page_height)
 
-                # Compute the overlap between this tile and the crop window,
-                # then copy only the overlapping pixels into the output array.
-                overlap_x0 = max(lx0, src_x0)
-                overlap_y0 = max(ly0, src_y0)
-                overlap_x1 = min(lx1, src_x1)
-                overlap_y1 = min(ly1, src_y1)
-                if overlap_x0 >= overlap_x1 or overlap_y0 >= overlap_y1:
+                # Copy only the overlap between this tile and the crop window.
+                slices = tile_crop_slices(ly0, lx0, ly1, lx1, src_y0, src_x0, src_y1, src_x1)
+                if slices is None:
                     continue
-
-                out_x0 = overlap_x0 - lx0
-                out_y0 = overlap_y0 - ly0
-                out_x1 = overlap_x1 - lx0
-                out_y1 = overlap_y1 - ly0
-                in_x0 = overlap_x0 - src_x0
-                in_y0 = overlap_y0 - src_y0
-                in_x1 = overlap_x1 - src_x0
-                in_y1 = overlap_y1 - src_y0
-
-                cropped[page_index, out_y0:out_y1, out_x0:out_x1] = tile[
-                    in_y0:in_y1, in_x0:in_x1
-                ]
+                (out_y, out_x), (in_y, in_x) = slices
+                cropped[page_index, out_y, out_x] = tile[in_y, in_x]
 
     if len(level.shape) == 2:
         return cropped[0]
@@ -495,16 +523,39 @@ def _read_tiff_level_crop(level, y0, x0, y1, x1):
             src_y1 = min(src_y0 + tile.shape[0], lh)
             src_x1 = min(src_x0 + tile.shape[1], lw)
 
-            ov_y0, ov_y1 = max(y0, src_y0), min(y1, src_y1)
-            ov_x0, ov_x1 = max(x0, src_x0), min(x1, src_x1)
-            if ov_y0 >= ov_y1 or ov_x0 >= ov_x1:
+            slices = tile_crop_slices(y0, x0, y1, x1, src_y0, src_x0, src_y1, src_x1)
+            if slices is None:
                 continue
-
-            result[ov_y0 - y0:ov_y1 - y0, ov_x0 - x0:ov_x1 - x0] = (
-                tile[ov_y0 - src_y0:ov_y1 - src_y0, ov_x0 - src_x0:ov_x1 - src_x0]
-            )
+            (out_y, out_x), (in_y, in_x) = slices
+            result[out_y, out_x] = tile[in_y, in_x]
 
     return result
+
+
+def write_ome_pyramid(dst, crops, photometric, base_metadata):
+    """Write pyramid-level crops to a BigTIFF OME-TIFF.
+
+    crops[0] is the full-resolution base level; the rest are stored as
+    reduced-resolution SubIFDs. Only the base level carries OME metadata.
+    """
+    import tifffile
+
+    with tifffile.TiffWriter(dst, bigtiff=True, ome=True) as tif:
+        tif.write(
+            crops[0],
+            subifds=max(0, len(crops) - 1),
+            photometric=photometric,
+            compression="deflate",
+            metadata=base_metadata,
+        )
+        for crop in crops[1:]:
+            tif.write(
+                crop,
+                subfiletype=1,
+                photometric=photometric,
+                compression="deflate",
+                metadata=None,
+            )
 
 
 def crop_he_ome_tiff(src, dst, x0, y0, x1, y1):
@@ -519,35 +570,16 @@ def crop_he_ome_tiff(src, dst, x0, y0, x1, y1):
     with tifffile.TiffFile(src) as tif:
         series = tif.series[0]
         levels = list(series.levels) if getattr(series, "levels", None) else [series]
-        base_h, base_w = levels[0].shape[0], levels[0].shape[1]
+        # H&E is YXS (spatial axes first), so scale on shape[:2] to match
+        # scaled_crop_bounds' last-two-axes (y, x) convention.
+        base_yx = levels[0].shape[:2]
 
         crops = []
         for level in levels:
-            lh, lw = level.shape[0], level.shape[1]
-            scale_y = base_h / lh
-            scale_x = base_w / lw
-            ly0 = max(0, int(np.floor(y0 / scale_y)))
-            lx0 = max(0, int(np.floor(x0 / scale_x)))
-            ly1 = min(lh, max(ly0 + 1, int(np.ceil(y1 / scale_y))))
-            lx1 = min(lw, max(lx0 + 1, int(np.ceil(x1 / scale_x))))
+            lx0, ly0, lx1, ly1 = scaled_crop_bounds(base_yx, level.shape[:2], x0, y0, x1, y1)
             crops.append(_read_tiff_level_crop(level, ly0, lx0, ly1, lx1))
 
-    with tifffile.TiffWriter(dst, bigtiff=True, ome=True) as tif_out:
-        tif_out.write(
-            crops[0],
-            subifds=max(0, len(crops) - 1),
-            photometric="rgb",
-            compression="deflate",
-            metadata={"axes": "YXS"},
-        )
-        for crop in crops[1:]:
-            tif_out.write(
-                crop,
-                subfiletype=1,
-                photometric="rgb",
-                compression="deflate",
-                metadata=None,
-            )
+    write_ome_pyramid(dst, crops, photometric="rgb", base_metadata={"axes": "YXS"})
 
 
 def crop_ome_tiff(src, dst, x0, y0, x1, y1):
@@ -581,22 +613,7 @@ def crop_ome_tiff(src, dst, x0, y0, x1, y1):
     metadata = {"axes": axes} if axes and len(axes) == crops[0].ndim else None
     if metadata is not None and channel_names:
         metadata["Channel"] = {"Name": channel_names}
-    with tifffile.TiffWriter(dst, bigtiff=True, ome=True) as tif:
-        tif.write(
-            crops[0],
-            subifds=max(0, len(crops) - 1),
-            photometric="minisblack",
-            compression="deflate",
-            metadata=metadata,
-        )
-        for crop in crops[1:]:
-            tif.write(
-                crop,
-                subfiletype=1,
-                photometric="minisblack",
-                compression="deflate",
-                metadata=None,
-            )
+    write_ome_pyramid(dst, crops, photometric="minisblack", base_metadata=metadata)
 
     # tifffile auto-generates channel IDs as "Channel:<image_index>:<channel_index>"
     # (standard OME spec), but spatialdata_io's v4 xenium reader expects Xenium's
@@ -671,19 +688,16 @@ def shift_zarr_dataset_if_spatial(key, data, region):
 def process_cells_zarr_region(input_dir, output_dir, selected_indices, n_total, region, pixel_size):
     """Crop cells.zarr.zip to the selected cells and region pixel bounds.
 
-    Writes cell_id, cell_summary (rebased), segmentation masks (cropped and
-    filtered to selected cells), and polygon_sets (filtered and rebased) to a
-    new cells.zarr.zip. The homogeneous_transform is updated so that the
-    cropped zarr's coordinate system aligns with the rebased cell coordinates.
+    Returns (nucleus_label_id_remap, cell_label_id_remap): dicts mapping
+    {old_label_id → new_label_id} for renumbering boundary parquets.
 
-    Xenium mask values are global cell IDs (not 1-based local indices). The
-    global-to-local mapping is derived from the sorted unique mask values: the
-    i-th sorted unique value corresponds to the i-th cell in the cell_id array.
-    This matches the convention spatialdata_io uses when building its indices
-    mapping. For masks where the count of unique labels equals n_total (the cell
-    mask), extra pixels from cells whose centroids fall outside the bbox are
-    zeroed out. For masks with fewer unique labels (e.g. the nucleus mask),
-    spatial cropping alone is used — spatialdata_io does not cell-match nuclei.
+    Xenium native invariant: polygon at position p in polygon_sets/{0,1} has
+    raster label p+1 in masks/{0,1}. After filtering to M kept positions, the
+    new polygon at rank r has label r+1. The remap dict carries this mapping
+    so nucleus_boundaries.parquet and cell_boundaries.parquet can be updated
+    to match the new sequential labels that spatialdata-io 0.7.0 requires.
+
+    Masks are read in row-chunks to avoid loading the full slide into memory.
     """
     store_in = open_zip_read_store(input_dir / "cells.zarr.zip", mode="r")
     z_in = zarr.open(store_in, mode="r")
@@ -723,32 +737,57 @@ def process_cells_zarr_region(input_dir, output_dir, selected_indices, n_total, 
             transform[1, 2] = transform[1, 2] + y0 * transform[1, 1] - region.ymin
         create_zarr_dataset(masks_out, "homogeneous_transform", data=transform)
 
-        for mask_name in ["0", "1"]:
-            print(f"    mask {mask_name} crop...")
-            mask_in = z_in[f"masks/{mask_name}"]
-            full_mask = np.asarray(mask_in)
-            crop = full_mask[y0:min(y1, mask_in.shape[0]), x0:min(x1, mask_in.shape[1])].copy()
-
-            # Derive selected global label IDs when the mask has exactly one
-            # unique label per cell (n_total). This is true for the cell mask
-            # (masks/1) but not always for the nucleus mask (masks/0).
-            all_unique = np.sort(np.unique(full_mask[full_mask > 0]))
-            if len(all_unique) == n_total:
-                selected_global_labels = set(all_unique[selected_indices].tolist())
-                nonzero = crop > 0
-                if nonzero.any():
-                    keep = np.isin(crop[nonzero], list(selected_global_labels))
-                    crop[nonzero] = np.where(keep, crop[nonzero], 0)
-
-            create_zarr_dataset(masks_out, mask_name, data=crop, chunks=mask_in.chunks)
-
-        # Remap cell_index values in polygon_sets from original indices to the
-        # new 0-based indices within the selected subset.
         old_to_new_idx = {old: new for new, old in enumerate(selected_indices)}
+        remaps = {}
+
         for ps_name in ["0", "1"]:
             ps_in = z_in[f"polygon_sets/{ps_name}"]
             cell_index = ps_in["cell_index"][:]
             keep_mask = np.isin(cell_index, selected_indices)
+            kept_positions = np.where(keep_mask)[0]
+            n_ps_total = len(cell_index)
+
+            # Build a lookup table (LUT) that maps old raster label → new raster label.
+            # Position p in polygon_sets has raster label p+1 (Xenium native invariant).
+            # After filtering, position new_rank has label new_rank+1.
+            # LUT[old_pos+1] = new_rank+1; LUT[anything else] = 0 (erase pixel).
+            lut = np.zeros(n_ps_total + 1, dtype=np.uint32)
+            for new_rank, old_pos in enumerate(kept_positions):
+                lut[int(old_pos) + 1] = new_rank + 1
+            remaps[ps_name] = {
+                int(old_pos) + 1: int(new_rank) + 1
+                for new_rank, old_pos in enumerate(kept_positions)
+            }
+
+            # Crop and remap the mask in row-chunks to avoid loading the full
+            # slide image into memory (can be multiple GB for large FOVs).
+            print(f"    mask {ps_name} crop + remap...")
+            mask_in = z_in[f"masks/{ps_name}"]
+            crop_y0 = y0
+            crop_y1 = min(y1, mask_in.shape[0])
+            crop_x0 = x0
+            crop_x1 = min(x1, mask_in.shape[1])
+            out_h = max(0, crop_y1 - crop_y0)
+            out_w = max(0, crop_x1 - crop_x0)
+
+            chunk_rows = mask_in.chunks[0] if mask_in.chunks else 512
+            mask_arr_out = masks_out.create_dataset(
+                ps_name,
+                shape=(out_h, out_w),
+                dtype=np.uint32,
+                chunks=(min(chunk_rows, out_h), out_w) if out_h > 0 else (1, 1),
+            )
+            for start in range(0, out_h, chunk_rows):
+                end = min(start + chunk_rows, out_h)
+                chunk = np.asarray(
+                    mask_in[crop_y0 + start:crop_y0 + end, crop_x0:crop_x1]
+                ).astype(np.uint32)
+                # LUT maps kept labels to new sequential values; out-of-range → 0.
+                chunk_clipped = np.minimum(chunk, n_ps_total)
+                mask_arr_out[start:end, :] = lut[chunk_clipped]
+
+            # Write filtered and rebased polygon_sets.
+            print(f"    polygon_sets/{ps_name}...")
             ps_out = z_out.create_group(f"polygon_sets/{ps_name}")
             for key in ps_in.keys():
                 data = ps_in[key][:][keep_mask]
@@ -764,6 +803,507 @@ def process_cells_zarr_region(input_dir, output_dir, selected_indices, n_total, 
         archive_directory_as_zip(tmpdir_path, output_dir / "cells.zarr.zip")
 
     store_in.close()
+    # mask "0" ↔ polygon_sets "0" ↔ nucleus_boundaries; "1" ↔ cell_boundaries
+    return remaps["0"], remaps["1"]
+
+
+# ---------------------------------------------------------------------------
+# Cell feature matrix
+# ---------------------------------------------------------------------------
+
+def subset_csc_columns(data, indices, indptr, col_indices):
+    """Subset a CSC sparse matrix to the given columns (cells).
+
+    Slices each selected column's value/row-index range out of data/indices and
+    rebuilds the pointer array. Returns (data, indices, indptr) as numpy arrays;
+    an empty selection yields correctly-typed empty arrays.
+    """
+    new_data, new_indices, new_indptr = [], [], [0]
+    for col_idx in col_indices:
+        s, e = indptr[col_idx], indptr[col_idx + 1]
+        new_data.append(data[s:e])
+        new_indices.append(indices[s:e])
+        new_indptr.append(new_indptr[-1] + (e - s))
+    out_data = np.concatenate(new_data) if new_data else np.array([], dtype=data.dtype)
+    out_indices = (
+        np.concatenate(new_indices) if new_indices else np.array([], dtype=indices.dtype)
+    )
+    out_indptr = np.array(new_indptr, dtype=indptr.dtype)
+    return out_data, out_indices, out_indptr
+
+
+def process_cell_feature_matrix_dir(input_dir, output_dir, selected_ids):
+    """Subset cell_feature_matrix/ directory (barcodes, matrix, features)."""
+    cfm_in = input_dir / "cell_feature_matrix"
+    cfm_out = output_dir / "cell_feature_matrix"
+    cfm_out.mkdir(exist_ok=True)
+
+    # Barcodes — find selected column indices
+    barcodes = pd.read_csv(
+        cfm_in / "barcodes.tsv.gz", header=None, names=["barcode"]
+    )
+    barcode_list = barcodes["barcode"].tolist()
+    selected_col_indices = [i for i, b in enumerate(barcode_list) if b in selected_ids]
+    selected_barcodes = [barcode_list[i] for i in selected_col_indices]
+
+    with gzip.open(cfm_out / "barcodes.tsv.gz", "wt") as f:
+        f.write("\n".join(selected_barcodes) + "\n")
+
+    # Features — copy unchanged
+    shutil.copy(cfm_in / "features.tsv.gz", cfm_out / "features.tsv.gz")
+
+    # Matrix — subset columns
+    matrix = mmread(cfm_in / "matrix.mtx.gz")
+    matrix_csc = csc_matrix(matrix)
+    del matrix
+    gc.collect()
+
+    matrix_sub = matrix_csc[:, selected_col_indices]
+    del matrix_csc
+    gc.collect()
+
+    with tempfile.NamedTemporaryFile(suffix=".mtx", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    mmwrite(str(tmp_path), matrix_sub)
+    del matrix_sub
+    gc.collect()
+
+    with open(tmp_path, "rb") as f_in:
+        with gzip.open(cfm_out / "matrix.mtx.gz", "wb") as f_out:
+            shutil.copyfileobj(f_in, f_out)
+    tmp_path.unlink()
+
+    return selected_col_indices
+
+
+def process_cell_feature_matrix_h5(input_dir, output_dir, selected_ids):
+    """Subset cell_feature_matrix.h5 (CSC sparse matrix)."""
+    with h5py.File(input_dir / "cell_feature_matrix.h5", "r") as f_in:
+        barcodes = f_in["matrix/barcodes"][:]
+        barcode_list = [b.decode() for b in barcodes]
+        selected_col_indices = [
+            i for i, b in enumerate(barcode_list) if b in selected_ids
+        ]
+
+        data = f_in["matrix/data"][:]
+        indices = f_in["matrix/indices"][:]
+        indptr = f_in["matrix/indptr"][:]
+        shape = f_in["matrix/shape"][:]
+
+        new_data, new_indices, new_indptr = subset_csc_columns(
+            data, indices, indptr, selected_col_indices
+        )
+        new_shape = np.array([shape[0], len(selected_col_indices)], dtype=shape.dtype)
+        new_barcodes = np.array([barcodes[i] for i in selected_col_indices])
+
+        with h5py.File(output_dir / "cell_feature_matrix.h5", "w") as f_out:
+            f_out.create_dataset("matrix/barcodes", data=new_barcodes)
+            f_out.create_dataset("matrix/data", data=new_data)
+            f_out.create_dataset("matrix/indices", data=new_indices)
+            f_out.create_dataset("matrix/indptr", data=new_indptr)
+            f_out.create_dataset("matrix/shape", data=new_shape)
+            for key in f_in["matrix/features"].keys():
+                f_out.create_dataset(
+                    f"matrix/features/{key}",
+                    data=f_in[f"matrix/features/{key}"][:],
+                )
+
+    del data, indices, indptr, new_data, new_indices
+    gc.collect()
+
+
+def process_cell_feature_matrix_tar(output_dir):
+    """Create cell_feature_matrix.tar.gz from the subset directory."""
+    cfm_out = output_dir / "cell_feature_matrix"
+    with tarfile.open(output_dir / "cell_feature_matrix.tar.gz", "w:gz") as tar:
+        for f in sorted(cfm_out.iterdir()):
+            tar.add(str(f), arcname=f"cell_feature_matrix/{f.name}")
+
+
+# ---------------------------------------------------------------------------
+# Analysis results
+# ---------------------------------------------------------------------------
+
+def process_analysis(input_dir, output_dir, selected_ids):
+    """Subset analysis/ directory (clustering, pca, umap, diffexp)."""
+    analysis_in = input_dir / "analysis"
+    analysis_out = output_dir / "analysis"
+
+    # Clustering
+    for cluster_dir in sorted((analysis_in / "clustering").iterdir()):
+        out_dir = analysis_out / "clustering" / cluster_dir.name
+        out_dir.mkdir(parents=True, exist_ok=True)
+        df = pd.read_csv(cluster_dir / "clusters.csv")
+        df[df["Barcode"].isin(selected_ids)].to_csv(
+            out_dir / "clusters.csv", index=False
+        )
+
+    # PCA
+    for pca_dir in sorted((analysis_in / "pca").iterdir()):
+        out_dir = analysis_out / "pca" / pca_dir.name
+        out_dir.mkdir(parents=True, exist_ok=True)
+        proj = pd.read_csv(pca_dir / "projection.csv")
+        proj[proj["Barcode"].isin(selected_ids)].to_csv(
+            out_dir / "projection.csv", index=False
+        )
+        for fname in [
+            "components.csv",
+            "dispersion.csv",
+            "features_selected.csv",
+            "variance.csv",
+        ]:
+            src = pca_dir / fname
+            if src.exists():
+                shutil.copy(src, out_dir / fname)
+
+    # UMAP
+    for umap_dir in sorted((analysis_in / "umap").iterdir()):
+        out_dir = analysis_out / "umap" / umap_dir.name
+        out_dir.mkdir(parents=True, exist_ok=True)
+        proj = pd.read_csv(umap_dir / "projection.csv")
+        proj[proj["Barcode"].isin(selected_ids)].to_csv(
+            out_dir / "projection.csv", index=False
+        )
+
+    # Diffexp — copy unchanged
+    for de_dir in sorted((analysis_in / "diffexp").iterdir()):
+        out_dir = analysis_out / "diffexp" / de_dir.name
+        out_dir.mkdir(parents=True, exist_ok=True)
+        for f in de_dir.iterdir():
+            shutil.copy(f, out_dir / f.name)
+
+
+def process_analysis_zarr(input_dir, output_dir, selected_ids):
+    """Subset analysis.zarr.zip (cluster groupings with remapped indices)."""
+    # analysis.zarr indices refer to positions in the full cells.parquet table,
+    # not to row numbers in clustering CSVs.
+    cells = pd.read_parquet(input_dir / "cells.parquet", columns=["cell_id"])
+    barcode_to_cell_idx = {cid: i for i, cid in enumerate(cells["cell_id"])}
+    del cells
+    gc.collect()
+
+    # Preserve the filtered clustering CSV row order so the remapped zarr
+    # indices match the subset analysis tables written by process_analysis().
+    clusters = pd.read_csv(
+        input_dir
+        / "analysis"
+        / "clustering"
+        / "gene_expression_graphclust"
+        / "clusters.csv"
+    )
+    selected_cluster_barcodes = [
+        barcode for barcode in clusters["Barcode"].tolist() if barcode in selected_ids
+    ]
+    del clusters
+    gc.collect()
+
+    # Build full-cell-index → new analysis-row-position mapping.
+    old_to_new = {
+        barcode_to_cell_idx[barcode]: new_idx
+        for new_idx, barcode in enumerate(selected_cluster_barcodes)
+        if barcode in barcode_to_cell_idx
+    }
+
+    store_in = open_zip_read_store(input_dir / "analysis.zarr.zip", mode="r")
+    z_in = zarr.open(store_in, mode="r")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        z_out = open_directory_group(tmpdir, mode="w")
+
+        # Preserve attrs on cell_groups
+        cg_out = z_out.create_group("cell_groups")
+        cg_out.attrs.update(z_in["cell_groups"].attrs.asdict())
+
+        for group_key in sorted(z_in["cell_groups"].keys(), key=int):
+            grp = z_in["cell_groups"][group_key]
+            indices = grp["indices"][:]
+            indptr = grp["indptr"][:]
+
+            new_indices_list = []
+            new_indptr = [0]
+            n_clusters = len(indptr) - 1
+
+            for c in range(n_clusters):
+                s, e = indptr[c], indptr[c + 1]
+                cluster_indices = indices[s:e]
+                filtered = sorted(
+                    old_to_new[idx] for idx in cluster_indices if idx in old_to_new
+                )
+                new_indices_list.extend(filtered)
+                new_indptr.append(len(new_indices_list))
+
+            grp_out = cg_out.create_group(group_key)
+            create_zarr_dataset(
+                grp_out,
+                "indices", data=np.array(new_indices_list, dtype=np.uint32)
+            )
+            create_zarr_dataset(
+                grp_out,
+                "indptr", data=np.array(new_indptr, dtype=np.uint32)
+            )
+
+        close_zarr_group(z_out)
+        archive_directory_as_zip(tmpdir_path, output_dir / "analysis.zarr.zip")
+
+    store_in.close()
+
+
+def process_cfm_zarr(input_dir, output_dir, selected_ids):
+    """Subset cell_feature_matrix.zarr.zip (CSC + CSR sparse, cell_id)."""
+    # Map selected_ids to zarr row positions (same order as cells.parquet)
+    cells = pd.read_parquet(input_dir / "cells.parquet", columns=["cell_id"])
+    barcode_to_idx = {cid: i for i, cid in enumerate(cells["cell_id"])}
+    selected_col_indices = sorted(
+        barcode_to_idx[cid] for cid in selected_ids if cid in barcode_to_idx
+    )
+    del cells
+    gc.collect()
+
+    store_in = open_zip_read_store(input_dir / "cell_feature_matrix.zarr.zip", mode="r")
+    z_in = zarr.open(store_in, mode="r")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        z_out = open_directory_group(tmpdir, mode="w")
+
+        cf_out = z_out.create_group("cell_features")
+        cf_out.attrs.update(z_in["cell_features"].attrs.asdict())
+
+        # cell_id — subset rows
+        cell_id = z_in["cell_features/cell_id"][:]
+        create_zarr_dataset(cf_out, "cell_id", data=cell_id[selected_col_indices])
+        del cell_id
+
+        # --- CSC (column-oriented: one column per cell) ---
+        csc_data = z_in["cell_features/csc/data"][:]
+        csc_indices = z_in["cell_features/csc/indices"][:]
+        csc_indptr = z_in["cell_features/csc/indptr"][:]
+
+        new_csc_data, new_csc_indices, new_csc_indptr = subset_csc_columns(
+            csc_data, csc_indices, csc_indptr, selected_col_indices
+        )
+
+        csc_out = cf_out.create_group("csc")
+        create_zarr_dataset(csc_out, "data", data=new_csc_data)
+        create_zarr_dataset(csc_out, "indices", data=new_csc_indices)
+        create_zarr_dataset(csc_out, "indptr", data=new_csc_indptr)
+
+        del csc_data, csc_indices, csc_indptr, new_csc_data, new_csc_indices
+        gc.collect()
+
+        # --- CSR (row-oriented: one row per feature) ---
+        # Build from the subset CSC using scipy for correctness
+        sub_csc_data = csc_out["data"][:]
+        sub_csc_indices = csc_out["indices"][:]
+        sub_csc_indptr = csc_out["indptr"][:]
+        n_features = int(z_in["cell_features"].attrs["feature_ids"].__len__())
+        n_cells_sub = len(selected_col_indices)
+
+        sub_csc_mat = csc_matrix(
+            (sub_csc_data, sub_csc_indices.astype(np.int32), sub_csc_indptr),
+            shape=(n_features, n_cells_sub),
+        )
+        sub_csr_mat = sub_csc_mat.tocsr()
+
+        create_zarr_dataset(
+            cf_out,
+            "data", data=sub_csr_mat.data.astype(np.uint32)
+        )
+        create_zarr_dataset(
+            cf_out,
+            "indices", data=sub_csr_mat.indices.astype(np.uint32)
+        )
+        create_zarr_dataset(
+            cf_out,
+            "indptr", data=sub_csr_mat.indptr.astype(np.uint32)
+        )
+
+        del sub_csc_mat, sub_csr_mat
+        gc.collect()
+
+        close_zarr_group(z_out)
+        archive_directory_as_zip(tmpdir_path, output_dir / "cell_feature_matrix.zarr.zip")
+
+    store_in.close()
+
+
+def validate_output(output_dir):
+    """Check internal consistency of all output files.
+
+    Returns True if all checks pass, False otherwise.
+    """
+    print("  Running consistency checks...")
+    passed = True
+
+    def check(description, condition):
+        nonlocal passed
+        status = "PASS" if condition else "FAIL"
+        if not condition:
+            passed = False
+        print(f"    [{status}] {description}")
+
+    # --- Core cell count ---
+    cells_table = pq.read_table(output_dir / "cells.parquet")
+    n_cells = len(cells_table)
+    cell_ids_set = set(cells_table.column("cell_id").to_pylist())
+    del cells_table
+
+    # barcodes.tsv.gz
+    with gzip.open(
+        output_dir / "cell_feature_matrix" / "barcodes.tsv.gz", "rt"
+    ) as f:
+        n_barcodes = sum(1 for line in f if line.strip())
+    check(f"barcodes.tsv.gz lines ({n_barcodes}) == cells ({n_cells})",
+          n_barcodes == n_cells)
+
+    # cell_feature_matrix.h5
+    with h5py.File(output_dir / "cell_feature_matrix.h5", "r") as h5:
+        h5_n_barcodes = len(h5["matrix/barcodes"])
+        h5_shape = h5["matrix/shape"][:]
+        h5_n_features = h5_shape[0]
+        h5_n_cells = h5_shape[1]
+    check(f"h5 barcodes ({h5_n_barcodes}) == cells ({n_cells})",
+          h5_n_barcodes == n_cells)
+    check(f"h5 matrix columns ({h5_n_cells}) == cells ({n_cells})",
+          h5_n_cells == n_cells)
+
+    # cell_feature_matrix.zarr.zip
+    store = open_zip_read_store(output_dir / "cell_feature_matrix.zarr.zip", mode="r")
+    z = zarr.open(store, mode="r")
+    zarr_cfm_n_cells = z["cell_features/cell_id"].shape[0]
+    zarr_cfm_csc_indptr = z["cell_features/csc/indptr"].shape[0] - 1
+    check(
+        f"cfm zarr cell_id rows ({zarr_cfm_n_cells}) == cells ({n_cells})",
+        zarr_cfm_n_cells == n_cells,
+    )
+    check(
+        f"cfm zarr CSC indptr ({zarr_cfm_csc_indptr}) == cells ({n_cells})",
+        zarr_cfm_csc_indptr == n_cells,
+    )
+    store.close()
+
+    # cells.zarr.zip
+    store = open_zip_read_store(output_dir / "cells.zarr.zip", mode="r")
+    z = zarr.open(store, mode="r")
+    zarr_cell_id_rows = z["cell_id"].shape[0]
+    zarr_summary_rows = z["cell_summary"].shape[0]
+    check(
+        f"cells zarr cell_id rows ({zarr_cell_id_rows}) == cells ({n_cells})",
+        zarr_cell_id_rows == n_cells,
+    )
+    check(
+        f"cells zarr cell_summary rows ({zarr_summary_rows}) == cells ({n_cells})",
+        zarr_summary_rows == n_cells,
+    )
+    store.close()
+
+    # --- Feature count ---
+    with gzip.open(
+        output_dir / "cell_feature_matrix" / "features.tsv.gz", "rt"
+    ) as f:
+        n_features = sum(1 for line in f if line.strip())
+    check(
+        f"features.tsv.gz lines ({n_features}) == h5 features ({h5_n_features})",
+        n_features == h5_n_features,
+    )
+
+    store = open_zip_read_store(output_dir / "cell_feature_matrix.zarr.zip", mode="r")
+    z = zarr.open(store, mode="r")
+    zarr_csr_indptr = z["cell_features/indptr"].shape[0] - 1
+    zarr_feature_ids = list(z["cell_features"].attrs["feature_ids"])
+    zarr_n_feature_ids = len(zarr_feature_ids)
+    has_total_transcripts = bool(zarr_feature_ids) and zarr_feature_ids[-1] == "Total transcripts"
+    check(
+        f"cfm zarr CSR indptr ({zarr_csr_indptr}) == feature_ids attr ({zarr_n_feature_ids})",
+        zarr_csr_indptr == zarr_n_feature_ids,
+    )
+    check(
+        f"cfm zarr feature_ids attr ({zarr_n_feature_ids}) matches features ({n_features}) or features+1 with Total transcripts",
+        zarr_n_feature_ids == n_features or (has_total_transcripts and zarr_n_feature_ids == n_features + 1),
+    )
+    store.close()
+
+    # --- Analysis cell counts ---
+    analysis_out = output_dir / "analysis"
+
+    # Collect all clustering row counts
+    cluster_counts = {}
+    for cluster_dir in sorted((analysis_out / "clustering").iterdir()):
+        df = pd.read_csv(cluster_dir / "clusters.csv")
+        cluster_counts[cluster_dir.name] = len(df)
+    unique_cluster_counts = set(cluster_counts.values())
+    check(
+        f"all clustering CSVs have same row count ({unique_cluster_counts})",
+        len(unique_cluster_counts) == 1,
+    )
+    n_analysis_cells = list(cluster_counts.values())[0] if cluster_counts else 0
+
+    # PCA projections
+    for pca_dir in sorted((analysis_out / "pca").iterdir()):
+        proj = pd.read_csv(pca_dir / "projection.csv")
+        check(
+            f"pca/{pca_dir.name} rows ({len(proj)}) == analysis cells ({n_analysis_cells})",
+            len(proj) == n_analysis_cells,
+        )
+
+    # UMAP projections
+    for umap_dir in sorted((analysis_out / "umap").iterdir()):
+        proj = pd.read_csv(umap_dir / "projection.csv")
+        check(
+            f"umap/{umap_dir.name} rows ({len(proj)}) == analysis cells ({n_analysis_cells})",
+            len(proj) == n_analysis_cells,
+        )
+
+    # analysis.zarr.zip — total indices per grouping should equal n_analysis_cells
+    store = open_zip_read_store(output_dir / "analysis.zarr.zip", mode="r")
+    z = zarr.open(store, mode="r")
+    for group_key in sorted(z["cell_groups"].keys(), key=int):
+        n_indices = z["cell_groups"][group_key]["indices"].shape[0]
+        check(
+            f"analysis zarr group {group_key} indices ({n_indices}) == analysis cells ({n_analysis_cells})",
+            n_indices == n_analysis_cells,
+        )
+    store.close()
+
+    # --- Boundary files ---
+    cb = pq.read_table(
+        output_dir / "cell_boundaries.parquet", columns=["cell_id"]
+    )
+    cb_ids = set(cb.column("cell_id").to_pylist())
+    check(
+        f"cell_boundaries cell_ids ({len(cb_ids)}) all in cells.parquet",
+        cb_ids.issubset(cell_ids_set),
+    )
+    del cb
+
+    nb = pq.read_table(
+        output_dir / "nucleus_boundaries.parquet", columns=["cell_id"]
+    )
+    nb_ids = set(nb.column("cell_id").to_pylist())
+    check(
+        f"nucleus_boundaries cell_ids ({len(nb_ids)}) all in cells.parquet",
+        nb_ids.issubset(cell_ids_set),
+    )
+    del nb
+
+    # --- Transcripts ---
+    parquet_file = pq.ParquetFile(output_dir / "transcripts.parquet")
+    transcript_cell_ids = set()
+    for batch in parquet_file.iter_batches(
+        batch_size=1_000_000, columns=["cell_id"]
+    ):
+        table = pa.Table.from_batches([batch])
+        ids = table.column("cell_id").to_pylist()
+        transcript_cell_ids.update(ids)
+    transcript_cell_ids.discard("UNASSIGNED")
+    check(
+        f"transcript assigned cell_ids ({len(transcript_cell_ids)}) all in cells.parquet",
+        transcript_cell_ids.issubset(cell_ids_set),
+    )
+
+    gc.collect()
+    return passed
 
 
 # ---------------------------------------------------------------------------
@@ -826,7 +1366,7 @@ def copy_and_crop_images(input_dir, output_dir, region, pixel_size, he_image=Non
         print(f"    he_imagealignment.csv written")
 
 
-def run_region(input_dir, output_dir, region, proportion, grid_size, pixel_size, skip_validation, he_image=None, he_alignment=None):
+def run_region(input_dir, output_dir, region, pixel_size, skip_validation, threads=None, he_image=None, he_alignment=None):
     """Run all crop/subset steps for a single region and write the output directory."""
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"\nRegion:     {region.name}")
@@ -836,7 +1376,7 @@ def run_region(input_dir, output_dir, region, proportion, grid_size, pixel_size,
 
     print("Step 1: Selecting cells in region...")
     selected_indices, selected_ids, n_total = select_cells_in_region(
-        input_dir, region, proportion, grid_size
+        input_dir, region
     )
     print(
         f"  Selected {len(selected_ids):,} / {n_total:,} cells "
@@ -845,18 +1385,36 @@ def run_region(input_dir, output_dir, region, proportion, grid_size, pixel_size,
     if not selected_ids:
         raise ValueError(f"No cells selected for region {region.name}")
 
-    print("\nStep 2: Subsetting and rebasing tabular cell files...")
-    for name in ["cells", "cell_boundaries", "nucleus_boundaries"]:
-        print(f"  {name}...")
-        subset_spatial_parquet_and_csv(input_dir, output_dir, name, selected_ids, region)
+    # Zarr is processed before parquets so label remaps are available.
+    # spatialdata-io 0.7.0 requires parquet label_id values to be sequential
+    # 1..M matching polygon_sets positions. The remap dicts translate from
+    # original label_ids to new sequential values.
+    print("\nStep 2: Cropping cells.zarr.zip...")
+    nucleus_label_id_remap, cell_label_id_remap = process_cells_zarr_region(
+        input_dir, output_dir, selected_indices, n_total, region, pixel_size
+    )
 
-    print("\nStep 3: Subsetting and rebasing transcripts...")
+    print("\nStep 3: Subsetting and rebasing tabular cell files...")
+    print("  cells...")
+    subset_spatial_parquet_and_csv(input_dir, output_dir, "cells", selected_ids, region)
+    print("  cell_boundaries...")
+    subset_spatial_parquet_and_csv(
+        input_dir, output_dir, "cell_boundaries", selected_ids, region,
+        label_id_remap=cell_label_id_remap,
+    )
+    print("  nucleus_boundaries...")
+    subset_spatial_parquet_and_csv(
+        input_dir, output_dir, "nucleus_boundaries", selected_ids, region,
+        label_id_remap=nucleus_label_id_remap,
+    )
+
+    print("\nStep 4: Subsetting and rebasing transcripts...")
     n_transcripts = process_transcripts_in_region(
-        input_dir, output_dir, selected_ids, region, proportion
+        input_dir, output_dir, selected_ids, region, threads=threads
     )
     print(f"  Kept {n_transcripts:,} transcripts")
 
-    print("\nStep 4: Subsetting cell feature matrix...")
+    print("\nStep 5: Subsetting cell feature matrix...")
     print("  cell_feature_matrix/ directory...")
     process_cell_feature_matrix_dir(input_dir, output_dir, selected_ids)
     print("  cell_feature_matrix.h5...")
@@ -864,11 +1422,8 @@ def run_region(input_dir, output_dir, region, proportion, grid_size, pixel_size,
     print("  cell_feature_matrix.tar.gz...")
     process_cell_feature_matrix_tar(output_dir)
 
-    print("\nStep 5: Subsetting analysis results...")
+    print("\nStep 6: Subsetting analysis results...")
     process_analysis(input_dir, output_dir, selected_ids)
-
-    print("\nStep 6: Cropping cells.zarr.zip...")
-    process_cells_zarr_region(input_dir, output_dir, selected_indices, n_total, region, pixel_size)
 
     print("\nStep 7: Subsetting analysis.zarr.zip...")
     process_analysis_zarr(input_dir, output_dir, selected_ids)
@@ -901,8 +1456,6 @@ def main():
     print(f"Input:      {input_dir}")
     print(f"Output root:{output_root}")
     print(f"Regions:    {len(regions)}")
-    print(f"Proportion: {args.proportion}")
-    print(f"Grid size:  {args.grid_size}")
     if he_image:
         print(f"H&E image:  {he_image}")
 
@@ -913,10 +1466,9 @@ def main():
                 input_dir=input_dir,
                 output_dir=output_root / safe_name(region.name),
                 region=region,
-                proportion=args.proportion,
-                grid_size=args.grid_size,
                 pixel_size=pixel_size,
                 skip_validation=args.skip_validation,
+                threads=args.threads,
                 he_image=he_image,
                 he_alignment=he_alignment,
             )
