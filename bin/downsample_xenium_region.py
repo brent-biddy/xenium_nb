@@ -416,6 +416,26 @@ def scaled_crop_bounds(base_shape, level_shape, x0, y0, x1, y1):
     return lx0, ly0, lx1, ly1
 
 
+def tile_crop_slices(crop_y0, crop_x0, crop_y1, crop_x1, src_y0, src_x0, src_y1, src_x1):
+    """Compute the (dst, src) slice pair for a tile's overlap with a crop window.
+
+    All bounds are in level pixel coordinates: the crop window (crop_*) and the
+    tile's actual extent (src_*). Returns ((out_y, out_x), (in_y, in_x)) where
+    out slices are relative to the crop origin and in slices to the tile origin,
+    so `output[out_y, out_x] = tile[in_y, in_x]` copies the overlap. Returns None
+    if the tile does not intersect the crop window.
+    """
+    oy0 = max(crop_y0, src_y0)
+    ox0 = max(crop_x0, src_x0)
+    oy1 = min(crop_y1, src_y1)
+    ox1 = min(crop_x1, src_x1)
+    if oy0 >= oy1 or ox0 >= ox1:
+        return None
+    dst = (slice(oy0 - crop_y0, oy1 - crop_y0), slice(ox0 - crop_x0, ox1 - crop_x0))
+    src = (slice(oy0 - src_y0, oy1 - src_y0), slice(ox0 - src_x0, ox1 - src_x0))
+    return dst, src
+
+
 def crop_tiff_level(level, base_shape, x0, y0, x1, y1):
     """Crop one pyramid level of a Xenium morphology OME-TIFF (channels as pages, CYX layout)."""
     lx0, ly0, lx1, ly1 = scaled_crop_bounds(base_shape, level.shape, x0, y0, x1, y1)
@@ -457,27 +477,12 @@ def crop_tiff_level(level, base_shape, x0, y0, x1, y1):
                 src_x1 = min(src_x0 + tile.shape[-1], page_width)
                 src_y1 = min(src_y0 + tile.shape[-2], page_height)
 
-                # Compute the overlap between this tile and the crop window,
-                # then copy only the overlapping pixels into the output array.
-                overlap_x0 = max(lx0, src_x0)
-                overlap_y0 = max(ly0, src_y0)
-                overlap_x1 = min(lx1, src_x1)
-                overlap_y1 = min(ly1, src_y1)
-                if overlap_x0 >= overlap_x1 or overlap_y0 >= overlap_y1:
+                # Copy only the overlap between this tile and the crop window.
+                slices = tile_crop_slices(ly0, lx0, ly1, lx1, src_y0, src_x0, src_y1, src_x1)
+                if slices is None:
                     continue
-
-                out_x0 = overlap_x0 - lx0
-                out_y0 = overlap_y0 - ly0
-                out_x1 = overlap_x1 - lx0
-                out_y1 = overlap_y1 - ly0
-                in_x0 = overlap_x0 - src_x0
-                in_y0 = overlap_y0 - src_y0
-                in_x1 = overlap_x1 - src_x0
-                in_y1 = overlap_y1 - src_y0
-
-                cropped[page_index, out_y0:out_y1, out_x0:out_x1] = tile[
-                    in_y0:in_y1, in_x0:in_x1
-                ]
+                (out_y, out_x), (in_y, in_x) = slices
+                cropped[page_index, out_y, out_x] = tile[in_y, in_x]
 
     if len(level.shape) == 2:
         return cropped[0]
@@ -526,16 +531,39 @@ def _read_tiff_level_crop(level, y0, x0, y1, x1):
             src_y1 = min(src_y0 + tile.shape[0], lh)
             src_x1 = min(src_x0 + tile.shape[1], lw)
 
-            ov_y0, ov_y1 = max(y0, src_y0), min(y1, src_y1)
-            ov_x0, ov_x1 = max(x0, src_x0), min(x1, src_x1)
-            if ov_y0 >= ov_y1 or ov_x0 >= ov_x1:
+            slices = tile_crop_slices(y0, x0, y1, x1, src_y0, src_x0, src_y1, src_x1)
+            if slices is None:
                 continue
-
-            result[ov_y0 - y0:ov_y1 - y0, ov_x0 - x0:ov_x1 - x0] = (
-                tile[ov_y0 - src_y0:ov_y1 - src_y0, ov_x0 - src_x0:ov_x1 - src_x0]
-            )
+            (out_y, out_x), (in_y, in_x) = slices
+            result[out_y, out_x] = tile[in_y, in_x]
 
     return result
+
+
+def write_ome_pyramid(dst, crops, photometric, base_metadata):
+    """Write pyramid-level crops to a BigTIFF OME-TIFF.
+
+    crops[0] is the full-resolution base level; the rest are stored as
+    reduced-resolution SubIFDs. Only the base level carries OME metadata.
+    """
+    import tifffile
+
+    with tifffile.TiffWriter(dst, bigtiff=True, ome=True) as tif:
+        tif.write(
+            crops[0],
+            subifds=max(0, len(crops) - 1),
+            photometric=photometric,
+            compression="deflate",
+            metadata=base_metadata,
+        )
+        for crop in crops[1:]:
+            tif.write(
+                crop,
+                subfiletype=1,
+                photometric=photometric,
+                compression="deflate",
+                metadata=None,
+            )
 
 
 def crop_he_ome_tiff(src, dst, x0, y0, x1, y1):
@@ -550,35 +578,16 @@ def crop_he_ome_tiff(src, dst, x0, y0, x1, y1):
     with tifffile.TiffFile(src) as tif:
         series = tif.series[0]
         levels = list(series.levels) if getattr(series, "levels", None) else [series]
-        base_h, base_w = levels[0].shape[0], levels[0].shape[1]
+        # H&E is YXS (spatial axes first), so scale on shape[:2] to match
+        # scaled_crop_bounds' last-two-axes (y, x) convention.
+        base_yx = levels[0].shape[:2]
 
         crops = []
         for level in levels:
-            lh, lw = level.shape[0], level.shape[1]
-            scale_y = base_h / lh
-            scale_x = base_w / lw
-            ly0 = max(0, int(np.floor(y0 / scale_y)))
-            lx0 = max(0, int(np.floor(x0 / scale_x)))
-            ly1 = min(lh, max(ly0 + 1, int(np.ceil(y1 / scale_y))))
-            lx1 = min(lw, max(lx0 + 1, int(np.ceil(x1 / scale_x))))
+            lx0, ly0, lx1, ly1 = scaled_crop_bounds(base_yx, level.shape[:2], x0, y0, x1, y1)
             crops.append(_read_tiff_level_crop(level, ly0, lx0, ly1, lx1))
 
-    with tifffile.TiffWriter(dst, bigtiff=True, ome=True) as tif_out:
-        tif_out.write(
-            crops[0],
-            subifds=max(0, len(crops) - 1),
-            photometric="rgb",
-            compression="deflate",
-            metadata={"axes": "YXS"},
-        )
-        for crop in crops[1:]:
-            tif_out.write(
-                crop,
-                subfiletype=1,
-                photometric="rgb",
-                compression="deflate",
-                metadata=None,
-            )
+    write_ome_pyramid(dst, crops, photometric="rgb", base_metadata={"axes": "YXS"})
 
 
 def crop_ome_tiff(src, dst, x0, y0, x1, y1):
@@ -612,22 +621,7 @@ def crop_ome_tiff(src, dst, x0, y0, x1, y1):
     metadata = {"axes": axes} if axes and len(axes) == crops[0].ndim else None
     if metadata is not None and channel_names:
         metadata["Channel"] = {"Name": channel_names}
-    with tifffile.TiffWriter(dst, bigtiff=True, ome=True) as tif:
-        tif.write(
-            crops[0],
-            subifds=max(0, len(crops) - 1),
-            photometric="minisblack",
-            compression="deflate",
-            metadata=metadata,
-        )
-        for crop in crops[1:]:
-            tif.write(
-                crop,
-                subfiletype=1,
-                photometric="minisblack",
-                compression="deflate",
-                metadata=None,
-            )
+    write_ome_pyramid(dst, crops, photometric="minisblack", base_metadata=metadata)
 
     # tifffile auto-generates channel IDs as "Channel:<image_index>:<channel_index>"
     # (standard OME spec), but spatialdata_io's v4 xenium reader expects Xenium's
@@ -825,6 +819,27 @@ def process_cells_zarr_region(input_dir, output_dir, selected_indices, n_total, 
 # Cell feature matrix
 # ---------------------------------------------------------------------------
 
+def subset_csc_columns(data, indices, indptr, col_indices):
+    """Subset a CSC sparse matrix to the given columns (cells).
+
+    Slices each selected column's value/row-index range out of data/indices and
+    rebuilds the pointer array. Returns (data, indices, indptr) as numpy arrays;
+    an empty selection yields correctly-typed empty arrays.
+    """
+    new_data, new_indices, new_indptr = [], [], [0]
+    for col_idx in col_indices:
+        s, e = indptr[col_idx], indptr[col_idx + 1]
+        new_data.append(data[s:e])
+        new_indices.append(indices[s:e])
+        new_indptr.append(new_indptr[-1] + (e - s))
+    out_data = np.concatenate(new_data) if new_data else np.array([], dtype=data.dtype)
+    out_indices = (
+        np.concatenate(new_indices) if new_indices else np.array([], dtype=indices.dtype)
+    )
+    out_indptr = np.array(new_indptr, dtype=indptr.dtype)
+    return out_data, out_indices, out_indptr
+
+
 def process_cell_feature_matrix_dir(input_dir, output_dir, selected_ids):
     """Subset cell_feature_matrix/ directory (barcodes, matrix, features)."""
     cfm_in = input_dir / "cell_feature_matrix"
@@ -883,24 +898,9 @@ def process_cell_feature_matrix_h5(input_dir, output_dir, selected_ids):
         indptr = f_in["matrix/indptr"][:]
         shape = f_in["matrix/shape"][:]
 
-        new_data, new_indices, new_indptr = [], [], [0]
-        for col_idx in selected_col_indices:
-            s, e = indptr[col_idx], indptr[col_idx + 1]
-            new_data.append(data[s:e])
-            new_indices.append(indices[s:e])
-            new_indptr.append(new_indptr[-1] + (e - s))
-
-        new_data = (
-            np.concatenate(new_data)
-            if new_data
-            else np.array([], dtype=data.dtype)
+        new_data, new_indices, new_indptr = subset_csc_columns(
+            data, indices, indptr, selected_col_indices
         )
-        new_indices = (
-            np.concatenate(new_indices)
-            if new_indices
-            else np.array([], dtype=indices.dtype)
-        )
-        new_indptr = np.array(new_indptr, dtype=indptr.dtype)
         new_shape = np.array([shape[0], len(selected_col_indices)], dtype=shape.dtype)
         new_barcodes = np.array([barcodes[i] for i in selected_col_indices])
 
@@ -1088,36 +1088,14 @@ def process_cfm_zarr(input_dir, output_dir, selected_ids):
         csc_indices = z_in["cell_features/csc/indices"][:]
         csc_indptr = z_in["cell_features/csc/indptr"][:]
 
-        new_csc_data, new_csc_indices, new_csc_indptr = [], [], [0]
-        for col_idx in selected_col_indices:
-            s, e = csc_indptr[col_idx], csc_indptr[col_idx + 1]
-            new_csc_data.append(csc_data[s:e])
-            new_csc_indices.append(csc_indices[s:e])
-            new_csc_indptr.append(new_csc_indptr[-1] + (e - s))
+        new_csc_data, new_csc_indices, new_csc_indptr = subset_csc_columns(
+            csc_data, csc_indices, csc_indptr, selected_col_indices
+        )
 
         csc_out = cf_out.create_group("csc")
-        create_zarr_dataset(
-            csc_out,
-            "data",
-            data=(
-                np.concatenate(new_csc_data)
-                if new_csc_data
-                else np.array([], dtype=csc_data.dtype)
-            ),
-        )
-        create_zarr_dataset(
-            csc_out,
-            "indices",
-            data=(
-                np.concatenate(new_csc_indices)
-                if new_csc_indices
-                else np.array([], dtype=csc_indices.dtype)
-            ),
-        )
-        create_zarr_dataset(
-            csc_out,
-            "indptr", data=np.array(new_csc_indptr, dtype=csc_indptr.dtype)
-        )
+        create_zarr_dataset(csc_out, "data", data=new_csc_data)
+        create_zarr_dataset(csc_out, "indices", data=new_csc_indices)
+        create_zarr_dataset(csc_out, "indptr", data=new_csc_indptr)
 
         del csc_data, csc_indices, csc_indptr, new_csc_data, new_csc_indices
         gc.collect()
