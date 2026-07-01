@@ -17,6 +17,7 @@ process DOWNSAMPLE_XENIUM_REGION {
         "--bbox ${xmin} ${ymin} ${xmax} ${ymax}",
         "--region_name ${region_name}",
         "--output_dir output",
+        "--threads ${task.cpus}",
     ]
     if (he_image)     downsampleArgs << "--he_image ${he_image}"
     if (he_alignment) downsampleArgs << "--he_alignment ${he_alignment}"

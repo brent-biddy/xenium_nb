@@ -1,3 +1,3 @@
 sample,path
-ROI1_A_sub,results/ROI1_A/downsample_xenium_region/ROI1_A_sub
-ROI1_B_sub,results/ROI1_B/downsample_xenium_region/ROI1_B_sub
+test_1,results/test_1/downsample_xenium_region/test_1
+test_2,results/test_2/downsample_xenium_region/test_2
