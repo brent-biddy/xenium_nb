@@ -19,11 +19,13 @@ regions.csv must contain: region,xmin,ymin,xmax,ymax
 import argparse
 import gc
 import gzip
+import os
 import shutil
 import sys
 import tarfile
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -125,22 +127,16 @@ def parse_args():
         help="CSV with columns region,xmin,ymin,xmax,ymax for multiple crops.",
     )
     parser.add_argument(
-        "--proportion",
-        type=float,
-        default=1.0,
-        help="Fraction of in-region cells to keep after cropping (default: 1.0).",
-    )
-    parser.add_argument(
-        "--grid_size",
-        type=float,
-        default=100.0,
-        help="Grid size for optional spatial cell downsampling (default: 100.0).",
-    )
-    parser.add_argument(
         "--pixel_size",
         type=float,
         default=None,
         help="Coordinate units per image pixel. Defaults to XENIUM_PIXEL_SIZE_UM (0.2125).",
+    )
+    parser.add_argument(
+        "--threads",
+        type=int,
+        default=None,
+        help="Worker threads for the transcript scan. Defaults to all CPUs.",
     )
     parser.add_argument(
         "--skip_validation",
@@ -165,8 +161,6 @@ def parse_args():
         parser.error("Provide exactly one of --bbox or --regions_csv.")
     if bool(args.he_image) != bool(args.he_alignment):
         parser.error("--he_image and --he_alignment must be provided together.")
-    if args.proportion <= 0 or args.proportion > 1:
-        parser.error("--proportion must be > 0 and <= 1.")
     return args
 
 
@@ -211,16 +205,11 @@ def bbox_mask(x, y, region):
     )
 
 
-def select_cells_in_region(input_dir, region, proportion, grid_size):
+def select_cells_in_region(input_dir, region):
     """Return (selected_indices, selected_ids, n_total) for cells inside region.
 
-    When proportion < 1, cells are spatially downsampled: the region is divided
-    into a grid and `proportion` of cells are randomly kept per grid cell. This
-    preserves spatial coverage better than random global subsampling.
-    Seed is fixed (42) for reproducibility.
+    Selects every cell whose centroid falls within the region bbox.
     """
-    rng = np.random.default_rng(42)
-
     cells_table = pq.read_table(
         input_dir / "cells.parquet", columns=["cell_id", "x_centroid", "y_centroid"]
     )
@@ -230,22 +219,7 @@ def select_cells_in_region(input_dir, region, proportion, grid_size):
     y = cells_table.column("y_centroid").to_numpy()
     in_region = bbox_mask(x, y, region)
 
-    if proportion < 1.0 and in_region.any():
-        # Divide the region into grid cells and sample `proportion` of cells
-        # from each grid cell independently to preserve spatial coverage.
-        grid_x = ((x - region.xmin) / grid_size).astype(int)
-        grid_y = ((y - region.ymin) / grid_size).astype(int)
-        selected_mask = np.zeros(len(x), dtype=bool)
-        grid_dict = {}
-        for i in np.where(in_region)[0]:
-            grid_dict.setdefault((int(grid_x[i]), int(grid_y[i])), []).append(i)
-        for indices in grid_dict.values():
-            n = max(1, round(len(indices) * proportion))
-            selected_mask[rng.choice(indices, size=n, replace=False)] = True
-    else:
-        selected_mask = in_region
-
-    selected_indices = np.where(selected_mask)[0]
+    selected_indices = np.where(in_region)[0]
     selected_ids = {cell_ids[i] for i in selected_indices}
     del cells_table
     gc.collect()
@@ -311,70 +285,88 @@ def subset_spatial_parquet_and_csv(input_dir, output_dir, filename, selected_ids
     return n
 
 
-def process_transcripts_in_region(input_dir, output_dir, selected_ids, region, proportion):
+def _filter_transcript_row_group(input_path, row_group, selected_ids_arrow, region):
+    """Filter one transcripts row group to the region and rebase its coordinates.
+
+    Runs in a worker thread. PyArrow's parquet decode and compute kernels
+    release the GIL, so row groups are filtered in parallel. Column-level
+    threading is disabled (use_threads=False) to avoid nested thread pools —
+    parallelism comes from running many row groups at once. Returns a rebased
+    pandas DataFrame of the kept rows, or None if none were kept.
+
+    Keep rule: inside the region bbox AND (cell in selected_ids OR unassigned).
+    """
+    table = pq.ParquetFile(input_path).read_row_group(row_group, use_threads=False)
+    x = table.column("x_location")
+    y = table.column("y_location")
+    region_mask = pc.and_(
+        pc.and_(pc.greater_equal(x, region.xmin), pc.less(x, region.xmax)),
+        pc.and_(pc.greater_equal(y, region.ymin), pc.less(y, region.ymax)),
+    )
+    cell_id_col = table.column("cell_id")
+    assigned_keep = pc.is_in(cell_id_col, value_set=selected_ids_arrow)
+    unassigned = pc.equal(cell_id_col, "UNASSIGNED")
+    keep = pc.and_(region_mask, pc.or_(assigned_keep, unassigned))
+
+    chunk_sub = table.filter(keep)
+    if len(chunk_sub) == 0:
+        return None
+    return shift_spatial_columns(chunk_sub.to_pandas(), region)
+
+
+def process_transcripts_in_region(input_dir, output_dir, selected_ids, region, threads=None):
     """Filter transcripts.parquet to the region, writing parquet + csv.gz.
 
-    Reads in 1M-row batches to avoid loading the full transcript table into
-    memory (whole-slide transcript files can exceed several GB).
+    transcripts.parquet has no spatial index or row-group statistics, so finding
+    the in-region rows requires scanning every row group. The scan is the
+    dominant cost of a crop, so row groups are filtered concurrently across
+    `threads` workers (default: all CPUs).
 
-    Assigned transcripts (cell_id != UNASSIGNED) are kept only if their cell
-    is in selected_ids. Unassigned transcripts are kept if they fall inside
-    the region bbox; if proportion < 1 they are additionally randomly thinned
-    to match the cell downsampling rate.
+    Determinism: results are collected per row group and concatenated in
+    row-group order, so the output row order is identical to a serial scan and
+    stable run-to-run regardless of thread scheduling. The keep rule is a pure
+    per-row predicate (no sampling), so the set of kept rows is thread-independent.
+
+    Keeps every transcript inside the region bbox whose cell is in selected_ids,
+    plus all unassigned (extracellular) transcripts inside the bbox. Assigned
+    transcripts whose parent cell was cropped out are dropped so the output
+    contains no dangling cell_id references.
     """
-    rng = np.random.default_rng(42)
+    input_path = str(input_dir / "transcripts.parquet")
+    parquet_file = pq.ParquetFile(input_path)
+    n_row_groups = parquet_file.metadata.num_row_groups
     selected_ids_arrow = pa.array(list(selected_ids))
-    parquet_file = pq.ParquetFile(input_dir / "transcripts.parquet")
-    writer = None
+    max_workers = max(1, min(threads or os.cpu_count() or 1, n_row_groups))
+
+    # Kept memory scales with the region's transcript count (small for a crop),
+    # not the whole slide, since only filtered rows are retained per row group.
+    frames = [None] * n_row_groups
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {
+            pool.submit(
+                _filter_transcript_row_group, input_path, rg, selected_ids_arrow, region
+            ): rg
+            for rg in range(n_row_groups)
+        }
+        for future in futures:
+            frames[futures[future]] = future.result()
+
+    # Concatenate in row-group order for a deterministic, serial-equivalent order.
+    kept = [frame for frame in frames if frame is not None]
     csv_path = output_dir / "transcripts.csv"
-    first_chunk = True
-    total_kept = 0
-
-    for batch in parquet_file.iter_batches(batch_size=1_000_000):
-        table = pa.Table.from_batches([batch])
-        x = table.column("x_location")
-        y = table.column("y_location")
-        region_mask = pc.and_(
-            pc.and_(pc.greater_equal(x, region.xmin), pc.less(x, region.xmax)),
-            pc.and_(pc.greater_equal(y, region.ymin), pc.less(y, region.ymax)),
-        )
-
-        cell_id_col = table.column("cell_id")
-        assigned_keep = pc.is_in(cell_id_col, value_set=selected_ids_arrow)
-        unassigned = pc.equal(cell_id_col, "UNASSIGNED")
-        if proportion < 1.0:
-            sampled = pa.array(rng.random(len(table)) < proportion)
-            unassigned = pc.and_(unassigned, sampled)
-
-        keep = pc.and_(region_mask, pc.or_(assigned_keep, unassigned))
-        chunk_sub = table.filter(keep)
-
-        if len(chunk_sub) > 0:
-            df = shift_spatial_columns(chunk_sub.to_pandas(), region)
-            out_table = pa.Table.from_pandas(df, preserve_index=False)
-            if writer is None:
-                writer = pq.ParquetWriter(output_dir / "transcripts.parquet", out_table.schema)
-            writer.write_table(out_table)
-            df.to_csv(csv_path, mode="a", index=False, header=first_chunk)
-            first_chunk = False
-            total_kept += len(df)
-
-        del table, chunk_sub
-        gc.collect()
-
-    if writer:
-        writer.close()
+    if kept:
+        out_df = pd.concat(kept, ignore_index=True)
     else:
         # Keep the expected files present even if the region has no transcripts.
-        empty = parquet_file.schema_arrow.empty_table().to_pandas()
-        empty.to_parquet(output_dir / "transcripts.parquet", index=False)
-        empty.to_csv(csv_path, index=False)
+        out_df = parquet_file.schema_arrow.empty_table().to_pandas()
+    out_df.to_parquet(output_dir / "transcripts.parquet", index=False)
+    out_df.to_csv(csv_path, index=False)
 
     with open(csv_path, "rb") as f_in:
         with gzip.open(output_dir / "transcripts.csv.gz", "wb") as f_out:
             shutil.copyfileobj(f_in, f_out)
     csv_path.unlink()
-    return total_kept
+    return len(out_df)
 
 
 # ---------------------------------------------------------------------------
@@ -1374,7 +1366,7 @@ def copy_and_crop_images(input_dir, output_dir, region, pixel_size, he_image=Non
         print(f"    he_imagealignment.csv written")
 
 
-def run_region(input_dir, output_dir, region, proportion, grid_size, pixel_size, skip_validation, he_image=None, he_alignment=None):
+def run_region(input_dir, output_dir, region, pixel_size, skip_validation, threads=None, he_image=None, he_alignment=None):
     """Run all crop/subset steps for a single region and write the output directory."""
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"\nRegion:     {region.name}")
@@ -1384,7 +1376,7 @@ def run_region(input_dir, output_dir, region, proportion, grid_size, pixel_size,
 
     print("Step 1: Selecting cells in region...")
     selected_indices, selected_ids, n_total = select_cells_in_region(
-        input_dir, region, proportion, grid_size
+        input_dir, region
     )
     print(
         f"  Selected {len(selected_ids):,} / {n_total:,} cells "
@@ -1418,7 +1410,7 @@ def run_region(input_dir, output_dir, region, proportion, grid_size, pixel_size,
 
     print("\nStep 4: Subsetting and rebasing transcripts...")
     n_transcripts = process_transcripts_in_region(
-        input_dir, output_dir, selected_ids, region, proportion
+        input_dir, output_dir, selected_ids, region, threads=threads
     )
     print(f"  Kept {n_transcripts:,} transcripts")
 
@@ -1464,8 +1456,6 @@ def main():
     print(f"Input:      {input_dir}")
     print(f"Output root:{output_root}")
     print(f"Regions:    {len(regions)}")
-    print(f"Proportion: {args.proportion}")
-    print(f"Grid size:  {args.grid_size}")
     if he_image:
         print(f"H&E image:  {he_image}")
 
@@ -1476,10 +1466,9 @@ def main():
                 input_dir=input_dir,
                 output_dir=output_root / safe_name(region.name),
                 region=region,
-                proportion=args.proportion,
-                grid_size=args.grid_size,
                 pixel_size=pixel_size,
                 skip_validation=args.skip_validation,
+                threads=args.threads,
                 he_image=he_image,
                 he_alignment=he_alignment,
             )
