@@ -20,13 +20,13 @@ jobs:
         run: nextflow run main.nf --step create_sdata -stub --samplesheet assets/samplesheet.csv
 
       - name: Stub create_follicle_sdata
-        run: nextflow run main.nf --step create_follicle_sdata -stub --samplesheet results/sample_sdata_samplesheet.csv
+        run: nextflow run main.nf --step create_follicle_sdata -stub --samplesheet assets/ci_analyze_samplesheet.csv
 
       - name: Stub cluster_sdata
         run: nextflow run main.nf --step cluster_sdata -stub --samplesheet assets/ci_analyze_samplesheet.csv
 
       - name: Stub concat_sdata
-        run: nextflow run main.nf --step concat_sdata -stub --samplesheet results/sample_sdata_samplesheet.csv
+        run: nextflow run main.nf --step concat_sdata -stub --samplesheet assets/ci_analyze_samplesheet.csv
 
       - name: Stub downsample_sdata
         run: nextflow run main.nf --step downsample_sdata -stub --samplesheet assets/ci_analyze_samplesheet.csv --fraction 0.1
