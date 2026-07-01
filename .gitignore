@@ -8,6 +8,7 @@ __pycache__/
 containers/
 .apptainer-cache/
 container/*.sif
+container/images/
 container/.apptainer-tmp/
 container/.nextflow/
 container/.nextflow.log
