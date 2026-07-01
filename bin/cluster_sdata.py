@@ -2,20 +2,18 @@
 """
 cluster_sdata.py - QC, normalize, and cluster a SpatialData zarr.
 
-Reads an existing SpatialData zarr, runs scanpy QC/normalization, PCA, UMAP,
-and Leiden clustering, then computes spatial neighbours and neighbourhood
-enrichment with squidpy. Writes a new self-contained SpatialData zarr
-containing all embeddings, graphs, and cluster labels alongside the original
-spatial elements.
+Reads an existing SpatialData zarr, runs scanpy QC/normalization, PCA,
+neighbours, UMAP, and Leiden clustering, then writes a new self-contained
+SpatialData zarr whose table carries the embeddings, neighbour graph, and
+cluster labels alongside the original spatial elements.
 
-Writes output/clustered.zarr into the current working directory.
+Writes clustered.zarr into the current working directory.
 
 Usage:
     cluster_sdata.py --sample ROI1_A --path /data/ROI1_A.zarr
 """
 
 import argparse
-import os
 
 import scanpy as sc
 import spatialdata
