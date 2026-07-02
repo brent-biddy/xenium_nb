@@ -53,7 +53,9 @@ def main():
         rsc.get.anndata_to_GPU(adata)
 
     with timer("QC"):
-        rsc.pp.calculate_qc_metrics(adata, percent_top=(10, 20, 50, 150), inplace=True)
+        # rapids-singlecell's calculate_qc_metrics writes in place and does not
+        # support scanpy's percent_top; the downstream filters below don't use it.
+        rsc.pp.calculate_qc_metrics(adata)
         n_before = adata.n_obs
         rsc.pp.filter_cells(adata, min_counts=10)
         rsc.pp.filter_genes(adata, min_cells=5)
