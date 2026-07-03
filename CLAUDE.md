@@ -36,20 +36,20 @@ Defined in `nextflow.config`:
 | Profile | Executor | Container |
 |---------|----------|-----------|
 | (none)  | local, no container | requires activated conda env with Quarto + notebook deps |
-| `test`  | local, Apptainer | `babiddy755/xenium_nb:20260505-66addc7`, 2 CPUs, 8 GB |
+| `local` | local, Apptainer | `babiddy755/xenium_nb:20260505-66addc7`, 2 CPUs, 8 GB |
 | `oscer` | SLURM on OSCER HPC, Apptainer | same image, 8 CPUs, memory retries 32→64→96 GB |
 
-The `test` profile defaults `samplesheet` and `cell_ids_file` to the test assets, so no extra flags are needed:
+The `local` profile defaults `samplesheet` and `cell_ids_file` to the test assets, so no extra flags are needed:
 
 ```bash
-nextflow run create.nf --create all -profile test
-nextflow run analyze.nf --analyze plot_follicle -profile test
+nextflow run create.nf --create all -profile local
+nextflow run analyze.nf --analyze plot_follicle -profile local
 ```
 
 ### Stub run (CI-equivalent, no script/notebook execution)
 ```bash
-nextflow run create.nf -stub --create downsample -profile test
-nextflow run create.nf -stub --create all -profile test
+nextflow run create.nf -stub --create downsample -profile local
+nextflow run create.nf -stub --create all -profile local
 nextflow run analyze.nf -stub --samplesheet assets/ci_analyze_samplesheet.csv --analyze plot_follicle
 ```
 
