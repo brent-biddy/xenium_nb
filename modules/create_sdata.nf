@@ -8,8 +8,9 @@ process CREATE_SDATA {
     tuple val(sample), path(input_path), val(he_image), val(he_alignment)
 
     output:
-    tuple val(sample), path('output/*.zarr'), emit: artifacts
-    path "output/**", optional: true, hidden: true, emit: output_tree
+    tuple val(sample), path("${sample}.zarr"), emit: artifacts
+    path "${sample}_timing.tsv", emit: timing
+    path "${sample}_session_info.txt", emit: session_info
 
     script:
     def sdataArgs = ["--sample ${sample}", "--path ${input_path}", "--n_jobs ${task.cpus}"]
@@ -25,9 +26,11 @@ process CREATE_SDATA {
 
     stub:
     """
-    mkdir -p output/${sample}.zarr
-    touch output/${sample}.zarr/.zgroup
-    touch output/${sample}.zarr/.zattrs
-    touch output/${sample}.zarr/.zmetadata
+    mkdir -p ${sample}.zarr
+    touch ${sample}.zarr/.zgroup
+    touch ${sample}.zarr/.zattrs
+    touch ${sample}.zarr/.zmetadata
+    touch ${sample}_timing.tsv
+    touch ${sample}_session_info.txt
     """
 }

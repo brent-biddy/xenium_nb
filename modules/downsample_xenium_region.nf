@@ -2,21 +2,20 @@ process DOWNSAMPLE_XENIUM_REGION {
     tag "${sample}/${region_name}"
 
     publishDir { "${params.outdir}/${sample}/downsample_xenium_region" },
-        mode: 'copy',
-        saveAs: { it.replaceFirst('output/', '') }
+        mode: 'copy'
 
     input:
     tuple val(sample), path(input_path), val(xmin), val(ymin), val(xmax), val(ymax), val(region_name), val(he_image), val(he_alignment)
 
     output:
-    tuple val(sample), path('output/*'), emit: artifacts
+    tuple val(sample), path("${region_name}/*"), emit: artifacts
 
     script:
     def downsampleArgs = [
         "${input_path}",
         "--bbox ${xmin} ${ymin} ${xmax} ${ymax}",
         "--region_name ${region_name}",
-        "--output_dir output",
+        "--output_dir .",
         "--threads ${task.cpus}",
     ]
     if (he_image)     downsampleArgs << "--he_image ${he_image}"
@@ -31,7 +30,7 @@ process DOWNSAMPLE_XENIUM_REGION {
 
     stub:
     """
-    mkdir -p output/${region_name}
-    touch output/${region_name}/experiment.xenium
+    mkdir -p ${region_name}
+    touch ${region_name}/experiment.xenium
     """
 }
