@@ -4,31 +4,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this pipeline does
 
-`xenium_nb` is a Nextflow pipeline for Xenium spatial transcriptomics analysis with two entry points:
+`xenium_nb` is a Nextflow pipeline for Xenium spatial transcriptomics analysis. All steps run through a single entry point, `main.nf`, selected with `--step`:
 
-- `create.nf` — converts raw Xenium outputs into reusable SpatialData zarr artifacts
-- `analyze.nf` — renders Quarto analysis notebooks against artifact samplesheets
+- `downsample_xenium_region` — crops a raw Xenium output directory to a bounding box region
+- `create_sdata` — converts raw Xenium output into a sample-level SpatialData zarr artifact
+- `create_follicle_sdata` — subsets a sample zarr into per-cell follicle zarrs
+- `cluster_sdata` / `cluster_sdata_gpu` — QC, normalize, PCA, neighbors, UMAP, Leiden clustering (CPU vs. RAPIDS/GPU)
+- `concat_sdata` — merges multiple sample zarrs into one
+- `downsample_sdata` — subsamples cells from a SpatialData zarr
+- `plot_follicle` — renders the `plot_follicle.qmd` Quarto notebook per follicle zarr
 
 ## Commands
 
-### Run create workflow
-Both `--samplesheet` and `--create` are required. Valid `--create` values: `downsample`, `sdata`, `follicle_sdata`, `all`.
+### Run a step
+`--samplesheet` is always required; columns vary by step (see `main.nf`'s header comment for the full table). Some steps take extra flags.
 
 ```bash
-nextflow run create.nf --samplesheet assets/samplesheet.csv --create downsample
-nextflow run create.nf --samplesheet assets/samplesheet.csv --create all
-nextflow run create.nf --samplesheet assets/samplesheet.csv --create sdata
-nextflow run create.nf --samplesheet results/sample_sdata_samplesheet.csv --create follicle_sdata
+nextflow run main.nf --step downsample_xenium_region --samplesheet assets/samplesheet.csv
+nextflow run main.nf --step create_sdata --samplesheet assets/downsampled_region_samplesheet.csv
+nextflow run main.nf --step create_follicle_sdata --samplesheet my_sample_zarrs.csv --cell_ids_file assets/stage_quality_area_all_rois.csv
+nextflow run main.nf --step cluster_sdata --samplesheet my_sample_zarrs.csv
+nextflow run main.nf --step cluster_sdata_gpu --samplesheet my_sample_zarrs.csv
+nextflow run main.nf --step concat_sdata --samplesheet assets/concat_sdata_samplesheet.csv
+nextflow run main.nf --step downsample_sdata --samplesheet my_sample_zarrs.csv --fraction 0.1
+nextflow run main.nf --step plot_follicle --samplesheet assets/ci_analyze_samplesheet.csv
 ```
 
-The `downsample` mode requires the samplesheet to include `xmin,ymin,xmax,ymax` columns (µm coordinates) and an optional `region_name` column. The `region_name` defaults to the sample ID if omitted.
+No step writes a handoff samplesheet automatically — `my_sample_zarrs.csv` above is a stand-in for a hand-built `sample,path` CSV pointing at a prior step's output zarrs (e.g. `results/<sample>/create_sdata/output/<sample>.zarr`).
 
-### Run analyze workflow
-Both `--samplesheet` and `--analyze` are required. Valid `--analyze` values: `plot_follicle`, `all`.
-
-```bash
-nextflow run analyze.nf --samplesheet results/follicle_sdata_samplesheet.csv --analyze plot_follicle
-```
+`downsample_xenium_region` requires the samplesheet to include `xmin,ymin,xmax,ymax` columns (µm coordinates) and an optional `region_name` column, which defaults to the sample ID if omitted. `downsample_sdata` requires `--fraction` or `--n_cells`.
 
 ### Profiles
 Defined in `nextflow.config`:
@@ -39,18 +43,22 @@ Defined in `nextflow.config`:
 | `local` | local, Apptainer | `babiddy755/xenium_nb:20260505-66addc7`, 2 CPUs, 8 GB |
 | `oscer` | SLURM on OSCER HPC, Apptainer | same image, 8 CPUs, memory retries 32→64→96 GB |
 
-The `local` profile defaults `samplesheet` and `cell_ids_file` to the test assets, so no extra flags are needed:
+The `local` profile defaults `samplesheet` and `cell_ids_file` to the test assets, and also points `cluster_sdata_gpu` at the local RAPIDS container with WSL2 GPU passthrough settings:
 
 ```bash
-nextflow run create.nf --create all -profile local
-nextflow run analyze.nf --analyze plot_follicle -profile local
+nextflow run main.nf --step cluster_sdata_gpu -profile local
 ```
 
 ### Stub run (CI-equivalent, no script/notebook execution)
 ```bash
-nextflow run create.nf -stub --create downsample -profile local
-nextflow run create.nf -stub --create all -profile local
-nextflow run analyze.nf -stub --samplesheet assets/ci_analyze_samplesheet.csv --analyze plot_follicle
+nextflow run main.nf --step create_sdata -stub --samplesheet assets/samplesheet.csv
+nextflow run main.nf --step create_follicle_sdata -stub --samplesheet assets/ci_analyze_samplesheet.csv
+nextflow run main.nf --step cluster_sdata -stub --samplesheet assets/ci_analyze_samplesheet.csv
+nextflow run main.nf --step cluster_sdata_gpu -stub --samplesheet assets/ci_analyze_samplesheet.csv
+nextflow run main.nf --step concat_sdata -stub --samplesheet assets/ci_analyze_samplesheet.csv
+nextflow run main.nf --step downsample_sdata -stub --samplesheet assets/ci_analyze_samplesheet.csv --fraction 0.1
+nextflow run main.nf --step downsample_xenium_region -stub --samplesheet assets/samplesheet.csv
+nextflow run main.nf --step plot_follicle -stub --samplesheet assets/ci_analyze_samplesheet.csv
 ```
 
 ### Validate notebook registry
@@ -65,18 +73,17 @@ nextflow config .
 
 ## Architecture
 
-### Two-stage data flow
-1. `create.nf` reads a `sample,path` samplesheet and runs `CREATE_SDATA` and/or `CREATE_FOLLICLE_SDATA` (both plain Python scripts) to produce zarr artifacts. It writes `results/sample_sdata_samplesheet.csv` and `results/follicle_sdata_samplesheet.csv` as handoff inputs for the next stage.
-2. `analyze.nf` reads an artifact samplesheet (produced by create) and runs analysis notebook processes, publishing reports under `results/<sample>/<notebook_id>/`.
+### Single entry point, one workflow per step
+`main.nf` dispatches on `--step` to one of eight named workflows, each of which reads a samplesheet, builds a channel of tuples, and pipes it into a single process. There is no chaining between steps inside Nextflow, and no step writes a handoff samplesheet automatically — to run steps in sequence, point the next step's `--samplesheet` at a CSV listing the prior step's published output paths (e.g. `results/<sample>/create_sdata/output/<sample>.zarr`) yourself.
 
-### Create-stage scripts (`bin/`)
-`CREATE_SDATA` runs `bin/create_sdata.py` and `CREATE_FOLLICLE_SDATA` runs `bin/create_follicle_sdata.py`. Both use `argparse` CLIs; parameters are passed directly from the pipeline rather than through a params YAML.
+### Create/cluster/downsample scripts (`bin/`)
+Every step except `plot_follicle` runs a plain Python script with an `argparse` CLI (`bin/<step>.py`), invoked directly from its module's `script:` block — no params YAML involved.
 
 ### Notebook registry (`assets/notebook_registry.json`)
-Maps analysis notebook IDs to their `.qmd` path and the params they declare. This is the source of truth used by `modules/quarto_params.nf` at runtime and validated by `bin/check_notebook_registry.py` in CI. Every param listed in the registry must have a matching variable in the notebook's `#| tags: [parameters]` cell. Create-stage scripts are not registered here.
+Maps analysis notebook IDs (currently just `plot_follicle`) to their `.qmd` path and the params they declare. This is the source of truth used by `modules/quarto_params.nf` at runtime and validated by `bin/check_notebook_registry.py` in CI. Every param listed in the registry must have a matching variable in the notebook's `#| tags: [parameters]` cell. The Python scripts under `bin/` are not registered here.
 
 ### Params YAML flow (`modules/quarto_params.nf`)
-Used by `analyze.nf` only. `paramsFile()` writes `<outdir>/.quarto_params/<notebook>/params_<id>.yml` and returns the path for Nextflow staging. Writing to `outdir` (NFS) rather than `/tmp` is intentional — symlinks to head-node `/tmp` break on OSCER compute nodes.
+Used by the `plot_follicle` step only. `paramsFile()` writes `<outdir>/.quarto_params/<notebook>/params_<id>.yml` and returns the path for Nextflow staging. Writing to `outdir` (NFS) rather than `/tmp` is intentional — symlinks to head-node `/tmp` break on OSCER compute nodes.
 
 ### Process conventions
 - Always use `script:` blocks, never `exec:` — processes must run through SLURM.
@@ -96,22 +103,22 @@ my_script.py ${myArgs.join(' ')}
 
 1. Create `notebooks/analyze/<name>.qmd` with a `#| tags: [parameters]` Python cell declaring all inputs.
 2. Add an entry to `assets/notebook_registry.json` with the notebook ID, relative path, and `params` list matching the parameters cell exactly.
-3. Wire a new process into `modules/analyze_notebooks.nf` and `analyze.nf`.
+3. Wire a new process into `modules/<name>.nf` and add a matching `--step` branch in `main.nf`.
 4. Run `python bin/check_notebook_registry.py` to verify.
 
-## Adding a create-stage script
+## Adding a create/cluster/downsample-stage script
 
-Create-stage steps use plain Python scripts, not notebooks.
+These steps use plain Python scripts, not notebooks.
 
 1. Create `bin/<name>.py` with an `argparse` CLI (`parse_args()` function) declaring all inputs.
-2. Wire a new process into `modules/create_notebooks.nf` and `create.nf`, passing args directly.
+2. Wire a new process into `modules/<name>.nf` and add a matching `--step` branch in `main.nf`, passing args directly.
 3. No registry entry is needed.
 
 ## CI
 
 Two GitHub Actions run on PRs to `main`:
 - **Validate notebook registry** — runs `python bin/check_notebook_registry.py`
-- **Stub run** — runs both entry points with `-stub` to verify workflow wiring without executing scripts or notebooks
+- **Stub run** — runs every `main.nf --step` with `-stub` to verify workflow wiring without executing scripts or notebooks
 
 ## Code style (`.nf` files)
 
