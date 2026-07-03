@@ -1,11 +1,6 @@
 # xenium_nb
 
-A Nextflow pipeline for Xenium spatial transcriptomics data with two separate entry points:
-
-- `create.nf` builds reusable data artifacts
-- `analyze.nf` runs analysis notebooks against artifact samplesheets
-
-Notebook-specific inputs, outputs, and samplesheet contracts are documented in [notebooks/README.md](notebooks/README.md).
+A Nextflow pipeline for Xenium spatial transcriptomics data. All steps run through a single entry point, `main.nf`, selected with `--step`.
 
 ---
 
@@ -21,22 +16,30 @@ Notebook-specific inputs, outputs, and samplesheet contracts are documented in [
 
 ```
 xenium_nb/
-├── create.nf                  # Create workflow: raw Xenium -> sample and follicle artifacts
-├── analyze.nf                 # Analysis workflow: artifact samplesheet -> notebook reports
-├── nextflow.config            # Parameters and profiles
+├── main.nf                        # Single entry point; dispatches on --step
+├── nextflow.config                # Parameters and profiles
 ├── modules/
-│   ├── create_notebooks.nf    # Create-stage process definitions
-│   ├── analyze_notebooks.nf   # Analysis notebook process definitions
-│   └── quarto_params.nf       # Quarto params YAML helper (used by analyze.nf)
+│   ├── downsample_xenium_region.nf  # Crop raw Xenium output to a bounding box
+│   ├── create_sdata.nf              # Raw Xenium → sample-level SpatialData zarr
+│   ├── create_follicle_sdata.nf     # Sample zarr → per-cell follicle zarrs
+│   ├── cluster_sdata.nf             # QC, normalize, PCA, UMAP, Leiden clustering (CPU)
+│   ├── cluster_sdata_gpu.nf         # Same clustering pipeline, RAPIDS-accelerated (GPU)
+│   ├── concat_sdata.nf              # Merge multiple SpatialData zarrs into one
+│   ├── downsample_sdata.nf          # Subsample cells from a SpatialData zarr
+│   ├── plot_follicle.nf             # Per-cell follicle plots (Quarto notebook)
+│   └── quarto_params.nf             # Quarto params YAML helper (used by plot_follicle)
 ├── notebooks/
 │   ├── README.md
 │   └── analyze/
 │       └── plot_follicle.qmd
 ├── bin/
+│   ├── downsample_xenium_region.py  # Crop a Xenium output to a bounding box region
 │   ├── create_sdata.py              # Convert raw Xenium output to SpatialData zarr
 │   ├── create_follicle_sdata.py     # Subset sample zarr into per-cell follicle zarrs
-│   ├── downsample_xenium.py         # Downsample a full Xenium output directory
-│   ├── downsample_xenium_region.py  # Crop a Xenium output to a bounding box region
+│   ├── cluster_sdata.py             # QC, normalize, cluster, write zarr (CPU)
+│   ├── cluster_sdata_gpu.py         # QC, normalize, cluster, write zarr (RAPIDS/GPU)
+│   ├── concat_sdata.py              # Concatenate SpatialData zarrs
+│   ├── downsample_sdata.py          # Subsample a SpatialData zarr
 │   ├── check_notebook_registry.py   # CI validator for notebook registry
 │   └── timer.py                     # Timing utilities for scripts and notebooks
 └── assets/
@@ -50,55 +53,62 @@ xenium_nb/
 
 ## Usage
 
-### Create artifacts
+Every step is run the same way:
 
 ```bash
-nextflow run create.nf \
-    --samplesheet assets/samplesheet.csv \
-    --create all
+nextflow run main.nf --step <name> --samplesheet <path> [step-specific flags]
 ```
 
-This runs both create-stage scripts:
+| Step | Samplesheet columns | Extra flags |
+|------|----------------------|-------------|
+| `downsample_xenium_region` | `sample, path, xmin, ymin, xmax, ymax[, region_name, he_image, he_alignment]` | |
+| `create_sdata` | `sample, path[, he_image, he_alignment]` | |
+| `create_follicle_sdata` | `sample, path` | `--cell_ids_file <path>` (required) |
+| `cluster_sdata` | `sample, path` | |
+| `cluster_sdata_gpu` | `sample, path` | |
+| `concat_sdata` | `path` | |
+| `downsample_sdata` | `sample, path` | `--fraction <float>` or `--n_cells <int>` (one required) |
+| `plot_follicle` | `sample, cell, path` | |
 
-- `bin/create_sdata.py` — raw Xenium → sample-level SpatialData zarr
-- `bin/create_follicle_sdata.py` — sample zarr → per-cell follicle zarrs
-
-and writes:
-
-- sample zarrs under `results/<sample>/create_sdata/output/`
-- follicle zarrs under `results/<sample>/follicle_sdata/output/`
-- `results/sample_sdata_samplesheet.csv`
-- `results/follicle_sdata_samplesheet.csv`
-
-### Create sdata only
+Examples:
 
 ```bash
-nextflow run create.nf \
-    --samplesheet assets/samplesheet.csv \
-    --create sdata
+# Crop raw Xenium output to a bounding box region
+nextflow run main.nf --step downsample_xenium_region \
+    --samplesheet assets/samplesheet.csv
+
+# Raw Xenium → sample-level SpatialData zarr
+nextflow run main.nf --step create_sdata \
+    --samplesheet assets/downsampled_region_samplesheet.csv
+
+# Sample zarr → per-cell follicle zarrs (samplesheet: sample,path -> *.zarr from create_sdata)
+nextflow run main.nf --step create_follicle_sdata \
+    --samplesheet my_sample_zarrs.csv \
+    --cell_ids_file assets/stage_quality_area_all_rois.csv
+
+# Cluster a sample zarr (CPU)
+nextflow run main.nf --step cluster_sdata \
+    --samplesheet my_sample_zarrs.csv
+
+# Cluster a sample zarr (GPU, RAPIDS)
+nextflow run main.nf --step cluster_sdata_gpu \
+    --samplesheet my_sample_zarrs.csv
+
+# Merge multiple sample zarrs into one
+nextflow run main.nf --step concat_sdata \
+    --samplesheet assets/concat_sdata_samplesheet.csv
+
+# Subsample a sample zarr
+nextflow run main.nf --step downsample_sdata \
+    --samplesheet my_sample_zarrs.csv \
+    --fraction 0.1
+
+# Render per-cell follicle plots
+nextflow run main.nf --step plot_follicle \
+    --samplesheet assets/ci_analyze_samplesheet.csv
 ```
 
-Writes `results/sample_sdata_samplesheet.csv`, which can be used as input to `--create follicle_sdata`.
-
-### Create follicle sdata only
-
-Run this after `create sdata` has produced `results/sample_sdata_samplesheet.csv`:
-
-```bash
-nextflow run create.nf \
-    --samplesheet results/sample_sdata_samplesheet.csv \
-    --create follicle_sdata
-```
-
-Writes `results/follicle_sdata_samplesheet.csv`.
-
-### Analyze follicle artifacts
-
-```bash
-nextflow run analyze.nf \
-    --samplesheet results/follicle_sdata_samplesheet.csv \
-    --analyze plot_follicle
-```
+No step writes a handoff samplesheet automatically. `create_sdata` writes zarrs under `results/<sample>/create_sdata/output/` (see [Output structure](#output-structure)) — to chain steps together, point the next step's `--samplesheet` at a CSV listing those output paths yourself.
 
 ---
 
@@ -108,14 +118,13 @@ Key parameters (set in `nextflow.config` or passed via `--param value`):
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `samplesheet` | *(required)* | Path to samplesheet CSV |
+| `step` | *(required)* | Pipeline step to run; see the table above |
+| `samplesheet` | *(required)* | Path to samplesheet CSV (columns vary by step) |
 | `outdir` | `results` | Output directory |
-| `cell_ids_file` | `${projectDir}/assets/stage_quality_area_all_rois.csv` | Cell ID reference file path |
-| `radius` | `100` | Default bounding box radius (µm) |
-| `create` | *(required)* | Create workflow mode: `sdata`, `follicle_sdata`, or `all` |
-| `analyze` | *(required)* | Analysis notebook selector: `all` or a notebook ID from `assets/notebook_registry.json` |
-
-Analysis notebook IDs and how to add new notebooks are documented in [notebooks/README.md](notebooks/README.md).
+| `cell_ids_file` | `${launchDir}/assets/stage_quality_area_all_rois.csv` | Cell ID reference file for `create_follicle_sdata` |
+| `radius` | `100` | Default bounding box radius (µm) around each cell centroid; overridable per-cell via a `radius` column in `cell_ids_file` |
+| `fraction` | `0.1` | Fraction of cells to retain in `downsample_sdata` |
+| `n_cells` | `null` | Absolute cell count to retain in `downsample_sdata` (alternative to `fraction`) |
 
 ### Profiles
 
@@ -125,20 +134,15 @@ Analysis notebook IDs and how to add new notebooks are documented in [notebooks/
 | `local` | Local execution with Apptainer, sized for a laptop / WSL2 box (2 CPUs, 8 GB). Defaults `samplesheet` and `cell_ids_file` to the test assets. Also points `CLUSTER_SDATA_GPU` at the local RAPIDS container with WSL2 GPU passthrough settings. |
 | `oscer` | SLURM executor on OSCER HPC, Apptainer container, scratch-based work directory. Memory scales 32→64→96 GB across retries. |
 
-Activate with `-profile oscer`:
-
 ```bash
-nextflow run create.nf \
+# Local profile (no --samplesheet needed)
+nextflow run main.nf --step cluster_sdata_gpu -profile local
+
+# OSCER HPC
+nextflow run main.nf \
+    --step create_sdata \
     --samplesheet assets/samplesheet.csv \
-    --create all \
     -profile oscer
-```
-
-For local containerized runs:
-
-```bash
-nextflow run create.nf --create all -profile local
-nextflow run analyze.nf --analyze plot_follicle -profile local
 ```
 
 ---
@@ -150,9 +154,11 @@ results/
 ├── pipeline_info/
 │   ├── timeline.html
 │   └── report.html
-├── sample_sdata_samplesheet.csv
-├── follicle_sdata_samplesheet.csv
+├── concat_sdata/
+│   └── merged.zarr/
 ├── ROI1_A/
+│   ├── downsample_xenium_region/
+│   │   └── ROI1_A/
 │   ├── create_sdata/
 │   │   └── output/
 │   │       └── ROI1_A.zarr/
@@ -160,15 +166,17 @@ results/
 │   │   └── output/
 │   │       ├── aaaaimck-1.zarr/
 │   │       └── aaameida-1.zarr/
+│   ├── cluster_sdata/
+│   │   └── clustered.zarr/
+│   ├── cluster_sdata_gpu/
+│   │   └── clustered.zarr/
+│   ├── downsample_sdata/
+│   │   └── downsampled.zarr/
 │   └── plot_follicle/
 │       ├── aaaaimck-1_plot_follicle.pptx
-│       ├── aaaaimck-1_plot_follicle.timing.tsv
-│       ├── aaameida-1_plot_follicle.pptx
-│       └── aaameida-1_plot_follicle.timing.tsv
+│       └── aaameida-1_plot_follicle.pptx
 └── ROI1_B/
     └── ...
 ```
 
-If `--create sdata` is used, `follicle_sdata/` outputs and `results/follicle_sdata_samplesheet.csv` are not created.
-
-The sample-stage sheet is the handoff input for `--create follicle_sdata`.
+Each step publishes under `results/<sample>/<step>/`, except `concat_sdata`, which merges multiple samples and publishes once under `results/concat_sdata/`.
