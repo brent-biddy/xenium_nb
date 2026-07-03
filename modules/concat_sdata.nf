@@ -7,7 +7,7 @@ process CONCAT_SDATA {
     path input_paths
 
     output:
-    path 'merged.zarr', emit: artifacts
+    path '*.zarr', emit: artifacts
     path "concat_sdata_timing.tsv", emit: timing
     path "concat_sdata_session_info.txt", emit: session_info
 

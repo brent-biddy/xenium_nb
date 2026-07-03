@@ -155,7 +155,7 @@ results/
 │   ├── timeline.html
 │   └── report.html
 ├── concat_sdata/
-│   └── merged.zarr/
+│   └── <sample1>_<sample2>.zarr/
 ├── ROI1_A/
 │   ├── downsample_xenium_region/
 │   │   └── ROI1_A/
