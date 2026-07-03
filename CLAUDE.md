@@ -30,7 +30,7 @@ nextflow run main.nf --step downsample_sdata --samplesheet my_sample_zarrs.csv -
 nextflow run main.nf --step plot_follicle --samplesheet assets/ci_analyze_samplesheet.csv
 ```
 
-No step writes a handoff samplesheet automatically — `my_sample_zarrs.csv` above is a stand-in for a hand-built `sample,path` CSV pointing at a prior step's output zarrs (e.g. `results/<sample>/create_sdata/output/<sample>.zarr`).
+No step writes a handoff samplesheet automatically — `my_sample_zarrs.csv` above is a stand-in for a hand-built `sample,path` CSV pointing at a prior step's output zarrs (e.g. `results/<sample>/create_sdata/<sample>.zarr`).
 
 `downsample_xenium_region` requires the samplesheet to include `xmin,ymin,xmax,ymax` columns (µm coordinates) and an optional `region_name` column, which defaults to the sample ID if omitted. `downsample_sdata` requires `--fraction` or `--n_cells`.
 
@@ -74,7 +74,7 @@ nextflow config .
 ## Architecture
 
 ### Single entry point, one workflow per step
-`main.nf` dispatches on `--step` to one of eight named workflows, each of which reads a samplesheet, builds a channel of tuples, and pipes it into a single process. There is no chaining between steps inside Nextflow, and no step writes a handoff samplesheet automatically — to run steps in sequence, point the next step's `--samplesheet` at a CSV listing the prior step's published output paths (e.g. `results/<sample>/create_sdata/output/<sample>.zarr`) yourself.
+`main.nf` dispatches on `--step` to one of eight named workflows, each of which reads a samplesheet, builds a channel of tuples, and pipes it into a single process. There is no chaining between steps inside Nextflow, and no step writes a handoff samplesheet automatically — to run steps in sequence, point the next step's `--samplesheet` at a CSV listing the prior step's published output paths (e.g. `results/<sample>/create_sdata/<sample>.zarr`) yourself.
 
 ### Create/cluster/downsample scripts (`bin/`)
 Every step except `plot_follicle` runs a plain Python script with an `argparse` CLI (`bin/<step>.py`), invoked directly from its module's `script:` block — no params YAML involved.
