@@ -1,11 +1,18 @@
 # Container Build
 
-This directory captures the runtime used by the Xenium notebooks.
-The primary local workflow is:
+This directory captures a CPU-only runtime for the Xenium notebooks. It is **not currently
+referenced by any `nextflow.config` profile** — `local` and `oscer` both use
+`babiddy755/python_spatial:1.0.0` (built from `/home/babiddy/containers/definitions/python_spatial/`,
+which includes RAPIDS for GPU clustering alongside the same spatialdata/squidpy/Quarto stack).
+This directory is kept for reference in case a CPU-only image is needed again; the workflow
+below still builds and validates it, but you'd need to point a profile's `container` at the
+result to actually use it.
+
+The build workflow is:
 
 1. build a local `.sif` with Apptainer
-2. validate the pipeline locally with `-profile local`
-3. build and push the matching Docker image to a registry for OSCER
+2. validate it locally
+3. build and push the matching Docker image to a registry
 
 ## Files
 
