@@ -33,9 +33,9 @@ ROI1_A,aaaaimck-1,results/ROI1_A/follicle_sdata/output/aaaaimck-1.zarr
 ## Running
 
 ```bash
-nextflow run create.nf --samplesheet assets/samplesheet.csv --create sdata
-nextflow run create.nf --samplesheet results/sample_sdata_samplesheet.csv --create follicle_sdata
-nextflow run analyze.nf --samplesheet results/follicle_sdata_samplesheet.csv --analyze plot_follicle
+nextflow run main.nf --step create_sdata --samplesheet assets/samplesheet.csv
+nextflow run main.nf --step create_follicle_sdata --samplesheet results/sample_sdata_samplesheet.csv --cell_ids_file assets/stage_quality_area_all_rois.csv
+nextflow run main.nf --step plot_follicle --samplesheet results/follicle_sdata_samplesheet.csv
 ```
 
 ## Analysis Notebook IDs
@@ -52,7 +52,7 @@ Notebook metadata is defined in [`../assets/notebook_registry.json`](../assets/n
 
 1. Create `notebooks/analyze/<name>.qmd` with a `#| tags: [parameters]` Python cell declaring all inputs.
 2. Add an entry to [`../assets/notebook_registry.json`](../assets/notebook_registry.json) with a unique ID, the relative path, and a `params` list matching the parameters cell exactly.
-3. Wire a new process into `modules/analyze_notebooks.nf` and `analyze.nf`.
+3. Wire a new process into `modules/<name>.nf` and add a matching `--step` branch in `main.nf`.
 4. Run `python bin/check_notebook_registry.py` to verify.
 
 ## Adding a create-stage script
@@ -60,5 +60,5 @@ Notebook metadata is defined in [`../assets/notebook_registry.json`](../assets/n
 Create-stage steps run plain Python scripts, not notebooks.
 
 1. Create `bin/<name>.py` with an `argparse` CLI matching the inputs the process needs.
-2. Wire a new process into `modules/create_notebooks.nf` and `create.nf`.
+2. Wire a new process into `modules/<name>.nf` and add a matching `--step` branch in `main.nf`.
 3. No registry entry is needed for scripts.

@@ -37,12 +37,13 @@ You can also pass an explicit output path:
 ./container/build_apptainer.sh /absolute/path/to/xenium_tools_squidpy_local.sif
 ```
 
-Use the SIF directly with local Apptainer-backed Nextflow runs:
+Use the SIF directly with local Apptainer-backed Nextflow runs by pointing the `local` profile's
+container at it in `nextflow.config`, then:
 
 ```bash
-nextflow run create.nf \
+nextflow run main.nf \
+  --step create_sdata \
   -profile local \
-  --container_image /absolute/path/to/container/xenium_tools_squidpy_local.sif \
   --samplesheet assets/samplesheet.csv
 ```
 
@@ -81,4 +82,4 @@ docker tag xenium_tools_squidpy:local babiddy755/xenium_nb:<tag>
 docker push babiddy755/xenium_nb:<tag>
 ```
 
-Then point OSCER at that tag with `--container_image` or update the default in `nextflow.config`.
+Then point OSCER at that tag by updating the default container in the `oscer` profile in `nextflow.config`.
