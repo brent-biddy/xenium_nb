@@ -4,7 +4,7 @@ create_follicle_sdata.py - Subset a sample-level SpatialData zarr into one zarr 
 
 For each cell listed in cell_ids_file that belongs to the given sample, queries a
 bounding box of ± radius around the cell centroid and writes a follicle-level zarr
-to output/<cell_id>.zarr.
+to <cell_id>.zarr in the current working directory.
 
 Usage:
     create_follicle_sdata.py --sample ROI1_A --path ROI1_A.zarr \
@@ -12,7 +12,6 @@ Usage:
 """
 
 import argparse
-import os
 
 import pandas as pd
 import spatialdata
@@ -85,7 +84,6 @@ def main():
 
     print(f"Sample:   {args.sample}")
     print(f"Input:    {zarr_path}")
-    print(f"Output:   output/")
 
     # read_zarr opens the store lazily — array data is not loaded into memory
     # until accessed. This keeps startup fast even for large whole-sample zarrs.
@@ -101,8 +99,6 @@ def main():
     # The bounding box query runs in "global" (pixel) space, so both the centroid
     # coordinates and the radius must be converted from µm to pixels.
     radius_px_per_um = 1.0 / XENIUM_PIXEL_SIZE_UM
-
-    os.makedirs("output", exist_ok=True)
 
     for idx, row in cells.iterrows():
         cell_id = row["cell_id"]
@@ -130,15 +126,15 @@ def main():
             )
 
         with timer(f"Write {cell_id}"):
-            out = os.path.join("output", f"{cell_id}.zarr")
+            out = f"{cell_id}.zarr"
             embed_metadata(sdata_fov, cell_id, row)
             sdata_fov.write(out, overwrite=True)
 
         print(f"  {cell_id}: centroid=({cx:.1f}, {cy:.1f})  radius={radius:.1f}  →  {out}")
 
-    timing_summary(path=f"output/{args.sample}_timing.tsv")
+    timing_summary(path=f"{args.sample}_timing.tsv")
 
-    session_info_path = f"output/{args.sample}_session_info.txt"
+    session_info_path = f"{args.sample}_session_info.txt"
     session_info.show(write_req_file=True, req_file_name=session_info_path)
     print(f"Session info written to {session_info_path}")
 

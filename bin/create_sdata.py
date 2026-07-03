@@ -7,8 +7,8 @@ cells, transcripts, segmentation masks, morphology images, and optionally an
 aligned H&E image and DAPI z-stack. The zarr is the primary artifact consumed
 by downstream analysis notebooks.
 
-Writes output/<sample>.zarr into the current working directory.
-Timing and session info are written to output/ alongside the zarr.
+Writes <sample>.zarr into the current working directory, alongside
+timing and session info files.
 
 Usage:
     create_sdata.py --sample ROI1_A --path /data/ROI1_A --n_jobs 4
@@ -17,7 +17,6 @@ Usage:
 """
 
 import argparse
-import os
 from pathlib import Path
 
 import spatialdata_io
@@ -49,7 +48,7 @@ def parse_args():
 def main():
     args = parse_args()
 
-    output_path = os.path.join("output", f"{args.sample}.zarr")
+    output_path = f"{args.sample}.zarr"
     # morphology.ome.tif is the full DAPI z-stack (all focal planes). It is separate
     # from morphology_focus/, which contains the single best-focus plane per channel.
     morphology_3d_path = Path(args.path) / "morphology.ome.tif"
@@ -109,7 +108,6 @@ def main():
         print("Skipping DAPI z-stack (morphology.ome.tif not found).")
 
     with timer("Write zarr"):
-        os.makedirs("output", exist_ok=True)
         sdata.write(output_path, overwrite=True)
     print(f"Written to {output_path}")
 
@@ -120,9 +118,9 @@ def main():
         for name, element in group.items():
             print(f"  {name}: {type(element).__name__} [{group_name}]")
 
-    timing_summary(path=f"output/{args.sample}_timing.tsv")
+    timing_summary(path=f"{args.sample}_timing.tsv")
 
-    session_info_path = f"output/{args.sample}_session_info.txt"
+    session_info_path = f"{args.sample}_session_info.txt"
     session_info.show(write_req_file=True, req_file_name=session_info_path)
     print(f"Session info written to {session_info_path}")
 

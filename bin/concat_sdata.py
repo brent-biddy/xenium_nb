@@ -3,7 +3,8 @@
 concat_sdata.py - Concatenate multiple SpatialData zarr stores into one.
 
 Reads each input zarr with spatialdata.read_zarr(), merges them with
-spatialdata.concatenate(), and writes the result to merged.zarr.
+spatialdata.concatenate(), and writes the result to
+<sorted_sample_keys_joined_with_underscore>.zarr.
 
 Usage:
     concat_sdata.py --paths ROI1_A.zarr ROI1_B.zarr ROI2_A.zarr
@@ -29,9 +30,6 @@ def parse_args():
 def main():
     args = parse_args()
 
-    output_path = "merged.zarr"
-
-    print(f"Output:      {output_path}")
     print(f"Inputs ({len(args.paths)}):")
     for p in args.paths:
         print(f"  {p}")
@@ -44,6 +42,11 @@ def main():
             sdata = spatialdata.read_zarr(path)
         key = sdata.tables["table"].obs["sample"].iloc[0]
         sdata_dict[key] = sdata
+
+    # Output name reflects the merged samples so downstream samplesheets stay
+    # self-describing without hand-editing a hardcoded "merged.zarr" entry.
+    output_path = "_".join(sorted(sdata_dict.keys())) + ".zarr"
+    print(f"Output:      {output_path}")
 
     with timer("Concatenate"):
         # concatenate_tables merges the per-sample "table" elements into a
