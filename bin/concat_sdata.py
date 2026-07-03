@@ -46,7 +46,11 @@ def main():
         sdata_dict[key] = sdata
 
     with timer("Concatenate"):
-        merged = spatialdata.concatenate(sdata_dict)
+        # concatenate_tables merges the per-sample "table" elements into a
+        # single "table" (obs distinguished by the existing "sample" column)
+        # instead of suffixing them into table-<key>, so cluster_sdata's
+        # hardcoded table_key = "table" can read the merged object.
+        merged = spatialdata.concatenate(sdata_dict, concatenate_tables=True)
 
     with timer("Write zarr"):
         merged.write(output_path, overwrite=True)
