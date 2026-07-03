@@ -40,7 +40,7 @@ Defined in `nextflow.config`:
 | Profile | Executor | Container |
 |---------|----------|-----------|
 | (none)  | local, no container | requires activated conda env with Quarto + notebook deps |
-| `local` | local, Apptainer | `babiddy755/xenium_nb:20260505-66addc7`, 2 CPUs, 8 GB |
+| `local` | local, Apptainer | `babiddy755/python_spatial:1.0.0`, 8 CPUs, 16 GB |
 | `oscer` | SLURM on OSCER HPC, Apptainer | same image, 8 CPUs, memory retries 32→64→96 GB |
 
 The `local` profile defaults `samplesheet` and `cell_ids_file` to the test assets, and also points `cluster_sdata_gpu` at the local RAPIDS container with WSL2 GPU passthrough settings:

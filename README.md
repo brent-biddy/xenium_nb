@@ -131,7 +131,7 @@ Key parameters (set in `nextflow.config` or passed via `--param value`):
 | Profile | Description |
 |---------|-------------|
 | (default) | Local execution, no container (use an activated conda env that provides the notebook kernel). |
-| `local` | Local execution with Apptainer, sized for a laptop / WSL2 box (2 CPUs, 8 GB). Defaults `samplesheet` and `cell_ids_file` to the test assets. Also points `CLUSTER_SDATA_GPU` at the local RAPIDS container with WSL2 GPU passthrough settings. |
+| `local` | Local execution with Apptainer, sized for a laptop / WSL2 box (8 CPUs, 16 GB). Uses `babiddy755/python_spatial:1.0.0` (RAPIDS + spatialdata/squidpy/Quarto) for every process. Defaults `samplesheet` and `cell_ids_file` to the test assets. `CLUSTER_SDATA_GPU` additionally gets WSL2 GPU passthrough `containerOptions`. |
 | `oscer` | SLURM executor on OSCER HPC, Apptainer container, scratch-based work directory. Memory scales 32→64→96 GB across retries. |
 
 ```bash
