@@ -122,7 +122,7 @@ Analysis notebook IDs and how to add new notebooks are documented in [notebooks/
 | Profile | Description |
 |---------|-------------|
 | (default) | Local execution, no container (use an activated conda env that provides the notebook kernel). |
-| `test` | Local execution with Apptainer, sized for a laptop / WSL2 box (2 CPUs, 8 GB). Defaults `samplesheet` and `cell_ids_file` to the test assets. |
+| `local` | Local execution with Apptainer, sized for a laptop / WSL2 box (2 CPUs, 8 GB). Defaults `samplesheet` and `cell_ids_file` to the test assets. Also points `CLUSTER_SDATA_GPU` at the local RAPIDS container with WSL2 GPU passthrough settings. |
 | `oscer` | SLURM executor on OSCER HPC, Apptainer container, scratch-based work directory. Memory scales 32→64→96 GB across retries. |
 
 Activate with `-profile oscer`:
@@ -137,8 +137,8 @@ nextflow run create.nf \
 For local containerized runs:
 
 ```bash
-nextflow run create.nf --create all -profile test
-nextflow run analyze.nf --analyze plot_follicle -profile test
+nextflow run create.nf --create all -profile local
+nextflow run analyze.nf --analyze plot_follicle -profile local
 ```
 
 ---
