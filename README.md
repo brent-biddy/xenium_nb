@@ -81,18 +81,18 @@ nextflow run main.nf --step downsample_xenium_region \
 nextflow run main.nf --step create_sdata \
     --samplesheet assets/downsampled_region_samplesheet.csv
 
-# Sample zarr → per-cell follicle zarrs
+# Sample zarr → per-cell follicle zarrs (samplesheet: sample,path -> *.zarr from create_sdata)
 nextflow run main.nf --step create_follicle_sdata \
-    --samplesheet results/sample_sdata_samplesheet.csv \
+    --samplesheet my_sample_zarrs.csv \
     --cell_ids_file assets/stage_quality_area_all_rois.csv
 
 # Cluster a sample zarr (CPU)
 nextflow run main.nf --step cluster_sdata \
-    --samplesheet results/sample_sdata_samplesheet.csv
+    --samplesheet my_sample_zarrs.csv
 
 # Cluster a sample zarr (GPU, RAPIDS)
 nextflow run main.nf --step cluster_sdata_gpu \
-    --samplesheet results/sample_sdata_samplesheet.csv
+    --samplesheet my_sample_zarrs.csv
 
 # Merge multiple sample zarrs into one
 nextflow run main.nf --step concat_sdata \
@@ -100,15 +100,15 @@ nextflow run main.nf --step concat_sdata \
 
 # Subsample a sample zarr
 nextflow run main.nf --step downsample_sdata \
-    --samplesheet results/sample_sdata_samplesheet.csv \
+    --samplesheet my_sample_zarrs.csv \
     --fraction 0.1
 
 # Render per-cell follicle plots
 nextflow run main.nf --step plot_follicle \
-    --samplesheet results/follicle_sdata_samplesheet.csv
+    --samplesheet assets/ci_analyze_samplesheet.csv
 ```
 
-`create_sdata` writes zarrs under `results/<sample>/create_sdata/output/` — point a later step's `--samplesheet` at those paths (see [Output structure](#output-structure)) to chain steps together.
+No step writes a handoff samplesheet automatically. `create_sdata` writes zarrs under `results/<sample>/create_sdata/output/` (see [Output structure](#output-structure)) — to chain steps together, point the next step's `--samplesheet` at a CSV listing those output paths yourself.
 
 ---
 
@@ -154,8 +154,6 @@ results/
 ├── pipeline_info/
 │   ├── timeline.html
 │   └── report.html
-├── sample_sdata_samplesheet.csv
-├── follicle_sdata_samplesheet.csv
 ├── concat_sdata/
 │   └── merged.zarr/
 ├── ROI1_A/
