@@ -24,6 +24,7 @@ xenium_nb/
 │   ├── create_follicle_sdata.nf     # Sample zarr → per-cell follicle zarrs
 │   ├── cluster_sdata.nf             # QC, normalize, PCA, UMAP, Leiden clustering (CPU)
 │   ├── cluster_sdata_gpu.nf         # Same clustering pipeline, RAPIDS-accelerated (GPU)
+│   ├── cluster_sdata_gpu_ooc.nf     # Same, but streams X through Dask (out-of-core GPU)
 │   ├── concat_sdata.nf              # Merge multiple SpatialData zarrs into one
 │   ├── downsample_sdata.nf          # Subsample cells from a SpatialData zarr
 │   ├── plot_follicle.nf             # Per-cell follicle plots (Quarto notebook)
@@ -38,6 +39,7 @@ xenium_nb/
 │   ├── create_follicle_sdata.py     # Subset sample zarr into per-cell follicle zarrs
 │   ├── cluster_sdata.py             # QC, normalize, cluster, write zarr (CPU)
 │   ├── cluster_sdata_gpu.py         # QC, normalize, cluster, write zarr (RAPIDS/GPU)
+│   ├── cluster_sdata_gpu_ooc.py     # Same, but streams X through Dask (out-of-core GPU)
 │   ├── concat_sdata.py              # Concatenate SpatialData zarrs
 │   ├── downsample_sdata.py          # Subsample a SpatialData zarr
 │   ├── check_notebook_registry.py   # CI validator for notebook registry
@@ -66,6 +68,7 @@ nextflow run main.nf --step <name> --samplesheet <path> [step-specific flags]
 | `create_follicle_sdata` | `sample, path` | `--cell_ids_file <path>` (required) |
 | `cluster_sdata` | `sample, path` | |
 | `cluster_sdata_gpu` | `sample, path` | |
+| `cluster_sdata_gpu_ooc` | `sample, path` | `--chunk_size <int>`, `--n_top_genes <int>` (both optional) |
 | `concat_sdata` | `path` | |
 | `downsample_sdata` | `sample, path` | `--fraction <float>` or `--n_cells <int>` (one required) |
 | `plot_follicle` | `sample, cell, path` | |
@@ -93,6 +96,12 @@ nextflow run main.nf --step cluster_sdata \
 # Cluster a sample zarr (GPU, RAPIDS)
 nextflow run main.nf --step cluster_sdata_gpu \
     --samplesheet my_sample_zarrs.csv
+
+# Cluster a zarr too large for VRAM (GPU, RAPIDS out-of-core via Dask)
+nextflow run main.nf --step cluster_sdata_gpu_ooc \
+    --samplesheet my_sample_zarrs.csv \
+    --chunk_size 20000 \
+    --n_top_genes 2000
 
 # Merge multiple sample zarrs into one
 nextflow run main.nf --step concat_sdata \
@@ -125,13 +134,15 @@ Key parameters (set in `nextflow.config` or passed via `--param value`):
 | `radius` | `100` | Default bounding box radius (µm) around each cell centroid; overridable per-cell via a `radius` column in `cell_ids_file` |
 | `fraction` | `0.1` | Fraction of cells to retain in `downsample_sdata` |
 | `n_cells` | `null` | Absolute cell count to retain in `downsample_sdata` (alternative to `fraction`) |
+| `chunk_size` | `20000` | Row chunk size for the lazily-loaded X matrix in `cluster_sdata_gpu_ooc` |
+| `n_top_genes` | `2000` | Highly variable genes kept before PCA in `cluster_sdata_gpu_ooc` |
 
 ### Profiles
 
 | Profile | Description |
 |---------|-------------|
 | (default) | Local execution, no container (use an activated conda env that provides the notebook kernel). |
-| `local` | Local execution with Apptainer, sized for a laptop / WSL2 box (8 CPUs, 16 GB). Uses `babiddy755/python_spatial:1.0.0` (RAPIDS + spatialdata/squidpy/Quarto) for every process. Defaults `samplesheet` and `cell_ids_file` to the test assets. `CLUSTER_SDATA_GPU` additionally gets WSL2 GPU passthrough `containerOptions`. |
+| `local` | Local execution with Apptainer, sized for a laptop / WSL2 box (8 CPUs, 16 GB). Uses `babiddy755/python_spatial:1.2.0` (Python 3.12, RAPIDS + spatialdata/squidpy/Quarto) for every process. Defaults `samplesheet` and `cell_ids_file` to the test assets. `CLUSTER_SDATA_GPU` and `CLUSTER_SDATA_GPU_OOC` additionally get WSL2 GPU passthrough `containerOptions`. |
 | `oscer` | SLURM executor on OSCER HPC, Apptainer container, scratch-based work directory. Memory scales 32→64→96 GB across retries. |
 
 ```bash
@@ -169,6 +180,8 @@ results/
 │   ├── cluster_sdata/
 │   │   └── clustered.zarr/
 │   ├── cluster_sdata_gpu/
+│   │   └── clustered.zarr/
+│   ├── cluster_sdata_gpu_ooc/
 │   │   └── clustered.zarr/
 │   ├── downsample_sdata/
 │   │   └── downsampled.zarr/
