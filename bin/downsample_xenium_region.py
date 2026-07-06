@@ -54,10 +54,10 @@ def open_zip_read_store(path, mode):
 
 def create_zarr_dataset(group, name, data=None, **kwargs):
     if data is not None:
-        kwargs.setdefault("shape", np.shape(data))
-        kwargs.setdefault("dtype", getattr(data, "dtype", np.asarray(data).dtype))
-        return group.create_dataset(name, data=data, **kwargs)
-    return group.create_dataset(name, **kwargs)
+        # create_array infers shape/dtype from data and errors if shape is
+        # passed alongside it.
+        return group.create_array(name, data=data, **kwargs)
+    return group.create_array(name, **kwargs)
 
 
 def open_directory_group(path, mode):
@@ -771,7 +771,7 @@ def process_cells_zarr_region(input_dir, output_dir, selected_indices, n_total, 
             out_w = max(0, crop_x1 - crop_x0)
 
             chunk_rows = mask_in.chunks[0] if mask_in.chunks else 512
-            mask_arr_out = masks_out.create_dataset(
+            mask_arr_out = masks_out.create_array(
                 ps_name,
                 shape=(out_h, out_w),
                 dtype=np.uint32,

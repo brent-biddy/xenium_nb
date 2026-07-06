@@ -23,6 +23,7 @@ import argparse
 
 import anndata as ad
 import cupy as cp
+import numpy as np
 import rapids_singlecell as rsc
 import rmm
 import spatialdata
@@ -71,6 +72,11 @@ def read_table_lazy(path, table_key, chunk_size):
     obs = ad.io.read_elem(store["obs"])
     var = ad.io.read_elem(store["var"])
     uns = ad.io.read_elem(store["uns"]) if "uns" in store else {}
+    # ad.io.read_elem returns spatialdata_attrs.region as an ndarray, unlike
+    # spatialdata's own reader — TableModel.validate() requires a list.
+    region = uns.get("spatialdata_attrs", {}).get("region")
+    if isinstance(region, np.ndarray):
+        uns["spatialdata_attrs"]["region"] = region.tolist()
     X = read_dask(store["X"], (chunk_size, var.shape[0]))
     return ad.AnnData(X=X, obs=obs, var=var, uns=uns)
 
