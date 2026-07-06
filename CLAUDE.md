@@ -10,6 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `create_sdata` — converts raw Xenium output into a sample-level SpatialData zarr artifact
 - `create_follicle_sdata` — subsets a sample zarr into per-cell follicle zarrs
 - `cluster_sdata` / `cluster_sdata_gpu` — QC, normalize, PCA, neighbors, UMAP, Leiden clustering (CPU vs. RAPIDS/GPU)
+- `cluster_sdata_gpu_ooc` — same clustering pipeline, but streams the table's X matrix through Dask (rapids-singlecell out-of-core) so tables too large for VRAM (e.g. a merged cohort from `concat_sdata`) can still run on a single GPU
 - `concat_sdata` — merges multiple sample zarrs into one
 - `downsample_sdata` — subsamples cells from a SpatialData zarr
 - `plot_follicle` — renders the `plot_follicle.qmd` Quarto notebook per follicle zarr
@@ -25,6 +26,7 @@ nextflow run main.nf --step create_sdata --samplesheet assets/downsampled_region
 nextflow run main.nf --step create_follicle_sdata --samplesheet my_sample_zarrs.csv --cell_ids_file assets/stage_quality_area_all_rois.csv
 nextflow run main.nf --step cluster_sdata --samplesheet my_sample_zarrs.csv
 nextflow run main.nf --step cluster_sdata_gpu --samplesheet my_sample_zarrs.csv
+nextflow run main.nf --step cluster_sdata_gpu_ooc --samplesheet my_sample_zarrs.csv --chunk_size 20000 --n_top_genes 2000
 nextflow run main.nf --step concat_sdata --samplesheet assets/concat_sdata_samplesheet.csv
 nextflow run main.nf --step downsample_sdata --samplesheet my_sample_zarrs.csv --fraction 0.1
 nextflow run main.nf --step plot_follicle --samplesheet assets/ci_analyze_samplesheet.csv
@@ -40,14 +42,17 @@ Defined in `nextflow.config`:
 | Profile | Executor | Container |
 |---------|----------|-----------|
 | (none)  | local, no container | requires activated conda env with Quarto + notebook deps |
-| `local` | local, Apptainer | `babiddy755/python_spatial:1.0.0`, 8 CPUs, 16 GB |
+| `local` | local, Apptainer | `babiddy755/python_spatial:1.2.0`, 8 CPUs, 16 GB |
 | `oscer` | SLURM on OSCER HPC, Apptainer | same image, 8 CPUs, memory retries 32→64→96 GB |
 
-The `local` profile defaults `samplesheet` and `cell_ids_file` to the test assets, and also points `cluster_sdata_gpu` at the local RAPIDS container with WSL2 GPU passthrough settings:
+The `local` profile defaults `samplesheet` and `cell_ids_file` to the test assets, and also points `cluster_sdata_gpu` / `cluster_sdata_gpu_ooc` at the local RAPIDS container with WSL2 GPU passthrough settings:
 
 ```bash
 nextflow run main.nf --step cluster_sdata_gpu -profile local
+nextflow run main.nf --step cluster_sdata_gpu_ooc -profile local
 ```
+
+`cluster_sdata_gpu_ooc` additionally needs `dask` and `zarr` in the container — both are present in `babiddy755/python_spatial:1.2.0` as rapids-singlecell/spatialdata dependencies (verified).
 
 ### Stub run (CI-equivalent, no script/notebook execution)
 ```bash
@@ -55,6 +60,7 @@ nextflow run main.nf --step create_sdata -stub --samplesheet assets/samplesheet.
 nextflow run main.nf --step create_follicle_sdata -stub --samplesheet assets/ci_analyze_samplesheet.csv
 nextflow run main.nf --step cluster_sdata -stub --samplesheet assets/ci_analyze_samplesheet.csv
 nextflow run main.nf --step cluster_sdata_gpu -stub --samplesheet assets/ci_analyze_samplesheet.csv
+nextflow run main.nf --step cluster_sdata_gpu_ooc -stub --samplesheet assets/ci_analyze_samplesheet.csv
 nextflow run main.nf --step concat_sdata -stub --samplesheet assets/ci_analyze_samplesheet.csv
 nextflow run main.nf --step downsample_sdata -stub --samplesheet assets/ci_analyze_samplesheet.csv --fraction 0.1
 nextflow run main.nf --step downsample_xenium_region -stub --samplesheet assets/samplesheet.csv
