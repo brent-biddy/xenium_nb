@@ -43,7 +43,14 @@ Defined in `nextflow.config`:
 |---------|----------|-----------|
 | (none)  | local, no container | requires activated conda env with Quarto + notebook deps |
 | `local` | local, Apptainer | `babiddy755/python_spatial:1.2.0`, 8 CPUs, 16 GB |
-| `oscer` | SLURM on OSCER HPC, Apptainer | same image, 8 CPUs, memory retries 32→64→96 GB |
+| `oscer` | SLURM on OSCER HPC, Apptainer | same image, 16 CPUs, memory retries 48→96→144 GB (heavier for `CONCAT_SDATA`/`CLUSTER_SDATA`); GPU steps use the `sooner_gpu_test` partition with `--gres=gpu:1 --nv` |
+
+**Run directories.** The `local` and `oscer` profiles set their own `workDir` and `outdir` so nothing lands in the repo (runs are typically launched from the repo root), each under a unique per-run id (`params.run_id`, a launch timestamp by default):
+
+- `local` → `~/xenium_nb_runs/{work,results}/<run_id>`
+- `oscer` → `/scratch/$USER/xenium_nb_{work,results}/<run_id>`
+
+Because `run_id` defaults to a fresh timestamp, `-resume` across separate launches only works if you pin the id with `--run_id <name>` (or recover the prior timestamp from the run dir name / `.nextflow.log` and pass it back). `-resume` must also be run from the same launch directory, since its cache lives in `.nextflow/` there.
 
 The `local` profile defaults `samplesheet` and `cell_ids_file` to the test assets, and also points `cluster_sdata_gpu` / `cluster_sdata_gpu_ooc` at the local RAPIDS container with WSL2 GPU passthrough settings:
 
