@@ -32,7 +32,7 @@ nextflow run main.nf --step downsample_sdata --samplesheet my_sample_zarrs.csv -
 nextflow run main.nf --step plot_follicle --samplesheet assets/ci_analyze_samplesheet.csv
 ```
 
-No step writes a handoff samplesheet automatically — `my_sample_zarrs.csv` above is a stand-in for a hand-built `sample,path` CSV pointing at a prior step's output zarrs (e.g. `results/<sample>/create_sdata/<sample>.zarr`).
+`my_sample_zarrs.csv` above is a stand-in for a `sample,path` CSV pointing at a prior step's output zarrs (e.g. `results/<sample>/create_sdata/<sample>.zarr`). Some producing steps now publish a ready-to-use handoff samplesheet next to their outputs (`<outdir>/create_sdata_samplesheet.csv`, `<outdir>/cluster_sdata_samplesheet.csv`) that you can point the next step's `--samplesheet` straight at; for steps without one yet, hand-build the CSV.
 
 `downsample_xenium_region` requires the samplesheet to include `xmin,ymin,xmax,ymax` columns (µm coordinates) and an optional `region_name` column, which defaults to the sample ID if omitted. `downsample_sdata` requires `--fraction` or `--n_cells`.
 
@@ -87,7 +87,7 @@ nextflow config .
 ## Architecture
 
 ### Single entry point, one workflow per step
-`main.nf` dispatches on `--step` to one of eight named workflows, each of which reads a samplesheet, builds a channel of tuples, and pipes it into a single process. There is no chaining between steps inside Nextflow, and no step writes a handoff samplesheet automatically — to run steps in sequence, point the next step's `--samplesheet` at a CSV listing the prior step's published output paths (e.g. `results/<sample>/create_sdata/<sample>.zarr`) yourself.
+`main.nf` dispatches on `--step` to one of eight named workflows, each of which reads a samplesheet, builds a channel of tuples, and pipes it into a single process. There is no chaining between steps inside Nextflow — to run steps in sequence, point the next step's `--samplesheet` at a CSV listing the prior step's published output paths (e.g. `results/<sample>/create_sdata/<sample>.zarr`). As a convenience (not a control-flow link), `create_sdata` and `cluster_sdata` publish a `sample,path` handoff samplesheet into `outdir` (`<step>_samplesheet.csv`) reconstructed from the module's `publishDir` convention, so you can feed it directly to the next step. Note: the path string in `main.nf`'s `collectFile` map must be kept in sync with that module's `publishDir`.
 
 ### Create/cluster/downsample scripts (`bin/`)
 Every step except `plot_follicle` runs a plain Python script with an `argparse` CLI (`bin/<step>.py`), invoked directly from its module's `script:` block — no params YAML involved.

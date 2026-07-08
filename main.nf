@@ -77,6 +77,16 @@ workflow create_sdata {
             tuple(row.sample, file(row.path), heImage, heAlign)
         }                              // tuple(sample, path, he_image, he_alignment)
         | CREATE_SDATA
+
+    // Publish a ready-to-use handoff samplesheet pointing at the published zarrs,
+    // so a downstream step (cluster_sdata, downsample_sdata, concat_sdata,
+    // create_follicle_sdata) can be pointed straight at it instead of hand-building
+    // a sample,path CSV. The path is reconstructed from the module's publishDir
+    // convention — keep this in sync with modules/create_sdata.nf's publishDir.
+    CREATE_SDATA.out.artifacts
+        .map { sample, zarr -> "${sample},${params.outdir}/${sample}/create_sdata/${zarr.name}" }
+        .collectFile(name: 'create_sdata_samplesheet.csv', storeDir: params.outdir,
+                     seed: 'sample,path', newLine: true, sort: true)
 }
 
 // ── create_follicle_sdata ─────────────────────────────────────────────────────
@@ -113,6 +123,13 @@ workflow cluster_sdata {
             tuple(row.sample, file(row.path))
         }                            // tuple(sample, path)
         | CLUSTER_SDATA
+
+    // Handoff samplesheet of the clustered zarrs (see create_sdata for rationale).
+    // Keep the path in sync with modules/cluster_sdata.nf's publishDir convention.
+    CLUSTER_SDATA.out.zarr
+        .map { sample, zarr -> "${sample},${params.outdir}/${sample}/cluster_sdata/${zarr.name}" }
+        .collectFile(name: 'cluster_sdata_samplesheet.csv', storeDir: params.outdir,
+                     seed: 'sample,path', newLine: true, sort: true)
 }
 
 // ── cluster_sdata_gpu ─────────────────────────────────────────────────────────
