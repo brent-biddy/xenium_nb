@@ -8,8 +8,11 @@ def clusterSdataPublishDir(sample) {
 process CLUSTER_SDATA {
     tag "${sample}"
 
+    // saveAs drops the per-sample row fragment from the published dir; it is only
+    // needed on the channel for main.nf to collectFile into the aggregate sheet.
     publishDir { clusterSdataPublishDir(sample) },
-        mode: 'copy'
+        mode: 'copy',
+        saveAs: { fn -> fn.endsWith('.samplesheet_row.csv') ? null : fn }
 
     input:
     tuple val(sample), path(input_path)

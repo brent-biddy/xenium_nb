@@ -84,6 +84,7 @@ workflow create_sdata {
     // hand-building a sample,path CSV. The published path lives in the module (its
     // publishDir and the emitted row share one helper), so main.nf stays agnostic.
     CREATE_SDATA.out.samplesheet_row
+        .map { it.text }             // read row content so collectFile's sort is deterministic
         .collectFile(name: 'create_sdata_samplesheet.csv', storeDir: params.outdir,
                      seed: 'sample,path', newLine: true, sort: true)
 }
@@ -125,6 +126,7 @@ workflow cluster_sdata {
 
     // Handoff samplesheet of the clustered zarrs (see create_sdata for rationale).
     CLUSTER_SDATA.out.samplesheet_row
+        .map { it.text }             // read row content so collectFile's sort is deterministic
         .collectFile(name: 'cluster_sdata_samplesheet.csv', storeDir: params.outdir,
                      seed: 'sample,path', newLine: true, sort: true)
 }
@@ -143,6 +145,12 @@ workflow cluster_sdata_gpu {
             tuple(row.sample, file(row.path))
         }                            // tuple(sample, path)
         | CLUSTER_SDATA_GPU
+
+    // Handoff samplesheet of the clustered zarrs (see create_sdata for rationale).
+    CLUSTER_SDATA_GPU.out.samplesheet_row
+        .map { it.text }             // read row content so collectFile's sort is deterministic
+        .collectFile(name: 'cluster_sdata_gpu_samplesheet.csv', storeDir: params.outdir,
+                     seed: 'sample,path', newLine: true, sort: true)
 }
 
 // ── cluster_sdata_gpu_ooc ─────────────────────────────────────────────────────
@@ -160,6 +168,12 @@ workflow cluster_sdata_gpu_ooc {
         }                            // tuple(sample, path)
 
     CLUSTER_SDATA_GPU_OOC(inputs, params.chunk_size, params.n_top_genes)
+
+    // Handoff samplesheet of the clustered zarrs (see create_sdata for rationale).
+    CLUSTER_SDATA_GPU_OOC.out.samplesheet_row
+        .map { it.text }             // read row content so collectFile's sort is deterministic
+        .collectFile(name: 'cluster_sdata_gpu_ooc_samplesheet.csv', storeDir: params.outdir,
+                     seed: 'sample,path', newLine: true, sort: true)
 }
 
 // ── concat_sdata ──────────────────────────────────────────────────────────────
@@ -193,6 +207,12 @@ workflow downsample_sdata {
             tuple(row.sample, file(row.path))
         }                            // tuple(sample, path)
         | DOWNSAMPLE_SDATA
+
+    // Handoff samplesheet of the downsampled zarrs (see create_sdata for rationale).
+    DOWNSAMPLE_SDATA.out.samplesheet_row
+        .map { it.text }             // read row content so collectFile's sort is deterministic
+        .collectFile(name: 'downsample_sdata_samplesheet.csv', storeDir: params.outdir,
+                     seed: 'sample,path', newLine: true, sort: true)
 }
 
 // ── plot_follicle ─────────────────────────────────────────────────────────────
