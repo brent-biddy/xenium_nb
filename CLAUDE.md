@@ -45,10 +45,12 @@ Defined in `nextflow.config`:
 | `local` | local, Apptainer | `babiddy755/python_spatial:1.2.0`, 8 CPUs, 16 GB |
 | `oscer` | SLURM on OSCER HPC, Apptainer | same image, 16 CPUs, memory retries 48→96→144 GB (heavier for `CONCAT_SDATA`/`CLUSTER_SDATA`); GPU steps use the `sooner_gpu_test` partition with `--gres=gpu:1 --nv` |
 
-**Run directories.** The `local` and `oscer` profiles set their own `workDir` and `outdir` so nothing lands in the repo (runs are typically launched from the repo root), each under a unique per-run id (`params.run_id`, a launch timestamp by default):
+**Run directories.** The `local` and `oscer` profiles set their own `workDir` and `outdir` so nothing lands in the repo (runs are typically launched from the repo root). Each run gets one self-contained directory, `<out_root>/<run_id>/{work,results}`, so a whole run is a single unit to size (`du -sh`) or prune (`rm -rf`). The shared Apptainer cache is a sibling of the run dirs (`<out_root>/apptainer_cache`), never nested under a `run_id`, so it survives across runs:
 
-- `local` → `~/xenium_nb_runs/{work,results}/<run_id>`
-- `oscer` → `/scratch/$USER/xenium_nb_{work,results}/<run_id>`
+- `local` → `~/xenium_nb_out/<run_id>/{work,results}`
+- `oscer` → `/scratch/$USER/xenium_nb_out/<run_id>/{work,results}`
+
+Keeping `work` and `results` under the same root also keeps them on one filesystem, which the modules' hardlink publishing (`mode: 'link'`) relies on to avoid a second full copy of each zarr.
 
 Because `run_id` defaults to a fresh timestamp, `-resume` across separate launches only works if you pin the id with `--run_id <name>` (or recover the prior timestamp from the run dir name / `.nextflow.log` and pass it back). `-resume` must also be run from the same launch directory, since its cache lives in `.nextflow/` there.
 
