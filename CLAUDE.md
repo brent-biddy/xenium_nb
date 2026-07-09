@@ -52,7 +52,9 @@ Defined in `nextflow.config`:
 
 Keeping `work` and `results` under the same root also keeps them on one filesystem, which the modules' hardlink publishing (`mode: 'link'`) relies on to avoid a second full copy of each zarr.
 
-Because `run_id` defaults to a fresh timestamp, `-resume` across separate launches only works if you pin the id with `--run_id <name>` (or recover the prior timestamp from the run dir name / `.nextflow.log` and pass it back). `-resume` must also be run from the same launch directory, since its cache lives in `.nextflow/` there.
+Both profiles set `cleanup = true`, so the work dir is deleted once the whole run **completes successfully** — leaving only the (hardlinked) results, i.e. each output stored exactly once. Nextflow scopes cleanup to success: a **failed** run keeps its work dir, so resume-after-failure (bump resources, skip the samples that already finished) still works. What cleanup forfeits is resume-*from*-success — reusing a finished run's cache on a later relaunch — which this single-process-per-step pipeline (no DAG to reuse) rarely needs.
+
+Because `run_id` defaults to a fresh timestamp, `-resume` across separate launches only works if you pin the id with `--run_id <name>` (or recover the prior timestamp from the run dir name / `.nextflow.log` and pass it back). `-resume` must also be run from the same launch directory, since its cache lives in `.nextflow/` there. Note `cleanup = true` deletes that cache on success, so resume is available only after a failure.
 
 The `local` profile defaults `samplesheet` and `cell_ids_file` to the test assets, and also points `cluster_sdata_gpu` / `cluster_sdata_gpu_ooc` at the local RAPIDS container with WSL2 GPU passthrough settings:
 
