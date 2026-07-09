@@ -77,6 +77,16 @@ workflow create_sdata {
             tuple(row.sample, file(row.path), heImage, heAlign)
         }                              // tuple(sample, path, he_image, he_alignment)
         | CREATE_SDATA
+
+    // Aggregate the per-sample rows the process emits into a ready-to-use handoff
+    // samplesheet, so a downstream step (cluster_sdata, downsample_sdata,
+    // concat_sdata, create_follicle_sdata) can be pointed straight at it instead of
+    // hand-building a sample,path CSV. The published path lives in the module (its
+    // publishDir and the emitted row share one helper), so main.nf stays agnostic.
+    CREATE_SDATA.out.samplesheet_row
+        .map { it.text }             // read row content so collectFile's sort is deterministic
+        .collectFile(name: 'create_sdata_samplesheet.csv', storeDir: params.outdir,
+                     seed: 'sample,path', newLine: true, sort: true)
 }
 
 // ── create_follicle_sdata ─────────────────────────────────────────────────────
@@ -97,6 +107,13 @@ workflow create_follicle_sdata {
         }                            // tuple(sample, path)
 
     CREATE_FOLLICLE_SDATA(inputs, cellIdsFile, params.radius)
+
+    // Handoff samplesheet of the per-cell follicle zarrs for plot_follicle. Uses
+    // the sample,cell,path schema (see create_sdata for the general rationale).
+    CREATE_FOLLICLE_SDATA.out.samplesheet_row
+        .map { it.text }             // read row content so collectFile's sort is deterministic
+        .collectFile(name: 'create_follicle_sdata_samplesheet.csv', storeDir: params.outdir,
+                     seed: 'sample,cell,path', newLine: true, sort: true)
 }
 
 // ── cluster_sdata ─────────────────────────────────────────────────────────────
@@ -113,6 +130,12 @@ workflow cluster_sdata {
             tuple(row.sample, file(row.path))
         }                            // tuple(sample, path)
         | CLUSTER_SDATA
+
+    // Handoff samplesheet of the clustered zarrs (see create_sdata for rationale).
+    CLUSTER_SDATA.out.samplesheet_row
+        .map { it.text }             // read row content so collectFile's sort is deterministic
+        .collectFile(name: 'cluster_sdata_samplesheet.csv', storeDir: params.outdir,
+                     seed: 'sample,path', newLine: true, sort: true)
 }
 
 // ── cluster_sdata_gpu ─────────────────────────────────────────────────────────
@@ -129,6 +152,12 @@ workflow cluster_sdata_gpu {
             tuple(row.sample, file(row.path))
         }                            // tuple(sample, path)
         | CLUSTER_SDATA_GPU
+
+    // Handoff samplesheet of the clustered zarrs (see create_sdata for rationale).
+    CLUSTER_SDATA_GPU.out.samplesheet_row
+        .map { it.text }             // read row content so collectFile's sort is deterministic
+        .collectFile(name: 'cluster_sdata_gpu_samplesheet.csv', storeDir: params.outdir,
+                     seed: 'sample,path', newLine: true, sort: true)
 }
 
 // ── cluster_sdata_gpu_ooc ─────────────────────────────────────────────────────
@@ -146,6 +175,12 @@ workflow cluster_sdata_gpu_ooc {
         }                            // tuple(sample, path)
 
     CLUSTER_SDATA_GPU_OOC(inputs, params.chunk_size, params.n_top_genes)
+
+    // Handoff samplesheet of the clustered zarrs (see create_sdata for rationale).
+    CLUSTER_SDATA_GPU_OOC.out.samplesheet_row
+        .map { it.text }             // read row content so collectFile's sort is deterministic
+        .collectFile(name: 'cluster_sdata_gpu_ooc_samplesheet.csv', storeDir: params.outdir,
+                     seed: 'sample,path', newLine: true, sort: true)
 }
 
 // ── concat_sdata ──────────────────────────────────────────────────────────────
@@ -162,6 +197,12 @@ workflow concat_sdata {
         }                        // path
         .collect()               // List<path>
         | CONCAT_SDATA
+
+    // Handoff samplesheet for the merged zarr (see create_sdata for rationale).
+    CONCAT_SDATA.out.samplesheet_row
+        .map { it.text }             // read row content so collectFile's sort is deterministic
+        .collectFile(name: 'concat_sdata_samplesheet.csv', storeDir: params.outdir,
+                     seed: 'sample,path', newLine: true, sort: true)
 }
 
 // ── downsample_sdata ──────────────────────────────────────────────────────────
@@ -179,6 +220,12 @@ workflow downsample_sdata {
             tuple(row.sample, file(row.path))
         }                            // tuple(sample, path)
         | DOWNSAMPLE_SDATA
+
+    // Handoff samplesheet of the downsampled zarrs (see create_sdata for rationale).
+    DOWNSAMPLE_SDATA.out.samplesheet_row
+        .map { it.text }             // read row content so collectFile's sort is deterministic
+        .collectFile(name: 'downsample_sdata_samplesheet.csv', storeDir: params.outdir,
+                     seed: 'sample,path', newLine: true, sort: true)
 }
 
 // ── plot_follicle ─────────────────────────────────────────────────────────────
