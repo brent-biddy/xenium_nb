@@ -8,8 +8,10 @@ process CONCAT_SDATA {
 
     // saveAs drops the row fragment from the published dir; it is only needed on
     // the channel for main.nf to collectFile into the aggregate sheet.
+    // Hardlink (not copy) into results: workDir and outdir share the scratch
+    // filesystem, so linking avoids a second full copy of the large zarr.
     publishDir { concatSdataPublishDir() },
-        mode: 'copy',
+        mode: 'link',
         saveAs: { fn -> fn.endsWith('.samplesheet_row.csv') ? null : fn }
 
     input:

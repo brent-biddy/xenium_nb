@@ -1,8 +1,10 @@
 process DOWNSAMPLE_XENIUM_REGION {
     tag "${sample}/${region_name}"
 
+    // Hardlink (not copy) into results: workDir and outdir share the scratch
+    // filesystem, so linking avoids a second full copy of the cropped region.
     publishDir { "${params.outdir}/${sample}/downsample_xenium_region" },
-        mode: 'copy'
+        mode: 'link'
 
     input:
     tuple val(sample), path(input_path), val(xmin), val(ymin), val(xmax), val(ymax), val(region_name), val(he_image), val(he_alignment)
