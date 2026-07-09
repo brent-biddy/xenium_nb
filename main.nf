@@ -107,6 +107,13 @@ workflow create_follicle_sdata {
         }                            // tuple(sample, path)
 
     CREATE_FOLLICLE_SDATA(inputs, cellIdsFile, params.radius)
+
+    // Handoff samplesheet of the per-cell follicle zarrs for plot_follicle. Uses
+    // the sample,cell,path schema (see create_sdata for the general rationale).
+    CREATE_FOLLICLE_SDATA.out.samplesheet_row
+        .map { it.text }             // read row content so collectFile's sort is deterministic
+        .collectFile(name: 'create_follicle_sdata_samplesheet.csv', storeDir: params.outdir,
+                     seed: 'sample,cell,path', newLine: true, sort: true)
 }
 
 // ── cluster_sdata ─────────────────────────────────────────────────────────────
@@ -190,6 +197,12 @@ workflow concat_sdata {
         }                        // path
         .collect()               // List<path>
         | CONCAT_SDATA
+
+    // Handoff samplesheet for the merged zarr (see create_sdata for rationale).
+    CONCAT_SDATA.out.samplesheet_row
+        .map { it.text }             // read row content so collectFile's sort is deterministic
+        .collectFile(name: 'concat_sdata_samplesheet.csv', storeDir: params.outdir,
+                     seed: 'sample,path', newLine: true, sort: true)
 }
 
 // ── downsample_sdata ──────────────────────────────────────────────────────────
