@@ -1,3 +1,3 @@
-sample,path,xmin,ymin,xmax,ymax,region_name
-test_1,/home/babiddy/xenium_nb_test_inputs/raw_data/roi_1,3860,835,4860,1835,test_1
-test_2,/home/babiddy/xenium_nb_test_inputs/raw_data/roi_1,3139,743,4139,1743,test_2
+sample,path,xmin,ymin,xmax,ymax,region_name,he_image,he_alignment
+ROI1_A,/home/babiddy/xenium_nb_test_inputs/raw_data/roi_1,3500,1000,5500,1700,ROI1_A,/home/babiddy/xenium_nb_test_inputs/hne/Post_Xenium_HE_14654-TS-1/Post_Xenium_HE_14654-TS-1/20x_14654-TS-1_0060565_HE.ome.tif,/home/babiddy/xenium_nb_test_inputs/hne/new_alignment_files/roi_1/matrix.csv
+ROI1_B,/home/babiddy/xenium_nb_test_inputs/raw_data/roi_1,400,3000,1400,5200,ROI1_B,/home/babiddy/xenium_nb_test_inputs/hne/Post_Xenium_HE_14654-TS-1/Post_Xenium_HE_14654-TS-1/20x_14654-TS-1_0060565_HE.ome.tif,/home/babiddy/xenium_nb_test_inputs/hne/new_alignment_files/roi_1/matrix.csv

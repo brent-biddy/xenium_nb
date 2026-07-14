@@ -174,7 +174,13 @@ workflow cluster_sdata_gpu_ooc {
             tuple(row.sample, file(row.path))
         }                            // tuple(sample, path)
 
-    CLUSTER_SDATA_GPU_OOC(inputs, params.chunk_size, params.n_top_genes)
+    // HVG selection is off by default (params.n_top_genes = null) so this step
+    // matches cluster_sdata/cluster_sdata_gpu. A `val` process input cannot be
+    // null, so pass an empty string — the module's conditional append then omits
+    // the flag and the script falls back to its own default of no filtering.
+    def nTopGenes = params.n_top_genes ?: ''
+
+    CLUSTER_SDATA_GPU_OOC(inputs, params.chunk_size, nTopGenes)
 
     // Handoff samplesheet of the clustered zarrs (see create_sdata for rationale).
     CLUSTER_SDATA_GPU_OOC.out.samplesheet_row

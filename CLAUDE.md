@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `create_sdata` — converts raw Xenium output into a sample-level SpatialData zarr artifact
 - `create_follicle_sdata` — subsets a sample zarr into per-cell follicle zarrs
 - `cluster_sdata` / `cluster_sdata_gpu` — QC, normalize, PCA, neighbors, UMAP, Leiden clustering (CPU vs. RAPIDS/GPU)
-- `cluster_sdata_gpu_ooc` — same clustering pipeline, but streams the table's X matrix through Dask (rapids-singlecell out-of-core) so tables too large for VRAM (e.g. a merged cohort from `concat_sdata`) can still run on a single GPU
+- `cluster_sdata_gpu_ooc` — same clustering pipeline as `cluster_sdata_gpu`, but streams the table's X matrix through Dask (rapids-singlecell out-of-core) so tables too large for VRAM (e.g. a merged cohort from `concat_sdata`) can still run on a single GPU. Optional `--n_top_genes` subsets to highly variable genes before PCA; it is **off by default** because it would cluster a different feature space than the other two steps, and a Xenium panel is already curated. Turn it on only if the materialized X does not fit. Note the chunked PCA differs from the in-memory one at ~1e-5, which is enough for Leiden to land ±1 cluster either way versus `cluster_sdata_gpu` — the embeddings themselves correlate at 1.000000
 - `concat_sdata` — merges multiple sample zarrs into one
 - `downsample_sdata` — subsamples cells from a SpatialData zarr
 - `plot_follicle` — renders the `plot_follicle.qmd` Quarto notebook per follicle zarr
@@ -26,7 +26,7 @@ nextflow run main.nf --step create_sdata --samplesheet assets/downsampled_region
 nextflow run main.nf --step create_follicle_sdata --samplesheet my_sample_zarrs.csv --cell_ids_file assets/stage_quality_area_all_rois.csv
 nextflow run main.nf --step cluster_sdata --samplesheet my_sample_zarrs.csv
 nextflow run main.nf --step cluster_sdata_gpu --samplesheet my_sample_zarrs.csv
-nextflow run main.nf --step cluster_sdata_gpu_ooc --samplesheet my_sample_zarrs.csv --chunk_size 20000 --n_top_genes 2000
+nextflow run main.nf --step cluster_sdata_gpu_ooc --samplesheet my_sample_zarrs.csv --chunk_size 20000
 nextflow run main.nf --step concat_sdata --samplesheet assets/concat_sdata_samplesheet.csv
 nextflow run main.nf --step downsample_sdata --samplesheet my_sample_zarrs.csv --fraction 0.1
 nextflow run main.nf --step plot_follicle --samplesheet assets/ci_analyze_samplesheet.csv

@@ -7,7 +7,7 @@ __pycache__/
 *.quarto_ipynb
 containers/
 .apptainer-cache/
-container/*.sif
+*.sif
 container/images/
 container/.apptainer-tmp/
 container/.nextflow/
