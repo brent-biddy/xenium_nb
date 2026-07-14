@@ -6,6 +6,7 @@
 // Steps:
 //   downsample_xenium_region  samplesheet: sample, path, xmin, ymin, xmax, ymax[, region_name, he_image, he_alignment]
 //   create_sdata              samplesheet: sample, path[, he_image, he_alignment]
+//   create_adata              samplesheet: sample, path
 //   create_follicle_sdata     samplesheet: sample, path  (+ --cell_ids_file)
 //   cluster_sdata             samplesheet: sample, path
 //   cluster_sdata_gpu         samplesheet: sample, path
@@ -16,6 +17,7 @@
 
 include { DOWNSAMPLE_XENIUM_REGION } from './modules/downsample_xenium_region'
 include { CREATE_SDATA }             from './modules/create_sdata'
+include { CREATE_ADATA }             from './modules/create_adata'
 include { CREATE_FOLLICLE_SDATA }    from './modules/create_follicle_sdata'
 include { CLUSTER_SDATA }            from './modules/cluster_sdata'
 include { CLUSTER_SDATA_GPU }        from './modules/cluster_sdata_gpu'
@@ -28,10 +30,11 @@ include { paramsFile }               from './modules/quarto_params'
 // ── Entry workflow ────────────────────────────────────────────────────────────
 
 workflow {
-    if (!params.step) error "Please provide --step <name>. Valid steps: downsample_xenium_region, create_sdata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, concat_sdata, downsample_sdata, plot_follicle"
+    if (!params.step) error "Please provide --step <name>. Valid steps: downsample_xenium_region, create_sdata, create_adata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, concat_sdata, downsample_sdata, plot_follicle"
 
     if      (params.step == 'downsample_xenium_region')  downsample_xenium_region()
     else if (params.step == 'create_sdata')              create_sdata()
+    else if (params.step == 'create_adata')              create_adata()
     else if (params.step == 'create_follicle_sdata')     create_follicle_sdata()
     else if (params.step == 'cluster_sdata')             cluster_sdata()
     else if (params.step == 'cluster_sdata_gpu')         cluster_sdata_gpu()
@@ -39,7 +42,7 @@ workflow {
     else if (params.step == 'concat_sdata')              concat_sdata()
     else if (params.step == 'downsample_sdata')          downsample_sdata()
     else if (params.step == 'plot_follicle')             plot_follicle()
-    else error "Unknown --step '${params.step}'. Valid steps: downsample_xenium_region, create_sdata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, concat_sdata, downsample_sdata, plot_follicle"
+    else error "Unknown --step '${params.step}'. Valid steps: downsample_xenium_region, create_sdata, create_adata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, concat_sdata, downsample_sdata, plot_follicle"
 }
 
 // ── downsample_xenium_region ──────────────────────────────────────────────────
@@ -86,6 +89,30 @@ workflow create_sdata {
     CREATE_SDATA.out.samplesheet_row
         .map { it.text }             // read row content so collectFile's sort is deterministic
         .collectFile(name: 'create_sdata_samplesheet.csv', storeDir: params.outdir,
+                     seed: 'sample,path', newLine: true, sort: true)
+}
+
+// ── create_adata ──────────────────────────────────────────────────────────────
+
+workflow create_adata {
+    if (!params.samplesheet) error "Please provide --samplesheet"
+
+    channel
+        .fromPath(params.samplesheet)
+        .splitCsv(header: true)      // Map(sample, path)
+        .map { row ->
+            if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
+            if (!row.path)   error "Samplesheet row missing 'path': ${row}"
+            tuple(row.sample, file(row.path))
+        }                            // tuple(sample, path)
+        | CREATE_ADATA
+
+    // Handoff samplesheet of the per-sample h5ads (see create_sdata for the general
+    // rationale). No clustering step reads h5ad yet, so this currently serves ad hoc
+    // downstream use rather than another --step.
+    CREATE_ADATA.out.samplesheet_row
+        .map { it.text }             // read row content so collectFile's sort is deterministic
+        .collectFile(name: 'create_adata_samplesheet.csv', storeDir: params.outdir,
                      seed: 'sample,path', newLine: true, sort: true)
 }
 

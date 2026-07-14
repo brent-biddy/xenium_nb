@@ -8,6 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - `downsample_xenium_region` — crops a raw Xenium output directory to a bounding box region
 - `create_sdata` — converts raw Xenium output into a sample-level SpatialData zarr artifact
+- `create_adata` — converts a Cell Ranger `filtered_feature_bc_matrix` directory (scRNA-seq, not Xenium) into a sample-level `<sample>.h5ad`. Annotates per-cell/per-gene QC metrics (`total_counts`, `n_genes_by_counts`, `pct_counts_mt`, `percent_top`) but **filters nothing** — mirroring `create_sdata`, it produces the raw artifact and leaves thresholds to downstream analysis. Mito genes are auto-detected from the gene symbols with a case-insensitive `^[Mm][Tt]-` match (the same pattern used in the `oir-analysis` project), so human and mouse both work with no species flag. Output is a plain h5ad, so the `cluster_sdata*` steps (which read SpatialData zarrs) do **not** consume it — clustering scRNA-seq needs a new step
 - `create_follicle_sdata` — subsets a sample zarr into per-cell follicle zarrs
 - `cluster_sdata` / `cluster_sdata_gpu` — QC, normalize, PCA, neighbors, UMAP, Leiden clustering (CPU vs. RAPIDS/GPU)
 - `cluster_sdata_gpu_ooc` — same clustering pipeline as `cluster_sdata_gpu`, but streams the table's X matrix through Dask (rapids-singlecell out-of-core) so tables too large for VRAM (e.g. a merged cohort from `concat_sdata`) can still run on a single GPU. Optional `--n_top_genes` subsets to highly variable genes before PCA; it is **off by default** because it would cluster a different feature space than the other two steps, and a Xenium panel is already curated. Turn it on only if the materialized X does not fit. Note the chunked PCA differs from the in-memory one at ~1e-5, which is enough for Leiden to land ±1 cluster either way versus `cluster_sdata_gpu` — the embeddings themselves correlate at 1.000000
@@ -23,6 +24,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 nextflow run main.nf --step downsample_xenium_region --samplesheet assets/samplesheet.csv
 nextflow run main.nf --step create_sdata --samplesheet assets/downsampled_region_samplesheet.csv
+nextflow run main.nf --step create_adata --samplesheet assets/r21_adata_oscer_samplesheet.csv
 nextflow run main.nf --step create_follicle_sdata --samplesheet my_sample_zarrs.csv --cell_ids_file assets/stage_quality_area_all_rois.csv
 nextflow run main.nf --step cluster_sdata --samplesheet my_sample_zarrs.csv
 nextflow run main.nf --step cluster_sdata_gpu --samplesheet my_sample_zarrs.csv
@@ -68,6 +70,7 @@ nextflow run main.nf --step cluster_sdata_gpu_ooc -profile local
 ### Stub run (CI-equivalent, no script/notebook execution)
 ```bash
 nextflow run main.nf --step create_sdata -stub --samplesheet assets/samplesheet.csv
+nextflow run main.nf --step create_adata -stub --samplesheet assets/ci_analyze_samplesheet.csv
 nextflow run main.nf --step create_follicle_sdata -stub --samplesheet assets/ci_analyze_samplesheet.csv
 nextflow run main.nf --step cluster_sdata -stub --samplesheet assets/ci_analyze_samplesheet.csv
 nextflow run main.nf --step cluster_sdata_gpu -stub --samplesheet assets/ci_analyze_samplesheet.csv
@@ -91,7 +94,7 @@ nextflow config .
 ## Architecture
 
 ### Single entry point, one workflow per step
-`main.nf` dispatches on `--step` to one of eight named workflows, each of which reads a samplesheet, builds a channel of tuples, and pipes it into a single process. There is no chaining between steps inside Nextflow — to run steps in sequence, point the next step's `--samplesheet` at a CSV listing the prior step's published output paths (e.g. `results/<sample>/create_sdata/<sample>.zarr`). As a convenience (not a control-flow link), every zarr-producing step publishes a handoff samplesheet into `outdir` (`<step>_samplesheet.csv`) that you can feed directly to the next step. Each process emits a `samplesheet_row` output whose published path comes from a per-module helper that also drives that module's `publishDir` — so the convention is single-sourced in the module and `main.nf` just `.map { it.text }` + `collectFile`s the rows (the `.text` read makes `collectFile`'s `sort` deterministic). The row fragment is kept out of the publish dir via `publishDir`'s `saveAs`. Schemas: the single-per-sample producers (`create_sdata`, `cluster_sdata`, `cluster_sdata_gpu`, `cluster_sdata_gpu_ooc`, `downsample_sdata`) and `concat_sdata` emit `sample,path`; `create_follicle_sdata` emits `sample,cell,path` (one row per per-cell zarr) for `plot_follicle`. `concat_sdata` and `create_follicle_sdata` also stage `.zarr` inputs into the work dir, so their row generation globs `*.zarr` and excludes the staged inputs.
+`main.nf` dispatches on `--step` to one of ten named workflows, each of which reads a samplesheet, builds a channel of tuples, and pipes it into a single process. There is no chaining between steps inside Nextflow — to run steps in sequence, point the next step's `--samplesheet` at a CSV listing the prior step's published output paths (e.g. `results/<sample>/create_sdata/<sample>.zarr`). As a convenience (not a control-flow link), every artifact-producing step publishes a handoff samplesheet into `outdir` (`<step>_samplesheet.csv`) that you can feed directly to the next step. Each process emits a `samplesheet_row` output whose published path comes from a per-module helper that also drives that module's `publishDir` — so the convention is single-sourced in the module and `main.nf` just `.map { it.text }` + `collectFile`s the rows (the `.text` read makes `collectFile`'s `sort` deterministic). The row fragment is kept out of the publish dir via `publishDir`'s `saveAs`. Schemas: the single-per-sample producers (`create_sdata`, `create_adata`, `cluster_sdata`, `cluster_sdata_gpu`, `cluster_sdata_gpu_ooc`, `downsample_sdata`) and `concat_sdata` emit `sample,path`; `create_follicle_sdata` emits `sample,cell,path` (one row per per-cell zarr) for `plot_follicle`. `concat_sdata` and `create_follicle_sdata` also stage `.zarr` inputs into the work dir, so their row generation globs `*.zarr` and excludes the staged inputs.
 
 ### Create/cluster/downsample scripts (`bin/`)
 Every step except `plot_follicle` runs a plain Python script with an `argparse` CLI (`bin/<step>.py`), invoked directly from its module's `script:` block — no params YAML involved.

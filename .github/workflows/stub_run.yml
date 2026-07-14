@@ -19,6 +19,9 @@ jobs:
       - name: Stub create_sdata
         run: nextflow run main.nf --step create_sdata -stub --samplesheet assets/samplesheet.csv
 
+      - name: Stub create_adata
+        run: nextflow run main.nf --step create_adata -stub --samplesheet assets/ci_analyze_samplesheet.csv
+
       - name: Stub create_follicle_sdata
         run: nextflow run main.nf --step create_follicle_sdata -stub --samplesheet assets/ci_analyze_samplesheet.csv
 
