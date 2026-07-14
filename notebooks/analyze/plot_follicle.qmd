@@ -1,6 +1,6 @@
 ---
 title: "Plot Follicle"
-jupyter: xenium
+jupyter: python_spatial
 params:
   sample: "default"
   cell: "default"
