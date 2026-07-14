@@ -56,8 +56,11 @@ def parse_args():
     parser.add_argument(
         "--n-top-genes",
         type=int,
-        default=2000,
-        help="Number of highly variable genes to keep (default: 2000)",
+        default=None,
+        help="Subset to this many highly variable genes before PCA. Off by default, "
+        "so results match cluster_sdata/cluster_sdata_gpu, which do not select HVGs. "
+        "Set it only when the materialized X (n_obs x n_vars) will not fit — it "
+        "shrinks that matrix at the cost of clustering on a different feature space.",
     )
     return parser.parse_args()
 
@@ -135,9 +138,18 @@ def main():
         rsc.pp.normalize_total(adata, inplace=True)
         rsc.pp.log1p(adata)
 
-    with timer("HVG"):
-        rsc.pp.highly_variable_genes(adata, n_top_genes=args.n_top_genes)
-        rsc.pp.filter_highly_variable(adata)
+    # Off by default: cluster_sdata and cluster_sdata_gpu run PCA on every gene that
+    # survives QC, so selecting HVGs here would silently cluster a different feature
+    # space and yield different labels for the same input. That matters more on Xenium
+    # than on scRNA-seq — the panel is already curated, so dropping genes by variance
+    # discards deliberately chosen targets. Kept as an escape hatch because the
+    # materialize step below holds the whole X on the GPU, and a large enough cohort
+    # needs it narrowed to fit.
+    if args.n_top_genes:
+        with timer("HVG"):
+            rsc.pp.highly_variable_genes(adata, n_top_genes=args.n_top_genes)
+            rsc.pp.filter_highly_variable(adata)
+        print(f"HVG subset: {adata.n_vars:,} genes retained.")
 
     with timer("PCA"):
         rsc.pp.pca(adata, random_state=0)
@@ -146,9 +158,11 @@ def main():
         adata.obsm["X_pca"] = adata.obsm["X_pca"].compute()
 
     # From here on the working set is the PCA embedding (n_obs x n_comps), not
-    # the full gene matrix — small enough to finish in-memory on GPU. Materialize
-    # the (now HVG-subset) X too, since it still needs to be written to the zarr;
-    # it's already GPU-resident (cupy chunks), just still wrapped in a Dask array.
+    # the full gene matrix — small enough to finish in-memory on GPU. X still has to
+    # be materialized for the zarr write; it's already GPU-resident (cupy chunks),
+    # just still wrapped in a Dask array. This is the step --n-top-genes shrinks, and
+    # the reason managed_memory is on above: an oversized X spills to host rather
+    # than OOM-ing.
     with timer("Materialize"):
         adata.X = adata.X.compute()
 
