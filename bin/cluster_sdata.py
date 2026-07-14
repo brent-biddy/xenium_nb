@@ -72,7 +72,16 @@ def main():
         sc.tl.umap(adata, random_state=0)
 
     with timer("Leiden"):
-        sc.tl.leiden(adata, random_state=0)
+        # Use the igraph backend (orders of magnitude faster than the legacy
+        # leidenalg default). flavor="igraph" requires an undirected graph, and
+        # n_iterations=2 reproduces the old default's convergence behavior.
+        sc.tl.leiden(
+            adata,
+            flavor="igraph",
+            n_iterations=2,
+            directed=False,
+            random_state=0,
+        )
 
     print(f"Leiden clustering: {adata.obs['leiden'].nunique()} clusters")
 
