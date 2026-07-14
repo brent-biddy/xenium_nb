@@ -93,9 +93,14 @@ def main():
     with timer("Load cell IDs"):
         cells = load_cells(args.cell_ids_file, args.sample, default_radius)
 
-    # cell_circles is a GeoDataFrame of Shapely Point geometries, one per cell,
-    # with coordinates in the native Xenium coordinate system (µm).
-    circles = sdata["cell_circles"]
+    # cell_boundaries is a GeoDataFrame of Shapely Polygons, one per cell, with
+    # coordinates in the native Xenium coordinate system (µm); its centroid locates
+    # the cell. The older cell_circles element is not read here: spatialdata_io
+    # defaults cells_as_circles=False, so xenium() no longer emits it, and it only
+    # ever held a circular approximation of these same boundaries. Measured over
+    # ROI1_A (21,724 cells), the two centroids differ by <0.6 µm — negligible
+    # against the FOV radius (100 µm default), which comes from cell_ids_file.
+    boundaries = sdata["cell_boundaries"]
     # The bounding box query runs in "global" (pixel) space, so both the centroid
     # coordinates and the radius must be converted from µm to pixels.
     radius_px_per_um = 1.0 / XENIUM_PIXEL_SIZE_UM
@@ -105,10 +110,10 @@ def main():
         radius = float(row["radius"]) * radius_px_per_um
 
         with timer(f"Subset {cell_id}"):
-            if cell_id not in circles.index:
-                print(f"  WARNING: {cell_id} not found in cell_circles — skipping")
+            if cell_id not in boundaries.index:
+                print(f"  WARNING: {cell_id} not found in cell_boundaries — skipping")
                 continue
-            centroid = circles.loc[cell_id, "geometry"]
+            centroid = boundaries.loc[cell_id, "geometry"].centroid
             cx = centroid.x * radius_px_per_um
             cy = centroid.y * radius_px_per_um
             min_coordinate = [cx - radius, cy - radius]

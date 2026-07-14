@@ -60,20 +60,12 @@ with timer("Locate oocyte"):
             oocyte_element = "cell_boundaries"
             boundaries[oocyte_column] = "other"
             boundaries.loc[cell_id, oocyte_column] = "oocyte"
-    if oocyte_element is None and "cell_circles" in sdata.shapes:
-        if outline_element is None:
-            outline_element = "cell_circles"
-        circles = sdata["cell_circles"]
-        if cell_id in circles.index:
-            oocyte_element = "cell_circles"
-            circles[oocyte_column] = "other"
-            circles.loc[cell_id, oocyte_column] = "oocyte"
 
 oocyte_found = oocyte_element is not None
 if oocyte_found:
     print(f"Oocyte cell '{cell_id}' located in '{oocyte_element}'.")
 else:
-    print(f"Oocyte cell '{cell_id}' not found in cell_boundaries or cell_circles; plots will be rendered without a red outline.")
+    print(f"Oocyte cell '{cell_id}' not found in cell_boundaries; plots will be rendered without a red outline.")
 ```
 
 ```{python}
