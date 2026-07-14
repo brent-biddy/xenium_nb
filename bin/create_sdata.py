@@ -102,6 +102,15 @@ def main():
                 # imread reads only the base level; scale_factors rebuilds the pyramid.
                 # y/x only — z is not downsampled. 4 halvings reaches a screen-sized resolution.
                 scale_factors=[{"y": 2, "x": 2}, {"y": 2, "x": 2}, {"y": 2, "x": 2}, {"y": 2, "x": 2}],
+                # Without explicit chunks, building the pyramid above falls back to
+                # multiscale_spatial_image's default_chunks=64, so every level is written
+                # as 64x64 tiles — one ~90 KB zarr chunk file each, ~10k files for a
+                # single image, enough to threaten an HPC inode quota across a cohort.
+                # One chunk per z-plane matches how notebooks read this element (a focal
+                # plane at a time) and mirrors the chunking spatialdata_io already applies
+                # to morphology_focus. Each value is capped at that axis's extent, so
+                # smaller images degrade to one chunk per plane rather than padding.
+                chunks=(1, 1, 4096, 4096),
             )
         print(f"Loaded DAPI z-stack from {morphology_3d_path}")
     else:
