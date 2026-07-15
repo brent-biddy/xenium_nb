@@ -29,8 +29,15 @@ process DOWNSAMPLE_SDATA {
 
     script:
     def downsampleArgs = ["--sample ${sample}", "--path ${input_path}"]
-    if (params.fraction) downsampleArgs << "--fraction ${params.fraction}"
-    if (params.n_cells)  downsampleArgs << "--n_cells ${params.n_cells}"
+    // Mutually exclusive downstream, and `fraction` carries a non-null default, so
+    // an explicit --n_cells has to suppress it or the script gets handed both.
+    if (params.n_cells) downsampleArgs << "--n_cells ${params.n_cells}"
+    else if (params.fraction) downsampleArgs << "--fraction ${params.fraction}"
+    if (params.stratify_by) downsampleArgs << "--stratify_by ${params.stratify_by}"
+    // Compared against null, not truthiness: Groovy treats 0 as false, and 0 is a
+    // meaningful value for both (floor disabled / seed zero).
+    if (params.min_cells_per_cluster != null) downsampleArgs << "--min_cells_per_cluster ${params.min_cells_per_cluster}"
+    if (params.seed != null) downsampleArgs << "--seed ${params.seed}"
     """
     export XDG_CACHE_HOME="\$PWD/.cache"
     export TMPDIR="\$PWD/tmp"

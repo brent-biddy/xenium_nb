@@ -73,7 +73,7 @@ All three also take the **filtering cut** as `--min_counts` (cells below that ma
     - the slide is called **once per metric**, so each gets its own norm and colourbar; sharing a scale is not an option even in principle when genes top out near 2,400 against ~10,600 transcripts and 3% control
     - **never call `tight_layout` on this figure.** `spatialdata_plot` attaches its colourbar as a free-standing axes that `tight_layout` does not know about, so it expands the main axes from 77% to 92% of the figure width — straight under the colourbar — and the equal-aspect axes then centres itself in the oversized box, leaving a band of empty slide on its left. The panel is positioned by hand instead, fitted to the tissue's own aspect (read back from the drawn limits) and touching whichever edge of the slide binds first, with the colourbar re-seated beside it. These ROIs run both ways — one a 3:1 strip, the other a 1:2.2 block — so the binding edge differs per sample
 - `concat_sdata` — merges multiple sample zarrs into one
-- `downsample_sdata` — subsamples cells from a SpatialData zarr
+- `downsample_sdata` — subsamples cells from a SpatialData zarr. Cluster-aware: if the table has a `leiden` column (i.e. it came from a `cluster_sdata*` step) each cluster keeps its proportional share of the target but never fewer than `--min_cells_per_cluster` (default 50, or the cluster's full size if smaller), so rare clusters survive a deep downsample instead of rounding to ~1 cell. Tables with no `leiden` column (a raw `create_sdata` zarr) fall back to uniform subsampling, so the same command works either way. `--stratify_by <col>` stratifies on a different obs column instead and **must** exist — a typo errors rather than silently degrading to uniform. `--min_cells_per_cluster 0` restores strictly proportional allocation. Note the subsample only touches the table; images, labels, shapes, and points are copied through at full size, so the output zarr is not proportionally smaller on disk
 - `plot_follicle` — renders the `plot_follicle.qmd` Quarto notebook per follicle zarr
 
 ## Commands
@@ -95,12 +95,13 @@ nextflow run main.nf --step cluster_report --samplesheet results/cluster_sdata_s
 nextflow run main.nf --step qc_report --samplesheet results/create_sdata_samplesheet.csv
 nextflow run main.nf --step concat_sdata --samplesheet assets/concat_sdata_samplesheet.csv
 nextflow run main.nf --step downsample_sdata --samplesheet my_sample_zarrs.csv --fraction 0.1
+nextflow run main.nf --step downsample_sdata --samplesheet my_sample_zarrs.csv --n_cells 50000 --min_cells_per_cluster 100
 nextflow run main.nf --step plot_follicle --samplesheet assets/ci_analyze_samplesheet.csv
 ```
 
 `my_sample_zarrs.csv` above is a stand-in for a `sample,path` CSV pointing at a prior step's output zarrs (e.g. `results/<sample>/create_sdata/<sample>.zarr`). Some producing steps now publish a ready-to-use handoff samplesheet next to their outputs (`<outdir>/create_sdata_samplesheet.csv`, `<outdir>/cluster_sdata_samplesheet.csv`) that you can point the next step's `--samplesheet` straight at; for steps without one yet, hand-build the CSV.
 
-`downsample_xenium_region` requires the samplesheet to include `xmin,ymin,xmax,ymax` columns (µm coordinates) and an optional `region_name` column, which defaults to the sample ID if omitted. `downsample_sdata` requires `--fraction` or `--n_cells`.
+`downsample_xenium_region` requires the samplesheet to include `xmin,ymin,xmax,ymax` columns (µm coordinates) and an optional `region_name` column, which defaults to the sample ID if omitted. `downsample_sdata` requires `--fraction` or `--n_cells`; since `fraction` carries a non-null default (0.1), an explicit `--n_cells` takes precedence over it.
 
 ### Profiles
 Defined in `nextflow.config`:

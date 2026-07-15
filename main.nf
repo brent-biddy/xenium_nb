@@ -14,7 +14,8 @@
 //   cluster_report            samplesheet: sample, path  (clustered zarrs; one deck for the cohort)
 //   qc_report                 samplesheet: sample, path  (raw create_sdata zarrs; one deck for the cohort)
 //   concat_sdata              samplesheet: path
-//   downsample_sdata          samplesheet: sample, path  (+ --fraction or --n_cells)
+//   downsample_sdata          samplesheet: sample, path  (+ --fraction or --n_cells,
+//                                                          --stratify_by, --min_cells_per_cluster, --seed)
 //   plot_follicle             samplesheet: sample, cell, path
 
 include { DOWNSAMPLE_XENIUM_REGION } from './modules/downsample_xenium_region'
