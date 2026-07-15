@@ -19,6 +19,7 @@ Usage:
 import argparse
 from pathlib import Path
 
+import scanpy as sc
 import spatialdata_io
 from spatialdata_io import xenium_aligned_image
 from dask_image.imread import imread as dask_imread
@@ -67,6 +68,56 @@ def main():
         )
 
     sdata.tables["table"].obs["sample"] = args.sample
+
+    # Annotate per-cell QC metrics but filter nothing: create_sdata produces the raw
+    # artifact and leaves thresholds to downstream analysis, mirroring create_adata.
+    # Computing them here rather than in a QC notebook means X is read once, at the
+    # only point it is already in memory.
+    #
+    # expr_type="transcripts" is what keeps the outputs (total_transcripts,
+    # n_genes_by_transcripts, pct_transcripts_in_top_N_genes) from clobbering the
+    # Xenium-native total_counts that the reader takes from cells.parquet. The two
+    # are NOT the same quantity: native total_counts = transcript_counts + the five
+    # control/codeword counters, whereas calculate_qc_metrics would overwrite it with
+    # a plain row sum of X. Only transcript_counts (== X.sum(axis=1)) is the panel
+    # signal, so thresholds belong on it, not on total_counts.
+    #
+    # No qc_vars: the Xenium panel carries no MT- genes, so pct_transcripts_mt would
+    # read 0.0 for every cell — a metric that looks real and silently passes every
+    # threshold. create_adata warns about this same trap on the scRNA-seq side, where
+    # the genes do exist. Ribosomal/hemoglobin sets are likewise omitted: a targeted
+    # panel holds only a partial, arbitrary subset of each, so the percentages are not
+    # comparable to their scRNA-seq counterparts.
+    #
+    # percent_top reports the share of a cell's transcripts coming from its N most
+    # expressed genes. The values are lower than create_adata's (10, 20, 50, 150)
+    # because a cell cannot have more genes than the panel targets: at a median 174
+    # genes per cell, top_150 pins 40% of cells at exactly 100% (any cell with <= 150
+    # genes detected is 100% by definition), which inverts the metric — the emptiest
+    # cells score highest. These four stay below the per-cell gene count.
+    #
+    # log1p=False — the raw totals are what downstream thresholds are set on.
+    with timer("QC metrics"):
+        sc.pp.calculate_qc_metrics(
+            sdata.tables["table"],
+            expr_type="transcripts",
+            percent_top=(5, 10, 20, 50),
+            log1p=False,
+            inplace=True,
+        )
+
+    # obs["total_transcripts"] is X.sum(axis=1), which for Xenium is exactly the
+    # reader's transcript_counts. Drop it rather than leave obs holding three
+    # near-identically named totals — two identical, one (total_counts) meaning
+    # something else — for a later reader to pick the wrong one from. The per-gene
+    # var["total_transcripts"] is a different quantity (a gene's total across cells)
+    # and is kept.
+    qc_obs = sdata.tables["table"].obs
+    qc_obs.drop(columns="total_transcripts", inplace=True)
+
+    print(f"Cells:              {len(qc_obs):,}")
+    print(f"Median transcripts: {qc_obs['transcript_counts'].median():,.0f}")
+    print(f"Median genes:       {qc_obs['n_genes_by_transcripts'].median():,.0f}")
 
     # spatialdata_io auto-detects an H&E image if one is named with the expected
     # Xenium suffix alongside the data. If not auto-detected, load it explicitly
