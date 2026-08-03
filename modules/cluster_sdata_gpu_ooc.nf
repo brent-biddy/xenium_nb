@@ -23,6 +23,7 @@ process CLUSTER_SDATA_GPU_OOC {
     tuple val(sample), path(input_path)
     val chunk_size
     val n_top_genes
+    val resolutions
 
     output:
     tuple val(sample), path("clustered.zarr"), emit: zarr
@@ -36,6 +37,10 @@ process CLUSTER_SDATA_GPU_OOC {
     def clusterArgs = ["--sample ${sample}", "--path ${input_path}"]
     if (chunk_size)  clusterArgs << "--chunk-size ${chunk_size}"
     if (n_top_genes) clusterArgs << "--n-top-genes ${n_top_genes}"
+    // The script takes a space-separated nargs list; the param is comma-separated
+    // so it can be given as a single --resolutions value on the Nextflow CLI.
+    // toString() first: a single value (--resolutions 1.0) arrives as a Number.
+    if (resolutions) clusterArgs << "--resolutions ${resolutions.toString().tokenize(',').join(' ')}"
     """
     export XDG_CACHE_HOME="\$PWD/.cache"
     export TMPDIR="\$PWD/tmp"

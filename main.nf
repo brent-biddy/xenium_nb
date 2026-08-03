@@ -8,9 +8,9 @@
 //   create_sdata              samplesheet: sample, path[, he_image, he_alignment]
 //   create_adata              samplesheet: sample, path
 //   create_follicle_sdata     samplesheet: sample, path  (+ --cell_ids_file)
-//   cluster_sdata             samplesheet: sample, path
-//   cluster_sdata_gpu         samplesheet: sample, path
-//   cluster_sdata_gpu_ooc     samplesheet: sample, path  (+ --chunk_size, --n_top_genes)
+//   cluster_sdata             samplesheet: sample, path  (+ --resolutions)
+//   cluster_sdata_gpu         samplesheet: sample, path  (+ --resolutions)
+//   cluster_sdata_gpu_ooc     samplesheet: sample, path  (+ --chunk_size, --n_top_genes, --resolutions)
 //   concat_sdata              samplesheet: path
 //   downsample_sdata          samplesheet: sample, path  (+ --fraction or --n_cells)
 //   plot_follicle             samplesheet: sample, cell, path
@@ -148,7 +148,7 @@ workflow create_follicle_sdata {
 workflow cluster_sdata {
     if (!params.samplesheet) error "Please provide --samplesheet"
 
-    channel
+    def inputs = channel
         .fromPath(params.samplesheet)
         .splitCsv(header: true)      // Map(sample, path)
         .map { row ->
@@ -156,7 +156,13 @@ workflow cluster_sdata {
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
             tuple(row.sample, file(row.path))
         }                            // tuple(sample, path)
-        | CLUSTER_SDATA
+
+    // Leiden resolution sweep. Null by default (see nextflow.config) so the list
+    // lives only in the clustering script; a `val` process input cannot be null,
+    // so pass an empty string and let the module's conditional append omit the flag.
+    def resolutions = params.resolutions ?: ''
+
+    CLUSTER_SDATA(inputs, resolutions)
 
     // Handoff samplesheet of the clustered zarrs (see create_sdata for rationale).
     CLUSTER_SDATA.out.samplesheet_row
@@ -170,7 +176,7 @@ workflow cluster_sdata {
 workflow cluster_sdata_gpu {
     if (!params.samplesheet) error "Please provide --samplesheet"
 
-    channel
+    def inputs = channel
         .fromPath(params.samplesheet)
         .splitCsv(header: true)      // Map(sample, path)
         .map { row ->
@@ -178,7 +184,11 @@ workflow cluster_sdata_gpu {
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
             tuple(row.sample, file(row.path))
         }                            // tuple(sample, path)
-        | CLUSTER_SDATA_GPU
+
+    // See cluster_sdata above for why an empty string stands in for "unset".
+    def resolutions = params.resolutions ?: ''
+
+    CLUSTER_SDATA_GPU(inputs, resolutions)
 
     // Handoff samplesheet of the clustered zarrs (see create_sdata for rationale).
     CLUSTER_SDATA_GPU.out.samplesheet_row
@@ -207,7 +217,10 @@ workflow cluster_sdata_gpu_ooc {
     // the flag and the script falls back to its own default of no filtering.
     def nTopGenes = params.n_top_genes ?: ''
 
-    CLUSTER_SDATA_GPU_OOC(inputs, params.chunk_size, nTopGenes)
+    // See cluster_sdata above for why an empty string stands in for "unset".
+    def resolutions = params.resolutions ?: ''
+
+    CLUSTER_SDATA_GPU_OOC(inputs, params.chunk_size, nTopGenes, resolutions)
 
     // Handoff samplesheet of the clustered zarrs (see create_sdata for rationale).
     CLUSTER_SDATA_GPU_OOC.out.samplesheet_row

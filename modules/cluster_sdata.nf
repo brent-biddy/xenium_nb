@@ -18,6 +18,7 @@ process CLUSTER_SDATA {
 
     input:
     tuple val(sample), path(input_path)
+    val resolutions
 
     output:
     tuple val(sample), path("clustered.zarr"), emit: zarr
@@ -28,12 +29,17 @@ process CLUSTER_SDATA {
     path "${sample}.samplesheet_row.csv", emit: samplesheet_row
 
     script:
+    def clusterArgs = ["--sample ${sample}", "--path ${input_path}"]
+    // The script takes a space-separated nargs list; the param is comma-separated
+    // so it can be given as a single --resolutions value on the Nextflow CLI.
+    // toString() first: a single value (--resolutions 1.0) arrives as a Number.
+    if (resolutions) clusterArgs << "--resolutions ${resolutions.toString().tokenize(',').join(' ')}"
     """
     export XDG_CACHE_HOME="\$PWD/.cache"
     export TMPDIR="\$PWD/tmp"
     mkdir -p "\$XDG_CACHE_HOME" "\$TMPDIR"
 
-    cluster_sdata.py --sample ${sample} --path ${input_path}
+    cluster_sdata.py ${clusterArgs.join(' ')}
 
     printf '%s' '${sample},${clusterSdataPublishDir(sample)}/clustered.zarr' > ${sample}.samplesheet_row.csv
     """
