@@ -11,6 +11,7 @@
 //   cluster_sdata             samplesheet: sample, path  (+ --resolutions)
 //   cluster_sdata_gpu         samplesheet: sample, path  (+ --resolutions)
 //   cluster_sdata_gpu_ooc     samplesheet: sample, path  (+ --chunk_size, --n_top_genes, --resolutions)
+//   cluster_report            samplesheet: sample, path  (clustered zarrs; one deck for the cohort)
 //   concat_sdata              samplesheet: path
 //   downsample_sdata          samplesheet: sample, path  (+ --fraction or --n_cells)
 //   plot_follicle             samplesheet: sample, cell, path
@@ -22,6 +23,7 @@ include { CREATE_FOLLICLE_SDATA }    from './modules/create_follicle_sdata'
 include { CLUSTER_SDATA }            from './modules/cluster_sdata'
 include { CLUSTER_SDATA_GPU }        from './modules/cluster_sdata_gpu'
 include { CLUSTER_SDATA_GPU_OOC }    from './modules/cluster_sdata_gpu_ooc'
+include { CLUSTER_REPORT }           from './modules/cluster_report'
 include { CONCAT_SDATA }             from './modules/concat_sdata'
 include { DOWNSAMPLE_SDATA }         from './modules/downsample_sdata'
 include { PLOT_FOLLICLE }            from './modules/plot_follicle'
@@ -30,7 +32,7 @@ include { paramsFile }               from './modules/quarto_params'
 // ── Entry workflow ────────────────────────────────────────────────────────────
 
 workflow {
-    if (!params.step) error "Please provide --step <name>. Valid steps: downsample_xenium_region, create_sdata, create_adata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, concat_sdata, downsample_sdata, plot_follicle"
+    if (!params.step) error "Please provide --step <name>. Valid steps: downsample_xenium_region, create_sdata, create_adata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, cluster_report, concat_sdata, downsample_sdata, plot_follicle"
 
     if      (params.step == 'downsample_xenium_region')  downsample_xenium_region()
     else if (params.step == 'create_sdata')              create_sdata()
@@ -39,10 +41,11 @@ workflow {
     else if (params.step == 'cluster_sdata')             cluster_sdata()
     else if (params.step == 'cluster_sdata_gpu')         cluster_sdata_gpu()
     else if (params.step == 'cluster_sdata_gpu_ooc')     cluster_sdata_gpu_ooc()
+    else if (params.step == 'cluster_report')            cluster_report()
     else if (params.step == 'concat_sdata')              concat_sdata()
     else if (params.step == 'downsample_sdata')          downsample_sdata()
     else if (params.step == 'plot_follicle')             plot_follicle()
-    else error "Unknown --step '${params.step}'. Valid steps: downsample_xenium_region, create_sdata, create_adata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, concat_sdata, downsample_sdata, plot_follicle"
+    else error "Unknown --step '${params.step}'. Valid steps: downsample_xenium_region, create_sdata, create_adata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, cluster_report, concat_sdata, downsample_sdata, plot_follicle"
 }
 
 // ── downsample_xenium_region ──────────────────────────────────────────────────
@@ -227,6 +230,32 @@ workflow cluster_sdata_gpu_ooc {
         .map { it.text }             // read row content so collectFile's sort is deterministic
         .collectFile(name: 'cluster_sdata_gpu_ooc_samplesheet.csv', storeDir: params.outdir,
                      seed: 'sample,path', newLine: true, sort: true)
+}
+
+// ── cluster_report ────────────────────────────────────────────────────────────
+
+workflow cluster_report {
+    if (!params.samplesheet) error "Please provide --samplesheet"
+
+    // Point --samplesheet at a cluster_sdata* handoff sheet — this report reads the
+    // clustered zarrs (X_umap and the leiden_res_* columns), not create_sdata's raw ones.
+    channel
+        .fromPath(params.samplesheet)
+        .splitCsv(header: true)      // Map(sample, path)
+        .map { row ->
+            if (!row.path) error "Samplesheet row missing 'path': ${row}"
+            file(row.path)
+        }                            // path(zarr)
+        // sort so the staged order — and therefore the report — is reproducible
+        // regardless of the order tasks happen to finish upstream.
+        .toSortedList()              // one list of every zarr: fans in to a single task
+        .set { clusterReportZarrs }  // val(list of zarr paths)
+
+    CLUSTER_REPORT(
+        clusterReportZarrs,
+        file("${projectDir}/notebooks/analyze/cluster_report.qmd"),
+        file("${projectDir}/resources/ouhsc_ppt_template.pptx"),
+    )
 }
 
 // ── concat_sdata ──────────────────────────────────────────────────────────────
