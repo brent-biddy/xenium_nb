@@ -157,17 +157,19 @@ def panel_grid(n, figsize=FIGSIZE):
     return fig, flat[:n]
 
 
-def point_size(fig, n_cells, coverage):
-    """Marker area (pt²) that lets n_cells cover `coverage` of the axes, once.
+def point_size(ax, n_cells, coverage):
+    """Marker area (pt²) that lets n_cells cover `coverage` of these axes, once.
 
-    A fixed size cannot serve both slides: at s=3 a 21k-cell strip reads well but a
-    32k-cell section is a solid mat of dots with no tissue visible, and at s=1 the strip
-    is speckle. Samples in one cohort differ in both extent and density, so the size has
-    to come from the figure it is drawn on. 72 pt to the inch, squared, converts the
-    figure's area to the same pt² units scatter's `s` is in.
+    A fixed size cannot serve every tissue plot: at s=3 a 21k-cell strip reads well but a
+    32k-cell section is a solid mat of dots, and at s=1 the strip is speckle. The same
+    sample also needs a smaller dot in a five-panel sweep than on a full-slide plot.
+    Taking the axes' own area covers both — get_position() is the pre-tight_layout
+    fraction of the figure, close enough for a marker size. 72 pt to the inch, squared,
+    converts inches² to the pt² units scatter's `s` is in.
     """
-    w, h = fig.get_size_inches()
-    area_pt2 = (w - LEGEND_WIDTH) * h * 72 ** 2
+    w, h = ax.get_figure().get_size_inches()
+    pos = ax.get_position()
+    area_pt2 = (pos.width * w) * (pos.height * h) * 72 ** 2
     return float(np.clip(coverage * area_pt2 / n_cells, 0.5, 6.0))
 
 
@@ -188,22 +190,24 @@ def tissue_grid(x0, x1, y0, y1):
     return plt.subplots(figsize=(w + LEGEND_WIDTH, h))
 
 
-def style_tissue(ax, col):
-    """Shared framing for the two in-tissue slides: square units, no frame, side legend.
+def style_tissue(ax, col, legend=True):
+    """Shared framing for the in-tissue plots: square units, no frame, optional legend.
 
     A legend, not the on-data labels the UMAP slides use: clusters are spatially
     interleaved, so a label at a cluster's median centroid routinely lands inside a
-    different cluster.
+    different cluster. The sweep panels pass legend=False — one legend per panel would
+    cost more width than the tissue itself, and their titles carry the cluster count.
     """
     ax.set_aspect("equal")
     ax.set_xticks([])
     ax.set_yticks([])
     ax.spines[["top", "right", "bottom", "left"]].set_visible(False)
-    ax.legend(
-        loc="center left", bbox_to_anchor=(1.0, 0.5), frameon=False,
-        fontsize=6, markerscale=6, ncols=2,
-        title=f"resolution {col.removeprefix('leiden_res_')}", title_fontsize=6,
-    )
+    if legend:
+        ax.legend(
+            loc="center left", bbox_to_anchor=(1.0, 0.5), frameon=False,
+            fontsize=6, markerscale=6, ncols=2,
+            title=f"resolution {col.removeprefix('leiden_res_')}", title_fontsize=6,
+        )
 
 
 def style_umap(ax, title):
@@ -217,12 +221,17 @@ def style_umap(ax, title):
 def cluster_colors(labels):
     """(ordered levels, level -> colour) for one cluster column.
 
-    Numeric order so a cluster keeps its colour across the UMAP, spatial, and H&E slides
-    of the same sample, and so the on-data labels read in order. tab20 cycles past 20
-    clusters, which the on-data labels compensate for.
+    Numeric order so a cluster keeps its colour across every slide showing the same
+    resolution, and so the on-data labels read in order.
+
+    tab10 below 11 clusters, tab20 above: tab20 is ten dark/light *pairs*, so a
+    2-cluster panel drawn from it is navy against pale blue — nearly invisible at
+    sweep-panel size, which is exactly where the low resolutions land. tab10's first
+    two are blue and orange. Past 20 the palette cycles, which the on-data labels on
+    the UMAP panels compensate for.
     """
     levels = sorted(labels.unique(), key=int)
-    cmap = plt.get_cmap("tab20")
+    cmap = plt.get_cmap("tab10" if len(levels) <= 10 else "tab20")
     return levels, {level: cmap(i % cmap.N) for i, level in enumerate(levels)}
 
 
@@ -334,7 +343,7 @@ def spatial_clusters(sample):
     deal of render time to draw the same dots.
 
     y is inverted because Xenium global coordinates run downward from the top-left of
-    the slide image; without it the tissue renders mirrored against the H&E slide.
+    the slide image; without it the tissue renders upside down relative to the scan.
     """
     d = samples[sample]
     col = spatial_column(d)
@@ -345,7 +354,7 @@ def spatial_clusters(sample):
         d["spatial_x"].min(), d["spatial_x"].max(),
         d["spatial_y"].min(), d["spatial_y"].max(),
     )
-    size = point_size(fig, len(d), SPATIAL_COVERAGE)
+    size = point_size(ax, len(d), SPATIAL_COVERAGE)
     for level in levels:
         m = labels == level
         ax.scatter(
@@ -361,6 +370,50 @@ def spatial_clusters(sample):
         f" · {len(levels)} clusters",
         fontsize=9, x=0.01, ha="left",
     )
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+
+def spatial_sweep(sample, part):
+    """One slide's figure: the tissue once per resolution in part `part` of the sweep.
+
+    The UMAP sweep answers which resolutions split which blobs; this answers which of
+    those splits are spatial. A resolution that carves a UMAP blob in two but scatters
+    both halves through the same tissue is splitting on depth or noise, and that only
+    shows up side by side like this.
+
+    Same CLUSTER_SLIDES split as the UMAP sweep, so slide n here holds the same
+    resolutions as slide n there and the two can be read against each other.
+    """
+    d = samples[sample]
+    res_cols = resolution_columns(d)
+    if not res_cols:
+        raise ValueError(f"{sample}: no leiden_res_* columns in obs — was this zarr clustered?")
+    cols = resolution_parts(res_cols, CLUSTER_SLIDES)[part]
+
+    fig, axes = panel_grid(len(cols))
+
+    for ax, col in zip(axes, cols):
+        labels = d[col].astype(str)
+        levels, colors = cluster_colors(labels)
+        size = point_size(ax, len(d), SPATIAL_COVERAGE)
+        for level in levels:
+            m = labels == level
+            ax.scatter(
+                d.loc[m, "spatial_x"], d.loc[m, "spatial_y"],
+                color=colors[level],
+                s=size, alpha=1.0, edgecolors="none", rasterized=True,
+            )
+        ax.invert_yaxis()
+        style_tissue(ax, col, legend=False)
+        ax.set_title(
+            f"resolution {col.removeprefix('leiden_res_')} · {len(levels)} clusters",
+            fontsize=8, loc="left",
+        )
+
+    span = f"{cols[0].removeprefix('leiden_res_')}–{cols[-1].removeprefix('leiden_res_')}"
+    fig.suptitle(f"{sample} · {len(d):,} cells · resolutions {span}", fontsize=9, x=0.01, ha="left")
     fig.tight_layout()
     plt.show()
     plt.close(fig)
@@ -426,6 +479,10 @@ for s in sample_order:
     for part in range(CLUSTER_SLIDES):
         display(Markdown(f"## Clusters by resolution ({part + 1}/{CLUSTER_SLIDES})"))
         cluster_umap(s, part)
+
+    for part in range(CLUSTER_SLIDES):
+        display(Markdown(f"## Clusters in tissue by resolution ({part + 1}/{CLUSTER_SLIDES})"))
+        spatial_sweep(s, part)
 
     display(Markdown("## Clusters in tissue"))
     spatial_clusters(s)
