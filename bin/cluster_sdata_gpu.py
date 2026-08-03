@@ -3,8 +3,8 @@
 cluster_sdata_gpu.py - GPU-accelerated QC, normalize, and cluster a SpatialData zarr.
 
 Mirrors cluster_sdata.py but uses rapids-singlecell for the compute-heavy steps
-(QC, normalization, PCA, neighbors, UMAP, Leiden). Data is moved back to CPU
-before zarr I/O.
+(QC, normalization, PCA, neighbors, UMAP, and a sweep of Leiden clusterings).
+Data is moved back to CPU before zarr I/O.
 
 Requires an Apptainer/Docker image with rapids-singlecell and a CUDA-capable GPU.
 
@@ -12,6 +12,7 @@ Writes clustered.zarr into the current working directory.
 
 Usage:
     cluster_sdata_gpu.py --sample ROI1_A --path /data/ROI1_A.zarr
+    cluster_sdata_gpu.py --sample ROI1_A --path /data/ROI1_A.zarr --resolutions 0.5 1.0
 """
 
 import argparse
@@ -21,6 +22,8 @@ import spatialdata
 
 from timer import timer, timing_summary
 
+DEFAULT_RESOLUTIONS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -28,17 +31,29 @@ def parse_args():
     )
     parser.add_argument("--sample", required=True, help="Sample identifier")
     parser.add_argument("--path", required=True, help="Path to input SpatialData zarr")
+    parser.add_argument(
+        "--resolutions",
+        type=float,
+        nargs="+",
+        default=DEFAULT_RESOLUTIONS,
+        metavar="RES",
+        help="Leiden resolutions to sweep; one obs column is written per value "
+        f"(default: {' '.join(str(r) for r in DEFAULT_RESOLUTIONS)}).",
+    )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
 
+    resolutions = sorted(args.resolutions)
+
     output_path = "clustered.zarr"
 
     print(f"Sample:  {args.sample}")
     print(f"Input:   {args.path}")
     print(f"Output:  {output_path}")
+    print(f"Res:     {', '.join(f'{r:g}' for r in resolutions)}")
 
     with timer("Read zarr"):
         sdata = spatialdata.read_zarr(args.path)
@@ -77,10 +92,17 @@ def main():
     with timer("UMAP"):
         rsc.tl.umap(adata, random_state=0)
 
-    with timer("Leiden"):
-        rsc.tl.leiden(adata, random_state=0)
-
-    print(f"Leiden clustering: {adata.obs['leiden'].nunique()} clusters")
+    # Sweep resolutions rather than committing to one: the neighbour graph is
+    # already built, so each extra resolution only re-runs the (comparatively
+    # cheap) community detection on it. Downstream picks a column by name.
+    for res in resolutions:
+        with timer(f"Leiden res={res:g}"):
+            rsc.tl.leiden(
+                adata,
+                resolution=res,
+                key_added=f"leiden_res_{res:.2f}",
+                random_state=0,
+            )
 
     # Move back to CPU for zarr I/O — rapids-singlecell keeps arrays on GPU.
     with timer("Move to CPU"):

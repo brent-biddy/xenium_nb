@@ -11,6 +11,7 @@ in `bin/` rather than notebooks — see `bin/create_sdata.py` and `bin/create_fo
 | Notebook | Purpose | Params | Main outputs |
 |----------|---------|--------|--------------|
 | `analyze/plot_follicle.qmd` | Render follicle zarrs into PowerPoint slides. | `sample`, `cell`, `path` | `<cell>_plot_follicle.pptx`, `<cell>_plot_follicle.timing.tsv` |
+| `analyze/cluster_report.qmd` | One cohort deck: QC, the Leiden resolution sweep, and clusters in tissue, per sample. | none — globs the `*.zarr` staged beside it | `cluster_report.pptx` |
 
 ## Samplesheets
 
@@ -36,6 +37,7 @@ ROI1_A,aaaaimck-1,results/ROI1_A/follicle_sdata/output/aaaaimck-1.zarr
 nextflow run main.nf --step create_sdata --samplesheet assets/samplesheet.csv
 nextflow run main.nf --step create_follicle_sdata --samplesheet results/sample_sdata_samplesheet.csv --cell_ids_file assets/stage_quality_area_all_rois.csv
 nextflow run main.nf --step plot_follicle --samplesheet results/follicle_sdata_samplesheet.csv
+nextflow run main.nf --step cluster_report --samplesheet results/cluster_sdata_samplesheet.csv
 ```
 
 ## Analysis Notebook IDs
@@ -47,6 +49,9 @@ The built-in analysis registry currently defines:
 | `plot_follicle` | `notebooks/analyze/plot_follicle.qmd` | `sample`, `cell`, `path` |
 
 Notebook metadata is defined in [`../assets/notebook_registry.json`](../assets/notebook_registry.json).
+
+`cluster_report.qmd` is deliberately absent: it declares no parameters, so there is nothing
+for the registry to carry. Its inputs are whatever zarrs the process stages beside it.
 
 ## Adding an analysis notebook
 

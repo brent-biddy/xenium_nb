@@ -1,0 +1,489 @@
+---
+title: "xenium_nb — clustering"
+subtitle: "Per-sample Leiden resolution sweep, QC, and clusters in tissue"
+# Pin the kernel by name, as plot_follicle.qmd does. Apptainer bind-mounts $HOME, so
+# kernelspecs from ~/.local/share/jupyter/kernels shadow the container's own — quarto's
+# default "python3" then resolves to a host env missing the pipeline's packages, and
+# every cell fails at import under `error: true` while the render still exits 0.
+jupyter: python_spatial
+format:
+  pptx:
+    reference-doc: ouhsc_ppt_template.pptx
+    # `#` becomes a Section Header slide, `##` a Title-and-Content slide. Without
+    # this pandoc infers the level from the headings present, so adding the first
+    # `#` would silently demote every `##` to a bullet.
+    slide-level: 2
+execute:
+  echo: false
+  warning: false
+  # Keep rendering when a cell raises. The per-sample sections come from one loop over
+  # the staged zarrs, so a missing sample is simply absent rather than an error — but a
+  # sample whose plots raise would otherwise take the whole deck down with it. The cost
+  # is that a genuinely broken cell yields an error slide and an exit code of 0 — read
+  # the slides, not just the exit status.
+  error: true
+---
+
+```{python}
+# | tags: [setup]
+from pathlib import Path
+
+import anndata as ad
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import zarr
+from IPython.display import display, Markdown
+from matplotlib.colors import LogNorm
+
+# The reference template is 16:9 at 10 x 5.625in; leave room for a slide title.
+FIGSIZE = (9.0, 4.3)
+# Inches reserved beside the in-tissue plots for their cluster legend, which sits
+# outside the axes and would otherwise be cropped by tight_layout.
+LEGEND_WIDTH = 1.4
+# Fraction of the in-tissue axes the cell dots should cover, which sets their size.
+SPATIAL_COVERAGE = 0.45
+
+# Every clustered zarr is staged into this notebook's working directory by the Nextflow
+# process, so globbing is the whole input contract — no params to pass or drift. These
+# are cluster_sdata's zarrs, not create_sdata's: they carry X_umap and the leiden_res_*
+# columns, and their cells are already past the min_counts cut.
+ZARRS = sorted(Path(".").glob("*.zarr"))
+if not ZARRS:
+    raise FileNotFoundError("No .zarr directories staged next to the notebook.")
+
+# Cap the panels per row so a wide sweep wraps instead of shrinking to nothing.
+MAX_COLS = 3
+
+# The sweep is split across this many slides per sample so ten resolutions do not shrink
+# to ten unreadable thumbnails on one slide. Bump to 3 for a wider sweep — the per-sample
+# loop below iterates range(CLUSTER_SLIDES), so nothing else needs editing.
+CLUSTER_SLIDES = 2
+
+# The spatial and H&E slides show one resolution, not the sweep — overlaying ten
+# panels on tissue would be unreadable and the point of those slides is whether a
+# cluster is a coherent structure, not where to cut the sweep. Nearest available
+# resolution wins, so a run with a custom --resolutions still renders.
+SPATIAL_RESOLUTION = 1.0
+
+# obs columns holding the five Xenium control/codeword counters. Summed for the
+# negative-control panel; each one alone is too sparse to read on a UMAP.
+CONTROL_COLS = [
+    "control_probe_counts",
+    "genomic_control_counts",
+    "control_codeword_counts",
+    "unassigned_codeword_counts",
+    "deprecated_codeword_counts",
+]
+
+
+def load_sample(path):
+    """Read one zarr's obs, UMAP, and spatial coords without pulling X into memory.
+
+    ad.io.read_elem on the table's zarr groups reads obs/obsm only — the count matrix
+    stays on disk. That matters more here than for an h5ad cohort: spatialdata.read_zarr
+    would also materialize every image and the full X for each sample at once.
+    """
+    store = zarr.open(f"{path}/tables/table", mode="r")
+    df = ad.io.read_elem(store["obs"])
+    umap = ad.io.read_elem(store["obsm"]["X_umap"])
+    df["umap_1"] = umap[:, 0]
+    df["umap_2"] = umap[:, 1]
+    spatial = ad.io.read_elem(store["obsm"]["spatial"])
+    df["spatial_x"] = spatial[:, 0]
+    df["spatial_y"] = spatial[:, 1]
+
+    # Negative-control fraction, computed here rather than read from obs. It cannot use
+    # total_counts: create_sdata's total_counts is transcripts + all five counters, but
+    # cluster_sdata's calculate_qc_metrics overwrites it with X.sum(axis=1) — so the
+    # column means different things before and after clustering. transcript_counts is
+    # the one that always equals the row sum of X, so the denominator is rebuilt from it.
+    present = [c for c in CONTROL_COLS if c in df.columns]
+    if present:
+        controls = df[present].sum(axis=1)
+        df["pct_control"] = 100 * controls / (df["transcript_counts"] + controls)
+
+    return df
+
+
+def resolution_columns(df):
+    """The sweep's leiden columns, ordered by resolution rather than by string.
+
+    Discovered from obs rather than hardcoded: --resolutions is a pipeline param, so the
+    set of columns is whatever the run that produced these zarrs chose. Sorting on the
+    float matters — a plain sort puts leiden_res_1.00 before leiden_res_0.20.
+    """
+    cols = [c for c in df.columns if c.startswith("leiden_res_")]
+    return sorted(cols, key=lambda c: float(c.removeprefix("leiden_res_")))
+
+
+def resolution_parts(res_cols, nparts):
+    """Split the ordered sweep into nparts balanced, contiguous groups — one slide each.
+
+    A wide sweep (the default 0.1-1.0 is ten resolutions) crammed onto one slide shrinks
+    every UMAP to an unreadable thumbnail, and choosing a resolution is exactly what this
+    slide is for. Splitting across slides keeps the panels legible; the groups are
+    contiguous so each slide still reads low-to-high. np.array_split balances the
+    remainder (ten -> 5+5, seven -> 4+3) instead of stranding one panel alone on a slide.
+    """
+    return [list(part) for part in np.array_split(res_cols, nparts)]
+
+
+def spatial_column(df):
+    """The sweep column closest to SPATIAL_RESOLUTION, for the in-tissue slides."""
+    cols = resolution_columns(df)
+    if not cols:
+        raise ValueError("No leiden_res_* columns in obs — was this zarr clustered?")
+    return min(cols, key=lambda c: abs(float(c.removeprefix("leiden_res_")) - SPATIAL_RESOLUTION))
+
+
+def panel_grid(n, figsize=FIGSIZE):
+    """A balanced grid sized to exactly n panels, with any leftover axes removed.
+
+    Rows first, then columns back-solved from the row count, so the panels spread evenly
+    instead of filling rows to MAX_COLS and stranding a remainder: 4 metrics land 2x2
+    rather than 3 across with one alone under a two-thirds gap. 6 still lands 2x3.
+
+    delaxes, not set_visible(False): a hidden axes still reserves its cell under
+    tight_layout, which squeezes the real panels into a fraction of the slide and
+    strands the labels. Removing it reclaims the space.
+    """
+    nrows = int(np.ceil(n / MAX_COLS))
+    ncols = int(np.ceil(n / nrows))
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize, squeeze=False)
+    flat = axes.ravel()
+    for ax in flat[n:]:
+        fig.delaxes(ax)
+    return fig, flat[:n]
+
+
+def point_size(ax, n_cells, coverage):
+    """Marker area (pt²) that lets n_cells cover `coverage` of these axes, once.
+
+    A fixed size cannot serve every tissue plot: at s=3 a 21k-cell strip reads well but a
+    32k-cell section is a solid mat of dots, and at s=1 the strip is speckle. The same
+    sample also needs a smaller dot in a five-panel sweep than on a full-slide plot.
+    Taking the axes' own area covers both — get_position() is the pre-tight_layout
+    fraction of the figure, close enough for a marker size. 72 pt to the inch, squared,
+    converts inches² to the pt² units scatter's `s` is in.
+    """
+    w, h = ax.get_figure().get_size_inches()
+    pos = ax.get_position()
+    area_pt2 = (pos.width * w) * (pos.height * h) * 72 ** 2
+    return float(np.clip(coverage * area_pt2 / n_cells, 0.5, 6.0))
+
+
+def tissue_grid(x0, x1, y0, y1):
+    """A single-axes figure shaped like the tissue it will hold, plus room for a legend.
+
+    A fixed FIGSIZE wastes the slide on anything that is not 2:1: a tall section renders
+    as a sliver down the middle of a wide figure, because set_aspect("equal") is
+    non-negotiable for tissue. Sizing the figure to the data's aspect instead means the
+    image pandoc embeds is all tissue, and PowerPoint centres it on the slide.
+    """
+    aspect = (x1 - x0) / (y1 - y0)
+    plot_w = FIGSIZE[0] - LEGEND_WIDTH
+    if aspect >= plot_w / FIGSIZE[1]:
+        w, h = plot_w, plot_w / aspect
+    else:
+        w, h = FIGSIZE[1] * aspect, FIGSIZE[1]
+    return plt.subplots(figsize=(w + LEGEND_WIDTH, h))
+
+
+def style_tissue(ax, col, legend=True):
+    """Shared framing for the in-tissue plots: square units, no frame, optional legend.
+
+    A legend, not the on-data labels the UMAP slides use: clusters are spatially
+    interleaved, so a label at a cluster's median centroid routinely lands inside a
+    different cluster. The sweep panels pass legend=False — one legend per panel would
+    cost more width than the tissue itself, and their titles carry the cluster count.
+    """
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.spines[["top", "right", "bottom", "left"]].set_visible(False)
+    if legend:
+        ax.legend(
+            loc="center left", bbox_to_anchor=(1.0, 0.5), frameon=False,
+            fontsize=6, markerscale=6, ncols=2,
+            title=f"resolution {col.removeprefix('leiden_res_')}", title_fontsize=6,
+        )
+
+
+def style_umap(ax, title):
+    """UMAP axes carry no interpretable units — drop the frame, keep the title."""
+    ax.set_title(title, fontsize=8, loc="left")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.spines[["top", "right", "bottom", "left"]].set_visible(False)
+
+
+def cluster_colors(labels):
+    """(ordered levels, level -> colour) for one cluster column.
+
+    Numeric order so a cluster keeps its colour across every slide showing the same
+    resolution, and so the on-data labels read in order.
+
+    tab10 below 11 clusters, tab20 above: tab20 is ten dark/light *pairs*, so a
+    2-cluster panel drawn from it is navy against pale blue — nearly invisible at
+    sweep-panel size, which is exactly where the low resolutions land. tab10's first
+    two are blue and orange. Past 20 the palette cycles, which the on-data labels on
+    the UMAP panels compensate for.
+    """
+    levels = sorted(labels.unique(), key=int)
+    cmap = plt.get_cmap("tab10" if len(levels) <= 10 else "tab20")
+    return levels, {level: cmap(i % cmap.N) for i, level in enumerate(levels)}
+
+
+# (column, panel title, log colour scale). Counts span orders of magnitude, so a linear
+# ramp puts almost every cell in the bottom colour; the rest are bounded. No mito or
+# doublet panel: the Xenium panel carries no MT- genes at all, so pct_counts_mt would
+# read 0.0 for every cell, and no doublet caller runs in this pipeline.
+QC_METRICS = [
+    ("transcript_counts", "Transcripts", True),
+    ("n_genes_by_counts", "Genes detected", False),
+    ("cell_area", "Cell area (µm²)", False),
+    ("pct_control", "Negative control %", False),
+]
+
+
+def qc_umap(sample):
+    """One slide's figure: this sample's UMAP, once per QC metric.
+
+    A continuous viridis ramp: every cell here is already past cluster_sdata's
+    min_counts cut, so the question is not where to put a threshold but whether a region
+    of the manifold runs high — a magnitude read, which a ramp answers.
+
+    Debris is what to look for. The negative-control panel is the Xenium-specific one:
+    a cluster that lights up there is reading control probes, not biology, and should be
+    dropped rather than annotated.
+    """
+    d = samples[sample]
+    metrics = [(c, t, log_c) for c, t, log_c in QC_METRICS if c in d.columns]
+    fig, axes = panel_grid(len(metrics))
+
+    for ax, (metric, title, log_c) in zip(axes, metrics):
+        values = d[metric]
+        # Guard the log norm: a zero or negative would raise, and transcript_counts can
+        # be small on debris. vmin at the smallest positive value keeps the ramp honest.
+        norm = LogNorm(vmin=max(values[values > 0].min(), 1e-9), vmax=values.max()) if log_c else None
+        scatter = ax.scatter(
+            d["umap_1"], d["umap_2"], c=values,
+            cmap="viridis", norm=norm,
+            # Opaque: a colorbar inherits its mappable's alpha and would draw the ramp
+            # blended toward white.
+            s=2, alpha=1.0, edgecolors="none", rasterized=True,
+        )
+        style_umap(ax, title)
+        cbar = fig.colorbar(scatter, ax=ax, fraction=0.045, pad=0.02)
+        cbar.ax.tick_params(labelsize=6)
+
+    fig.suptitle(f"{sample} · {len(d):,} cells", fontsize=9, x=0.01, ha="left")
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+
+def cluster_umap(sample, part):
+    """One slide's figure: this sample's UMAP for part `part` of the resolution sweep.
+
+    The point of the slide is choosing a resolution, so the panels are the sweep and the
+    titles carry the cluster count. The sweep is split into CLUSTER_SLIDES contiguous
+    slides (part is 0-based) so each slide shows a legible handful of panels rather than
+    the whole sweep at thumbnail size.
+
+    Labels are drawn on the clusters rather than in a legend: at 25 clusters a legend
+    would eat the panel, and tab20 has to cycle anyway — the on-data label is what
+    actually identifies a cluster, so colour only has to separate neighbours.
+    """
+    d = samples[sample]
+    res_cols = resolution_columns(d)
+    if not res_cols:
+        raise ValueError(f"{sample}: no leiden_res_* columns in obs — was this zarr clustered?")
+    cols = resolution_parts(res_cols, CLUSTER_SLIDES)[part]
+
+    fig, axes = panel_grid(len(cols))
+
+    for ax, col in zip(axes, cols):
+        labels = d[col].astype(str)
+        levels, colors = cluster_colors(labels)
+        for level in levels:
+            m = labels == level
+            ax.scatter(
+                d.loc[m, "umap_1"], d.loc[m, "umap_2"],
+                color=colors[level],
+                s=2, alpha=1.0, edgecolors="none", rasterized=True,
+            )
+            # Median, not mean: a cluster with a stray arm would drag the mean off the
+            # cells it is labelling.
+            ax.annotate(
+                level,
+                (d.loc[m, "umap_1"].median(), d.loc[m, "umap_2"].median()),
+                fontsize=5, fontweight="bold", ha="center", va="center",
+                color="black",
+                bbox=dict(boxstyle="round,pad=0.1", facecolor="white",
+                          alpha=0.7, edgecolor="none"),
+            )
+        style_umap(ax, f"resolution {col.removeprefix('leiden_res_')} · {len(levels)} clusters")
+
+    # Name the resolution span on the title so the slides are self-identifying.
+    span = f"{cols[0].removeprefix('leiden_res_')}–{cols[-1].removeprefix('leiden_res_')}"
+    fig.suptitle(f"{sample} · {len(d):,} cells · resolutions {span}", fontsize=9, x=0.01, ha="left")
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+
+def spatial_clusters(sample):
+    """One slide's figure: this sample's cells in tissue coordinates, coloured by cluster.
+
+    The UMAP says which cells group together; only this says whether that group is a
+    structure. Centroids from obsm["spatial"], not cell_boundaries polygons — at
+    whole-section scale a 15 µm cell is well under a pixel, so the polygons cost a great
+    deal of render time to draw the same dots.
+
+    y is inverted because Xenium global coordinates run downward from the top-left of
+    the slide image; without it the tissue renders upside down relative to the scan.
+    """
+    d = samples[sample]
+    col = spatial_column(d)
+    labels = d[col].astype(str)
+    levels, colors = cluster_colors(labels)
+
+    fig, ax = tissue_grid(
+        d["spatial_x"].min(), d["spatial_x"].max(),
+        d["spatial_y"].min(), d["spatial_y"].max(),
+    )
+    size = point_size(ax, len(d), SPATIAL_COVERAGE)
+    for level in levels:
+        m = labels == level
+        ax.scatter(
+            d.loc[m, "spatial_x"], d.loc[m, "spatial_y"],
+            color=colors[level], label=level,
+            s=size, alpha=1.0, edgecolors="none", rasterized=True,
+        )
+
+    ax.invert_yaxis()
+    style_tissue(ax, col)
+    fig.suptitle(
+        f"{sample} · {len(d):,} cells · resolution {col.removeprefix('leiden_res_')}"
+        f" · {len(levels)} clusters",
+        fontsize=9, x=0.01, ha="left",
+    )
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+
+def spatial_sweep(sample, part):
+    """One slide's figure: the tissue once per resolution in part `part` of the sweep.
+
+    The UMAP sweep answers which resolutions split which blobs; this answers which of
+    those splits are spatial. A resolution that carves a UMAP blob in two but scatters
+    both halves through the same tissue is splitting on depth or noise, and that only
+    shows up side by side like this.
+
+    Same CLUSTER_SLIDES split as the UMAP sweep, so slide n here holds the same
+    resolutions as slide n there and the two can be read against each other.
+    """
+    d = samples[sample]
+    res_cols = resolution_columns(d)
+    if not res_cols:
+        raise ValueError(f"{sample}: no leiden_res_* columns in obs — was this zarr clustered?")
+    cols = resolution_parts(res_cols, CLUSTER_SLIDES)[part]
+
+    fig, axes = panel_grid(len(cols))
+
+    for ax, col in zip(axes, cols):
+        labels = d[col].astype(str)
+        levels, colors = cluster_colors(labels)
+        size = point_size(ax, len(d), SPATIAL_COVERAGE)
+        for level in levels:
+            m = labels == level
+            ax.scatter(
+                d.loc[m, "spatial_x"], d.loc[m, "spatial_y"],
+                color=colors[level],
+                s=size, alpha=1.0, edgecolors="none", rasterized=True,
+            )
+        ax.invert_yaxis()
+        style_tissue(ax, col, legend=False)
+        ax.set_title(
+            f"resolution {col.removeprefix('leiden_res_')} · {len(levels)} clusters",
+            fontsize=8, loc="left",
+        )
+
+    span = f"{cols[0].removeprefix('leiden_res_')}–{cols[-1].removeprefix('leiden_res_')}"
+    fig.suptitle(f"{sample} · {len(d):,} cells · resolutions {span}", fontsize=9, x=0.01, ha="left")
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+
+def md_table(df):
+    """Render a DataFrame as a markdown table.
+
+    Built by hand rather than via df.style (HTML-only, renders as nothing in pptx) or
+    df.to_markdown (needs tabulate, which the container does not carry).
+    """
+    header = "| " + " | ".join(str(c) for c in df.columns) + " |"
+    rule = "| " + " | ".join("---" for _ in df.columns) + " |"
+    rows = ["| " + " | ".join(str(v) for v in row) + " |" for row in df.itertuples(index=False)]
+    display(Markdown("\n".join([header, rule] + rows)))
+
+
+samples = {}
+for path in ZARRS:
+    df = load_sample(path)
+    # obs["sample"] is written by create_sdata and survives clustering, so the section
+    # headings carry the sample's own id rather than whatever the zarr got named.
+    name = df["sample"].iloc[0]
+    samples[name] = df
+
+sample_order = sorted(samples)
+```
+
+## Clusters per resolution
+
+```{python}
+# One row per sample, one column per resolution: the cluster counts the per-sample
+# slides show one at a time, in the one place they can be compared. Not hardcoded —
+# it iterates sample_order, so it picks up samples with no edit here.
+res_cols = resolution_columns(samples[sample_order[0]])
+rows = []
+for s in sample_order:
+    d = samples[s]
+    row = {"sample": s, "cells": f"{len(d):,}"}
+    for col in res_cols:
+        row[col.removeprefix("leiden_res_")] = d[col].nunique()
+    rows.append(row)
+md_table(pd.DataFrame(rows))
+```
+
+```{python}
+# One `# <sample>` section per sample, driven by sample_order rather than a hardcoded
+# block each. The cohort changes — samples are added and dropped — and a hardcoded list
+# silently omits a new sample while raising KeyError on a removed one.
+#
+# The headings are emitted with display(Markdown(...)) from inside an ordinary cell, NOT
+# under `output: asis`. Under asis an inline figure lands between the markdown blocks and
+# leaves the *next* heading not starting its own line, so pandoc emits a literal "## ..."
+# as text and drops the image. display(Markdown) does not hit it: each call emits its own
+# complete block, and the plot functions end with plt.show() so the figure lands between
+# them.
+for s in sample_order:
+    display(Markdown(f"# {s}"))
+
+    display(Markdown("## QC metrics on the UMAP"))
+    qc_umap(s)
+
+    for part in range(CLUSTER_SLIDES):
+        display(Markdown(f"## Clusters by resolution ({part + 1}/{CLUSTER_SLIDES})"))
+        cluster_umap(s, part)
+
+    for part in range(CLUSTER_SLIDES):
+        display(Markdown(f"## Clusters in tissue by resolution ({part + 1}/{CLUSTER_SLIDES})"))
+        spatial_sweep(s, part)
+
+    display(Markdown("## Clusters in tissue"))
+    spatial_clusters(s)
+```

@@ -17,6 +17,7 @@ Writes clustered.zarr into the current working directory.
 
 Usage:
     cluster_sdata_gpu_ooc.py --sample cohort --path /data/cohort.zarr --chunk-size 20000
+    cluster_sdata_gpu_ooc.py --sample cohort --path /data/cohort.zarr --resolutions 0.5 1.0
 """
 
 import argparse
@@ -36,6 +37,8 @@ try:
     from anndata.experimental import read_elem_lazy as read_dask
 except ImportError:  # older anndata: same functionality under the old name
     from anndata.experimental import read_elem_as_dask as read_dask
+
+DEFAULT_RESOLUTIONS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
 
 def parse_args():
@@ -62,6 +65,15 @@ def parse_args():
         "Set it only when the materialized X (n_obs x n_vars) will not fit — it "
         "shrinks that matrix at the cost of clustering on a different feature space.",
     )
+    parser.add_argument(
+        "--resolutions",
+        type=float,
+        nargs="+",
+        default=DEFAULT_RESOLUTIONS,
+        metavar="RES",
+        help="Leiden resolutions to sweep; one obs column is written per value "
+        f"(default: {' '.join(str(r) for r in DEFAULT_RESOLUTIONS)}).",
+    )
     return parser.parse_args()
 
 
@@ -87,12 +99,15 @@ def read_table_lazy(path, table_key, chunk_size):
 def main():
     args = parse_args()
 
+    resolutions = sorted(args.resolutions)
+
     output_path = "clustered.zarr"
 
     print(f"Sample:     {args.sample}")
     print(f"Input:      {args.path}")
     print(f"Output:     {output_path}")
     print(f"Chunk size: {args.chunk_size:,} rows")
+    print(f"Res:        {', '.join(f'{r:g}' for r in resolutions)}")
 
     # Managed memory lets chunks spill to host RAM instead of OOM-ing when the
     # dataset (or an intermediate) doesn't fit in VRAM — the whole point of an
@@ -172,10 +187,17 @@ def main():
     with timer("UMAP"):
         rsc.tl.umap(adata, random_state=0)
 
-    with timer("Leiden"):
-        rsc.tl.leiden(adata, random_state=0)
-
-    print(f"Leiden clustering: {adata.obs['leiden'].nunique()} clusters")
+    # Sweep resolutions rather than committing to one: the neighbour graph is
+    # already built, so each extra resolution only re-runs the (comparatively
+    # cheap) community detection on it. Downstream picks a column by name.
+    for res in resolutions:
+        with timer(f"Leiden res={res:g}"):
+            rsc.tl.leiden(
+                adata,
+                resolution=res,
+                key_added=f"leiden_res_{res:.2f}",
+                random_state=0,
+            )
 
     with timer("Move to CPU"):
         rsc.get.anndata_to_CPU(adata)
