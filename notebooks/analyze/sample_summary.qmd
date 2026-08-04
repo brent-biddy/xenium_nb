@@ -1,0 +1,635 @@
+---
+title: "xenium_nb — sample summary"
+subtitle: "Per-cell QC by cluster, one sample per section"
+# Pin the kernel by name, as cluster_report.qmd does. Apptainer bind-mounts $HOME, so
+# kernelspecs from ~/.local/share/jupyter/kernels shadow the container's own — quarto's
+# default "python3" then resolves to a host env missing the pipeline's packages, and
+# every cell fails at import under `error: true` while the render still exits 0.
+jupyter: python_spatial
+format:
+  pptx:
+    reference-doc: ouhsc_ppt_template.pptx
+    # `#` becomes a Section Header slide, `##` a Title-and-Content slide. Without
+    # this pandoc infers the level from the headings present, so adding the first
+    # `#` would silently demote every `##` to a bullet.
+    slide-level: 2
+execute:
+  echo: false
+  warning: false
+  # Keep rendering when a cell raises: one sample's panel erroring leaves an error slide
+  # in its own section instead of taking the whole deck down. The cost is that a
+  # genuinely broken cell yields an error slide and an exit code of 0 — read the slides,
+  # not just the exit status.
+  error: true
+---
+
+```{python}
+# | tags: [setup]
+import gc
+import traceback
+from pathlib import Path
+
+import anndata as ad
+import matplotlib.patheffects as patheffects
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import scipy.sparse as sp
+import zarr
+from IPython.display import display, Markdown
+from scipy.cluster.hierarchy import leaves_list, linkage
+from scipy.spatial.distance import squareform
+from scipy.stats import rankdata
+
+# The reference template is 16:9 at 10 x 5.625in; leave room for a slide title.
+FIGSIZE = (9.0, 4.3)
+
+# Every clustered zarr is staged into this notebook's working directory by the Nextflow
+# process, so globbing is the whole input contract — no params to pass or drift. These
+# are cluster_sdata's zarrs, not create_sdata's: they carry the leiden_res_* columns,
+# and their cells are already past the min_counts cut.
+ZARRS = sorted(Path(".").glob("*.zarr"))
+if not ZARRS:
+    raise FileNotFoundError("No .zarr directories staged next to the notebook.")
+
+# The resolution each sample's clusters are taken at unless its row in
+# chosen_resolutions.csv says otherwise. A cohort-wide starting point, not a claim that
+# 0.5 is right for any particular sample — the right resolution is a judgement made by
+# reading cluster_report, and this is what the deck splits on until that judgement exists.
+DEFAULT_RESOLUTION = 0.5
+
+# The per-sample resolution table, staged flat beside the zarrs by the same
+# staging-is-the-contract rule. Its rows are OVERRIDES on DEFAULT_RESOLUTION, not a
+# required entry per sample: a cohort renders with no rows at all, and a sample gets its
+# own resolution the moment one is written for it. Optional as a file too — if it is
+# absent every sample simply takes the default.
+RESOLUTIONS_CSV = Path("chosen_resolutions.csv")
+
+# obs columns holding the five Xenium control/codeword counters. Summed into a single
+# negative-control fraction; each one alone is too sparse to read per cell.
+CONTROL_COLS = [
+    "control_probe_counts",
+    "genomic_control_counts",
+    "control_codeword_counts",
+    "unassigned_codeword_counts",
+    "deprecated_codeword_counts",
+]
+
+
+def load_obs(path):
+    """Read one zarr's obs and UMAP coords without pulling X into memory.
+
+    ad.io.read_elem on the table's obs/obsm groups reads those alone — the count matrix
+    stays on disk. spatialdata.read_zarr would instead materialize every image and the
+    full X for each sample, and this deck only ever needs obs and the embedding.
+    """
+    store = zarr.open(f"{path}/tables/table", mode="r")
+    df = ad.io.read_elem(store["obs"])
+
+    umap = ad.io.read_elem(store["obsm"]["X_umap"])
+    df["umap_1"] = umap[:, 0]
+    df["umap_2"] = umap[:, 1]
+
+    # Negative-control fraction, computed here rather than read from obs. It cannot use
+    # total_counts: create_sdata's total_counts is transcripts + all five counters, but
+    # cluster_sdata's calculate_qc_metrics overwrites it with X.sum(axis=1) — so the
+    # column means different things before and after clustering. transcript_counts is
+    # the one that always equals the row sum of X, so the denominator is rebuilt from it.
+    present = [c for c in CONTROL_COLS if c in df.columns]
+    if present:
+        controls = df[present].sum(axis=1)
+        df["pct_control"] = 100 * controls / (df["transcript_counts"] + controls)
+
+    return df
+
+
+def resolution_columns(df):
+    """The sweep's leiden columns, ordered by resolution rather than by string.
+
+    Discovered from obs rather than hardcoded: --resolutions is a pipeline param, so the
+    set of columns is whatever the run that produced these zarrs chose. Sorting on the
+    float matters — a plain sort puts leiden_res_1.00 before leiden_res_0.20.
+    """
+    cols = [c for c in df.columns if c.startswith("leiden_res_")]
+    return sorted(cols, key=lambda c: float(c.removeprefix("leiden_res_")))
+
+
+# sample -> overriding resolution, as the float the CSV records. Read once here so a
+# malformed table fails the whole deck rather than every per-sample slide separately.
+# Samples absent from it (or from a missing file) fall back to DEFAULT_RESOLUTION.
+OVERRIDES = {}
+if RESOLUTIONS_CSV.exists():
+    chosen = pd.read_csv(RESOLUTIONS_CSV)
+    missing_cols = {"sample", "resolution"} - set(chosen.columns)
+    if missing_cols:
+        raise ValueError(f"chosen_resolutions.csv missing column(s): {sorted(missing_cols)}")
+    OVERRIDES = dict(zip(chosen["sample"].astype(str), chosen["resolution"].astype(float)))
+```
+
+```{python}
+# Load the cohort. Each zarr's obs is read once, up front, and kept: obs alone is ~10-50 MB
+# per sample against the multi-GB images and X that stay on disk, so the whole cohort fits
+# in memory and every slide below reads from these frames rather than reopening a store.
+samples = {}
+# sample -> the zarr it came from, kept because the centroid cell below has to reopen the
+# store for X. The staged path is not derivable from the sample id: cluster_sdata*
+# publishes every sample's output as clustered.zarr, so the names are sample1, sample2, …
+zarr_paths = {}
+
+for path in ZARRS:
+    df = load_obs(path)
+    # obs["sample"] is written by create_sdata and survives clustering, so the sample id
+    # comes from the object rather than the staged path — which is a meaningless
+    # sample1.zarr, since cluster_sdata* publishes every sample's output as clustered.zarr.
+    sample = str(df["sample"].iloc[0])
+    samples[sample] = df
+    zarr_paths[sample] = path
+
+SAMPLES = sorted(samples)
+
+# sample -> the resolution this deck splits it at: its override if it has one, the
+# cohort default otherwise.
+CHOSEN = {sample: OVERRIDES.get(sample, DEFAULT_RESOLUTION) for sample in SAMPLES}
+
+# Whichever resolution a sample lands on, it must name a leiden column that exists —
+# a default of 0.5 is no help if the run that produced these zarrs swept 0.6 to 1.0.
+# Checked here for the whole cohort rather than per slide: splitting on a resolution the
+# zarr does not carry is a hard error, and finding out about every such sample at once
+# beats one render per fix.
+problems = []
+for sample in SAMPLES:
+    key = f"leiden_res_{CHOSEN[sample]:.2f}"
+    if key not in samples[sample].columns:
+        available = ", ".join(resolution_columns(samples[sample])) or "none"
+        source = "override" if sample in OVERRIDES else "default"
+        problems.append(
+            f"{sample}: {source} resolution {CHOSEN[sample]:g} -> '{key}' not in obs. Available: {available}"
+        )
+if problems:
+    raise ValueError(
+        "No matching leiden column for:\n  " + "\n  ".join(problems)
+        + "\n\nSet a per-sample resolution in chosen_resolutions.csv, or change DEFAULT_RESOLUTION."
+    )
+```
+
+```{python}
+# The per-cell QC columns each sample's panel shows, as (obs column, axis label, log).
+# Counts and areas are strictly positive and heavily right-skewed, so they are shown on a
+# log scale; pct_control is a bounded percentage that is exactly 0 for most cells, which
+# a log scale would drop silently, so it stays linear.
+QC_COLUMNS = [
+    ("transcript_counts", "Transcripts", True),
+    ("n_genes_by_counts", "Genes", True),
+    ("cell_area", "Cell area (µm²)", True),
+    ("pct_control", "Negative control %", False),
+]
+
+
+def size_ranked(labels):
+    """Leiden labels ordered largest cluster first, for renumbering to 1..n.
+
+    Leiden's own ids carry no meaning across samples — they are assignment order, so
+    cluster 3 in one sample has nothing to do with cluster 3 in another. Ranking by cell
+    count at least makes the id mean the same *kind* of thing everywhere: 1 is always the
+    sample's largest cluster.
+
+    Ties break on the original numeric label rather than being left to sort order, so two
+    clusters of equal size do not swap ids between renders of the same data.
+
+    Note these ids are this deck's own. cluster_report labels its panels with the raw
+    leiden ids, so the two decks disagree on cluster names by design — the caption on
+    each slide says so.
+    """
+    counts = labels.value_counts()
+    return sorted(counts.index, key=lambda level: (-counts[level], int(level)))
+
+
+def cluster_colors(levels):
+    """level -> colour, matching cluster_report's palette so a cluster keeps its colour.
+
+    tab10 below 11 clusters, tab20 above: tab20 is ten dark/light *pairs*, so a 2-cluster
+    panel drawn from it is navy against pale blue. tab10's first two are blue and orange.
+    Past 20 the palette cycles, which the numeric x labels compensate for.
+    """
+    cmap = plt.get_cmap("tab10" if len(levels) <= 10 else "tab20")
+    return {level: cmap(i % cmap.N) for i, level in enumerate(levels)}
+
+
+def style_axes(ax):
+    """Shared framing: drop the top/right frame, shrink the labels to slide size."""
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.tick_params(labelsize=6)
+    ax.yaxis.label.set_size(7)
+
+
+def point_size(ax, n_cells, coverage=0.35):
+    """Marker area (pt²) that lets n_cells cover `coverage` of these axes, once.
+
+    A fixed size cannot serve a cohort whose samples differ tenfold in cell count: at s=3
+    a 20k-cell sample reads well but a 200k-cell one is a solid mat. Taking the axes' own
+    area covers both — get_position() is the pre-tight_layout fraction of the figure,
+    close enough for a marker size. 72 pt to the inch, squared, converts inches² to the
+    pt² units scatter's `s` is in.
+    """
+    w, h = ax.get_figure().get_size_inches()
+    pos = ax.get_position()
+    area_pt2 = (pos.width * w) * (pos.height * h) * 72 ** 2
+    return float(np.clip(coverage * area_pt2 / n_cells, 0.5, 6.0))
+
+
+# The renumbering, fixed once per sample here rather than recomputed inside each plot, so
+# the UMAP, the correlation heatmap, and the violins cannot disagree about which cluster
+# is 1. LEVELS holds the original leiden labels in size order — position i is cluster
+# i + 1 everywhere.
+LEVELS = {s: size_ranked(samples[s][f"leiden_res_{CHOSEN[s]:.2f}"]) for s in SAMPLES}
+COLORS = {s: cluster_colors(LEVELS[s]) for s in SAMPLES}
+
+
+def cluster_centroids(sample):
+    """Per-cluster centroids (clusters x genes), rows in size-rank order.
+
+    Follows the sammy_r21 / PNAS atlas pseudobulk (Seurat AverageExpression + ln(avg + 1)):
+    normalize each cell to CP10K, average the *linear* CP10K over the cells in a cluster,
+    then log1p that average — mean-then-log, not log-then-mean, since ln is nonlinear and
+    the two differ (up to 1.8 on this data). Built from the raw counts in layers["counts"]
+    (ground truth), which cluster_sdata stashes before normalizing, rather than expm1(X),
+    which round-trips the log transform.
+
+    The CP10K target itself does not affect the numbers on this slide: a uniform per-cell
+    scale factor leaves the gene ranks within a centroid untouched, so the within-sample
+    Spearman is identical (to 1e-7) under any target_sum. It matters for comparability
+    only — cluster_sdata's normalize_total takes no target_sum, and its default is not a
+    constant but the median pre-normalization total, which is 226 for one of these samples
+    and 198 for the other. Centroids built that way are on a per-sample scale and could not
+    be compared across samples or against an external atlas; CP10K can.
+
+    This is the one place the deck touches a count matrix. It is read, reduced to
+    n_clusters rows, and dropped before the next sample is opened — a cohort's worth of
+    matrices held at once would be tens of GB, while the centroids are a few thousand
+    floats per cluster.
+    """
+    store = zarr.open(f"{zarr_paths[sample]}/tables/table", mode="r")
+    counts = ad.io.read_elem(store["layers"]["counts"])
+    genes = ad.io.read_elem(store["var"]).index
+
+    # CP10K. Every cell is past cluster_sdata's min_counts=10 cut, so no total is zero and
+    # the division is safe. Scaling by a diagonal keeps a sparse matrix sparse; a dense
+    # broadcast would materialize the whole thing.
+    totals = np.asarray(counts.sum(axis=1)).ravel()
+    scale = 1e4 / totals
+    cp10k = sp.diags(scale) @ counts if sp.issparse(counts) else counts * scale[:, None]
+
+    key = f"leiden_res_{CHOSEN[sample]:.2f}"
+    labels = samples[sample][key].to_numpy()
+
+    rows = []
+    for level in LEVELS[sample]:
+        cells = np.flatnonzero(labels == level)
+        # np.asarray().ravel() because a sparse .mean(axis=0) returns a 1 x n np.matrix,
+        # while a dense one returns a 1-D array — this normalizes both. log1p AFTER the
+        # mean is the whole point of the recipe.
+        rows.append(np.log1p(np.asarray(cp10k[cells].mean(axis=0)).ravel()))
+
+    del counts, cp10k
+    gc.collect()
+    # Index is the size-ranked id, 1 = largest, matching the UMAP and violin labels.
+    return pd.DataFrame(rows, index=range(1, len(LEVELS[sample]) + 1), columns=genes)
+
+
+def rank_corr(centroids):
+    """Spearman r between every pair of centroid rows.
+
+    Spearman = Pearson of gene ranks: rank each centroid across genes, then correlate.
+    Rank-based rather than Pearson on the values because a targeted panel's centroids are
+    dominated by a few very high-expressing genes — those set a Pearson r almost on their
+    own, while ranks weight the whole panel.
+    """
+    ranked = np.vstack([rankdata(v) for v in centroids.to_numpy()])
+    return np.corrcoef(ranked)
+
+
+def dendrogram_order(values):
+    """Leaf order of an average-linkage tree on 1 - r, as indices into `values`.
+
+    squareform wants a condensed vector and rejects any asymmetry or nonzero diagonal, so
+    the diagonal is zeroed explicitly: 1 - r leaves it at ~1e-16 rather than exactly 0 and
+    squareform raises on that. checks=False would skip the validation but also skip
+    catching a genuinely malformed matrix, so the diagonal is fixed instead.
+    """
+    if len(values) <= 2:
+        # linkage needs at least 3 observations to build a tree worth ordering; with 1 or
+        # 2 clusters the incoming order is already the only sensible one.
+        return np.arange(len(values))
+    distance = 1 - values
+    np.fill_diagonal(distance, 0.0)
+    return leaves_list(linkage(squareform(distance, checks=False), method="average"))
+
+
+# Centroids, their correlation, and the dendrogram order, computed once per sample here
+# rather than inside a slide function. Both the heatmap and the dendrogram-ordered UMAP
+# need the ordering, and X is by far the most expensive thing this deck reads — computing
+# it per slide would read every count matrix twice.
+#
+# ORDER[s] indexes into size-rank positions: ORDER[s][p] is the size-rank position of the
+# cluster that sits at dendrogram position p. DENDRO_LEVELS[s] resolves that to the
+# original leiden labels, so position p is dendrogram cluster p + 1.
+CORR, ORDER, DENDRO_LEVELS = {}, {}, {}
+for s in SAMPLES:
+    CORR[s] = rank_corr(cluster_centroids(s))
+    ORDER[s] = dendrogram_order(CORR[s])
+    DENDRO_LEVELS[s] = [LEVELS[s][i] for i in ORDER[s]]
+
+DENDRO_COLORS = {s: cluster_colors(DENDRO_LEVELS[s]) for s in SAMPLES}
+
+
+def centroid_correlation(sample, numbering):
+    """One slide's figure: cluster-by-cluster Spearman correlation of centroids.
+
+    Self-self, so the diagonal is 1 by construction and carries no information. The colour
+    scale is set from the OFF-diagonal values alone: including the diagonal pins the top
+    of the ramp at 1.0 and squashes every real comparison — which on a targeted panel all
+    sit high and close together — into the top slice of the colormap.
+
+    Rows and columns are ordered by hierarchical clustering, symmetrically, so the matrix
+    stays symmetric and transcriptionally similar clusters sit adjacent as blocks. Only
+    the TICKS differ between the two numberings — the matrix itself is identical, drawn in
+    dendrogram order both times, so the two slides can be read against each other cell for
+    cell.
+
+    numbering="size"    ticks are the size-ranked ids, so they read out of sequence
+                        (dendrogram order applied to size-ranked names).
+    numbering="dendro"  ticks are the new ids, which read 1..n by construction — that
+                        numbering IS this ordering.
+    """
+    order = ORDER[sample]
+    values = CORR[sample][np.ix_(order, order)]
+    if numbering == "size":
+        # order[p] is a 0-based size-rank position; +1 makes it the printed size id.
+        ids = [int(p) + 1 for p in order]
+    else:
+        ids = list(range(1, len(order) + 1))
+
+    off_diagonal = values[~np.eye(len(ids), dtype=bool)]
+    vmin, vmax = float(off_diagonal.min()), float(off_diagonal.max())
+
+    # Blank the diagonal rather than drawing it. It is 1.0 by construction, above the
+    # scale's top, so it renders in the same saturated colour as the highest real pair —
+    # here 0.97 and 1.00 come out identical yellow while being a meaningful step apart.
+    # Grey says "not a comparison" and leaves the ramp entirely to the off-diagonal.
+    masked = values.copy()
+    np.fill_diagonal(masked, np.nan)
+
+    cmap = plt.get_cmap("viridis").copy()
+    cmap.set_bad("#e8e8e8")
+
+    fig, ax = plt.subplots(figsize=(FIGSIZE[1], FIGSIZE[1]))
+    image = ax.imshow(masked, cmap=cmap, vmin=vmin, vmax=vmax)
+
+    ticks = range(len(ids))
+    ax.set_xticks(ticks, [str(c) for c in ids], fontsize=6)
+    ax.set_yticks(ticks, [str(c) for c in ids], fontsize=6)
+    ax.set_xlabel("Cluster", size=7)
+    ax.set_ylabel("Cluster", size=7)
+
+    # Print the numbers while they still fit. Past ~12 clusters the cells are too small
+    # for two decimals and the colour alone has to carry it.
+    if len(ids) <= 12:
+        for i in range(len(ids)):
+            for j in range(len(ids)):
+                if i == j:
+                    continue  # blanked above; a printed 1.00 would only re-clutter it
+                # Threshold on the colour, not the value: mid-viridis is light enough that
+                # black reads better, and the ramp is stretched to the off-diagonal range.
+                shade = (values[i, j] - vmin) / (vmax - vmin) if vmax > vmin else 0.5
+                ax.text(j, i, f"{values[i, j]:.2f}", ha="center", va="center",
+                        fontsize=5, color="white" if shade < 0.5 else "black")
+
+    cbar = fig.colorbar(image, ax=ax, fraction=0.045, pad=0.02)
+    cbar.ax.tick_params(labelsize=6)
+    cbar.set_label("Spearman r", size=7)
+
+    label = "size-ranked ids" if numbering == "size" else "dendrogram-ordered ids"
+    fig.suptitle(f"{sample} · {len(ids)} clusters · {label}", fontsize=9, x=0.01, ha="left")
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+
+def umap_clusters(sample, levels, colors):
+    """One slide's figure: this sample's UMAP, coloured by one of the two numberings.
+
+    `levels` is the original leiden labels in the order the numbering assigns — position
+    i is cluster i + 1 — and `colors` maps those labels to their colour. Passing both in
+    rather than reading a global keeps the size-ranked and dendrogram-ordered versions of
+    this plot on one code path, so they cannot drift apart in styling.
+
+    Labels are drawn on the clusters rather than in a legend: past ~10 clusters a legend
+    eats the panel, and tab20 has to cycle anyway — the on-data number is what actually
+    identifies a cluster, so colour only has to separate neighbours.
+
+    Clusters are drawn in the order given, so for the size-ranked numbering the small ones
+    land on top. The reverse buries a 300-cell cluster under a 16,000-cell one wherever
+    they overlap.
+    """
+    d = samples[sample]
+    key = f"leiden_res_{CHOSEN[sample]:.2f}"
+
+    fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.6, FIGSIZE[1]))
+    size = point_size(ax, len(d))
+
+    for level in levels:
+        cells = d[d[key] == level]
+        ax.scatter(cells["umap_1"], cells["umap_2"], s=size, color=colors[level],
+                   alpha=1.0, edgecolors="none", rasterized=True)
+
+    for i, level in enumerate(levels):
+        cells = d[d[key] == level]
+        # The median, not the mean: a cluster split across two lobes of the embedding
+        # puts its mean in the empty space between them, where the label sits on no cells
+        # at all. The median lands inside one of the lobes.
+        ax.text(
+            cells["umap_1"].median(), cells["umap_2"].median(), str(i + 1),
+            fontsize=7, weight="bold", ha="center", va="center",
+            # White outline so the number stays legible on both the dark and the light
+            # end of the palette.
+            path_effects=[patheffects.withStroke(linewidth=2, foreground="white")],
+        )
+
+    # UMAP axes carry no interpretable units — drop the frame entirely.
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.spines[["top", "right", "bottom", "left"]].set_visible(False)
+    fig.suptitle(f"{sample} · {len(d):,} cells · {len(levels)} clusters", fontsize=9, x=0.01, ha="left")
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+
+def qc_violins(sample, levels, colors):
+    """One slide's figure: this sample's per-cell QC, one violin per cluster per metric.
+
+    Takes `levels` and `colors` the same way umap_clusters does — the original leiden
+    labels in the order the numbering assigns, so position i is cluster i + 1 — rather
+    than reading a global, so the violins and the UMAP cannot end up on different
+    numberings by accident.
+
+    Metrics stack in rows over a shared cluster axis, so a cluster reads straight down
+    the slide across all of them — a grid would repeat the cluster labels once per metric
+    and halve the width each gets. The point of the slide is spotting the cluster that is
+    a QC artefact rather than a cell type: low transcripts and genes together, or a
+    negative-control fraction that stands off the rest.
+    """
+    d = samples[sample]
+    key = f"leiden_res_{CHOSEN[sample]:.2f}"
+    groups = {level: d[d[key] == level] for level in levels}
+
+    metrics = [(c, label, log) for c, label, log in QC_COLUMNS if c in d.columns]
+    fig, axes = plt.subplots(len(metrics), 1, figsize=FIGSIZE, sharex=True, squeeze=False)
+
+    for ax, (col, label, log) in zip(axes.ravel(), metrics):
+        series = [groups[level][col].to_numpy() for level in levels]
+        if log:
+            # Guard the transform: cell_area can be 0 for a degenerate segmentation, and
+            # log10(0) is -inf, which makes the KDE fit fail outright.
+            series = [v[v > 0] for v in series]
+            series = [np.log10(v) for v in series]
+
+        # A violin needs a KDE, and a KDE needs spread: a cluster of one cell, or one
+        # where every cell has the same value (pct_control is exactly 0 for whole
+        # clusters), makes gaussian_kde raise on a singular covariance and would take the
+        # whole panel down. Those positions get their median dot alone — the cluster
+        # still appears on the axis rather than silently vanishing.
+        drawable = [i for i, v in enumerate(series) if len(np.unique(v)) > 1]
+        if drawable:
+            parts = ax.violinplot(
+                [series[i] for i in drawable],
+                positions=[i + 1 for i in drawable],
+                showextrema=False, widths=0.8,
+            )
+            for body, i in zip(parts["bodies"], drawable):
+                body.set_facecolor(colors[levels[i]])
+                body.set_alpha(0.8)
+
+        # The median marker. Drawn separately rather than via showmedians so it reads as
+        # one consistent point across every cluster, including the ones with no violin.
+        medians = [np.median(v) if len(v) else np.nan for v in series]
+        ax.scatter(range(1, len(levels) + 1), medians, s=6, color="black", zorder=3)
+
+        ax.set_ylabel(label)
+        if log:
+            # Ticks at whole decades, labelled with the linear value they stand for, so
+            # the axis reads in transcripts and µm² rather than in exponents.
+            lo, hi = ax.get_ylim()
+            decades = np.arange(np.floor(lo), np.ceil(hi) + 1)
+            ax.set_yticks(decades)
+            ax.set_yticklabels([f"{10 ** dec:,.0f}" for dec in decades])
+            # Restore the limits set_yticks just widened. Autoscale is still live here, so
+            # matplotlib expands the view to fit the outermost tick — the floor/ceil
+            # rounding then pushes a 100-10,000 distribution out onto a 1-100,000 axis and
+            # flattens every violin into a horizontal smear.
+            ax.set_ylim(lo, hi)
+        style_axes(ax)
+
+    # Cluster sizes on the shared axis rather than in a caption: a narrow violin means
+    # something different at n=40 than at n=4,000, and that is the first thing to check
+    # on a cluster that looks like an outlier.
+    bottom = axes.ravel()[-1]
+    bottom.set_xticks(range(1, len(levels) + 1))
+    bottom.set_xticklabels(
+        [f"{i + 1}\nn={len(groups[level]):,}" for i, level in enumerate(levels)], fontsize=5
+    )
+    bottom.set_xlabel(f"Cluster (leiden resolution {CHOSEN[sample]:g})", size=7)
+
+    fig.suptitle(f"{sample} · {len(d):,} cells · {len(levels)} clusters", fontsize=9, x=0.01, ha="left")
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+```
+
+```{python}
+# One `# <sample>` section per sample, driven by SAMPLES rather than a hardcoded block
+# each: the cohort changes, and a hardcoded list silently omits a new sample while
+# raising KeyError on a removed one.
+#
+# The headings are emitted with display(Markdown(...)) from inside an ORDINARY cell, NOT
+# under `output: asis`. Under asis everything a cell displays concatenates into one raw
+# markdown stream: the figure lands between the blocks and leaves the next heading not
+# starting its own line, so pandoc prints a literal "## ..." as text and drops the image
+# entirely. display(Markdown) does not hit it — each call emits its own complete block,
+# and qc_violins ends with plt.show() so the figure lands between them.
+for sample in SAMPLES:
+    display(Markdown(f"# {sample}"))
+
+    # The UMAP comes first: it establishes what each cluster number and colour refers to,
+    # which the violin slide then reads against.
+    display(Markdown("## Clusters on the UMAP — size-ranked ids"))
+    display(Markdown(
+        "Cells in UMAP coordinates, coloured by cluster at this sample's Leiden "
+        "resolution. Clusters are renumbered 1-n by descending cell count, so cluster 1 "
+        "is the largest — these ids are this deck's own and do not match the raw Leiden "
+        "labels cluster_report uses. Each number sits at its cluster's median position."
+    ))
+    try:
+        umap_clusters(sample, LEVELS[sample], COLORS[sample])
+    except Exception:
+        display(Markdown(f"```\n{traceback.format_exc()}\n```"))
+
+    display(Markdown("## Cluster centroid correlation — size-ranked ids"))
+    display(Markdown(
+        "Spearman correlation between every pair of cluster centroids within this "
+        "sample, across all genes. Centroids are CP10K pseudobulk, averaged linearly "
+        "over each cluster's cells and then log1p'd. Rows and columns are ordered by "
+        "hierarchical clustering, so similar clusters sit adjacent as blocks — the "
+        "size-ranked ticks therefore read out of numeric sequence. The diagonal is 1 by "
+        "construction and is left blank, so the colour scale covers the off-diagonal "
+        "values only. High off-diagonal pairs are clusters the chosen resolution split "
+        "that are transcriptionally near-identical."
+    ))
+    try:
+        centroid_correlation(sample, "size")
+    except Exception:
+        display(Markdown(f"```\n{traceback.format_exc()}\n```"))
+
+    display(Markdown("## Cluster centroid correlation — dendrogram-ordered ids"))
+    display(Markdown(
+        "The same matrix as the previous slide, cell for cell — only the tick labels "
+        "differ. Clusters are renumbered 1-n along the dendrogram order, so the ticks "
+        "now read in sequence and adjacent numbers are transcriptionally adjacent. The "
+        "mapping is "
+        + ", ".join(f"{p + 1}←{int(ORDER[sample][p]) + 1}" for p in range(len(ORDER[sample])))
+        + " (dendrogram←size)."
+    ))
+    try:
+        centroid_correlation(sample, "dendro")
+    except Exception:
+        display(Markdown(f"```\n{traceback.format_exc()}\n```"))
+
+    # The dendrogram-ordered UMAP follows the heatmaps, since they are what define this
+    # numbering — reading it before the matrix that produced it would be backwards.
+    display(Markdown("## Clusters on the UMAP — dendrogram-ordered ids"))
+    display(Markdown(
+        "The same cells and the same clusters as the first UMAP, carrying the "
+        "dendrogram-ordered ids from the heatmap above, so adjacent numbers are "
+        "transcriptionally adjacent. Colours follow the new numbering, so a given "
+        "cluster is not the same colour here as on the size-ranked UMAP — the number "
+        "identifies it, not the colour."
+    ))
+    try:
+        umap_clusters(sample, DENDRO_LEVELS[sample], DENDRO_COLORS[sample])
+    except Exception:
+        display(Markdown(f"```\n{traceback.format_exc()}\n```"))
+
+    display(Markdown("## Per-cell QC by cluster — dendrogram-ordered ids"))
+    display(Markdown(
+        "Per-cell QC distributions, one violin per cluster, at this sample's Leiden "
+        "resolution. Clusters carry the dendrogram-ordered ids and colours, matching the "
+        "heatmap and UMAP above, so adjacent violins are transcriptionally adjacent. "
+        "Transcripts, genes, and cell area are on log axes; "
+        "the black dot is each cluster's median. A cluster with no violin had too little "
+        "spread to fit a density — its median is still plotted."
+    ))
+    try:
+        qc_violins(sample, DENDRO_LEVELS[sample], DENDRO_COLORS[sample])
+    except Exception:
+        display(Markdown(f"```\n{traceback.format_exc()}\n```"))
+```
