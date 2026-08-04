@@ -223,11 +223,13 @@ def dendrogram_order(values):
     the diagonal is zeroed explicitly: 1 - r leaves it at ~1e-16 rather than exactly 0 and
     squareform raises on that. checks=False would skip the validation but also skip
     catching a genuinely malformed matrix, so the diagonal is fixed instead.
+
+    Two clusters need no special case — linkage builds the single merge and leaves_list
+    returns [0, 1]. One cluster raises on the empty distance matrix, deliberately: a
+    correlation slide for a sample with a single cluster has nothing to correlate, and the
+    per-sample try turns that into a traceback on that sample's section rather than a
+    heatmap of one cell reading 1.00, which looks like a result.
     """
-    if len(values) <= 2:
-        # linkage needs at least 3 observations to build a tree worth ordering; with 1 or
-        # 2 clusters the incoming order is already the only sensible one.
-        return np.arange(len(values))
     distance = 1 - values
     np.fill_diagonal(distance, 0.0)
     return leaves_list(linkage(squareform(distance, checks=False), method="average"))
