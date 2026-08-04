@@ -64,25 +64,19 @@ DEFAULT_RESOLUTION = 0.5
 # absent every sample simply takes the default.
 RESOLUTIONS_CSV = Path("chosen_resolutions.csv")
 
-# obs columns holding the five Xenium control/codeword counters. Summed into a single
-# negative-control fraction; each one alone is too sparse to read per cell.
-CONTROL_COLS = [
-    "control_probe_counts",
-    "genomic_control_counts",
-    "control_codeword_counts",
-    "unassigned_codeword_counts",
-    "deprecated_codeword_counts",
-]
-
 # The per-cell QC columns each sample's panel shows, as (obs column, axis label, log).
-# Counts and areas are strictly positive and heavily right-skewed, so they are shown on a
-# log scale; pct_control is a bounded percentage that is exactly 0 for most cells, which
-# a log scale would drop silently, so it stays linear.
+# All are strictly positive and heavily right-skewed, so all are shown on a log scale.
+#
+# Every entry must already exist in obs — this deck derives no QC of its own. A
+# negative-control fraction belongs here too, but the Xenium reader leaves the five
+# control/codeword counters as raw per-cell counts and scanpy's qc_vars cannot turn them
+# into a percentage (they are obs columns, not features in X), so nothing upstream emits
+# one yet. Computing it here would hide a cohort-wide QC metric inside one deck; it
+# belongs in create_sdata alongside the other per-cell metrics.
 QC_COLUMNS = [
     ("transcript_counts", "Transcripts", True),
     ("n_genes_by_counts", "Genes", True),
     ("cell_area", "Cell area (µm²)", True),
-    ("pct_control", "Negative control %", False),
 ]
 
 # sample -> overriding resolution, as the float the CSV records. Read once here so a
@@ -95,32 +89,6 @@ if RESOLUTIONS_CSV.exists():
     if missing_cols:
         raise ValueError(f"chosen_resolutions.csv missing column(s): {sorted(missing_cols)}")
     OVERRIDES = dict(zip(chosen["sample"].astype(str), chosen["resolution"].astype(float)))
-
-
-def load_sample(path):
-    """Read one staged zarr's table as a plain AnnData, with pct_control added.
-
-    ad.read_zarr on tables/table rather than spatialdata.read_zarr: this deck never
-    touches the images, points, or shapes, and the table is the whole input. One object
-    per sample carries obs, the UMAP in obsm, and the counts layer together, so every
-    plot below reads from it and scanpy can be handed it directly.
-
-    Only one of these is alive at a time — the render loop drops each sample before
-    opening the next, so the cohort's count matrices are never co-resident.
-    """
-    adata = ad.read_zarr(f"{path}/tables/table")
-
-    # Negative-control fraction, computed here rather than read from obs. It cannot use
-    # total_counts: create_sdata's total_counts is transcripts + all five counters, but
-    # cluster_sdata's calculate_qc_metrics overwrites it with X.sum(axis=1) — so the
-    # column means different things before and after clustering. transcript_counts is
-    # the one that always equals the row sum of X, so the denominator is rebuilt from it.
-    present = [c for c in CONTROL_COLS if c in adata.obs.columns]
-    if present:
-        controls = adata.obs[present].sum(axis=1)
-        adata.obs["pct_control"] = 100 * controls / (adata.obs["transcript_counts"] + controls)
-
-    return adata
 
 
 def resolution_columns(adata):
@@ -407,18 +375,18 @@ def qc_violins(adata, sample, name, resolution):
     Metrics stack in rows over a shared cluster axis, so a cluster reads straight down
     the slide across all of them — a grid would repeat the cluster labels once per metric
     and halve the width each gets. The point of the slide is spotting the cluster that is
-    a QC artefact rather than a cell type: low transcripts and genes together, or a
-    negative-control fraction that stands off the rest.
+    a QC artefact rather than a cell type: low transcripts and genes together, or cells
+    whose area sits well off the rest.
 
     log=True gives a genuine log axis, but matplotlib labels one in exponent notation —
     the ticks are overridden back to the linear value they stand for, so the axis reads in
     transcripts and µm² rather than in powers of ten.
 
-    seaborn's violin tolerates a cluster with no spread (pct_control is exactly 0 for
-    whole clusters) instead of raising on a singular KDE, so such a cluster keeps its slot
-    on the axis rather than taking the panel down — which the hand-rolled version needed an
-    explicit guard for. inner="box" is passed through to seaborn so each violin carries its
-    own median and interquartile range.
+    seaborn's violin tolerates a cluster with no spread instead of raising on a singular
+    KDE, so a degenerate cluster keeps its slot on the axis rather than taking the panel
+    down — which the hand-rolled version needed an explicit guard for. inner="box" is
+    passed through to seaborn so each violin carries its own median and interquartile
+    range.
     """
     metrics = [(c, label, log) for c, label, log in QC_COLUMNS if c in adata.obs.columns]
     fig, axes = plt.subplots(len(metrics), 1, figsize=FIGSIZE, sharex=True, squeeze=False)
@@ -482,7 +450,12 @@ def qc_violins(adata, sample, name, resolution):
 # entirely. display(Markdown) does not hit it — each call emits its own complete block,
 # and each figure ends with plt.show() so it lands between them.
 for path in ZARRS:
-    adata = load_sample(path)
+    # ad.read_zarr on tables/table rather than spatialdata.read_zarr: this deck never
+    # touches the images, points, or shapes, and the table is the whole input. One object
+    # per sample carries obs, the UMAP in obsm, and the counts layer together, so every
+    # slide below reads from it and scanpy can be handed it directly.
+    adata = ad.read_zarr(f"{path}/tables/table")
+
     # obs["sample"] is written by create_sdata and survives clustering, so the sample id
     # comes from the object rather than the staged path — which is a meaningless
     # sample1.zarr, since cluster_sdata* publishes every sample's output as clustered.zarr.
