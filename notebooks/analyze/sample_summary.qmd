@@ -90,25 +90,6 @@ if RESOLUTIONS_CSV.exists():
     OVERRIDES = dict(zip(chosen["sample"].astype(str), chosen["resolution"].astype(float)))
 
 
-def size_ranked(labels):
-    """Leiden labels ordered largest cluster first, for renumbering to 1..n.
-
-    Leiden's own ids carry no meaning across samples — they are assignment order, so
-    cluster 3 in one sample has nothing to do with cluster 3 in another. Ranking by cell
-    count at least makes the id mean the same *kind* of thing everywhere: 1 is always the
-    sample's largest cluster.
-
-    Ties break on the original numeric label rather than being left to sort order, so two
-    clusters of equal size do not swap ids between renders of the same data.
-
-    Note these ids are this deck's own. cluster_report labels its panels with the raw
-    leiden ids, so the two decks disagree on cluster names by design — the caption on
-    each slide says so.
-    """
-    counts = labels.value_counts()
-    return sorted(counts.index, key=lambda level: (-counts[level], int(level)))
-
-
 def cluster_palette(n):
     """n colours, matching cluster_report's palette so a cluster keeps its colour.
 
@@ -450,7 +431,20 @@ for path in ZARRS:
         # The two numberings, both written into obs up front so every plot below is a
         # column name away from either. `levels` holds the original leiden labels in size
         # order; applying the dendrogram order to it gives the second numbering.
-        levels = size_ranked(adata.obs[key])
+        #
+        # Leiden's own ids carry no meaning across samples — they are assignment order, so
+        # cluster 3 in one sample has nothing to do with cluster 3 in another. Ranking by
+        # cell count at least makes the id mean the same *kind* of thing everywhere: 1 is
+        # always the sample's largest cluster. These ids are this deck's own, and
+        # cluster_report labels its panels with the raw leiden ids — the two disagree on
+        # cluster names by design, which each slide's caption says.
+        #
+        # value_counts already orders by descending count; the sort only settles ties, on
+        # the original numeric label. Pandas sorts value_counts with a non-stable
+        # algorithm, so two equal-sized clusters could otherwise swap ids between renders
+        # of the same data. int() because the labels are strings, where "10" < "2".
+        counts = adata.obs[key].value_counts()
+        levels = sorted(counts.index, key=lambda level: (-counts[level], int(level)))
         add_cluster_ids(adata, key, levels, "cluster_size")
 
         # Centroids and their correlation, computed once here rather than inside a slide
