@@ -35,7 +35,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scanpy as sc
-import scipy.sparse as sp
 from IPython.display import display, Markdown
 from matplotlib.colors import to_hex
 from scipy.cluster.hierarchy import leaves_list, linkage
@@ -185,10 +184,10 @@ def cluster_centroids(adata, name):
     (ground truth), which cluster_sdata stashes before normalizing, rather than expm1(X),
     which round-trips the log transform.
 
-    Kept hand-rolled rather than handed to sc.tl.dendrogram / sc.pl.correlation_matrix:
-    those average a *representation* (X_pca by default) and correlate with Pearson, i.e.
-    log-then-mean in a reduced space. That is a different quantity from this recipe, not a
-    different spelling of it.
+    Still not handed to sc.tl.dendrogram / sc.pl.correlation_matrix: those average a
+    *representation* (X_pca by default) and correlate with Pearson, i.e. log-then-mean in a
+    reduced space. That is a different quantity from this recipe, not a different spelling
+    of it. The two scanpy calls used here do the recipe's own steps and nothing else.
 
     The CP10K target itself does not affect the numbers on this slide: a uniform per-cell
     scale factor leaves the gene ranks within a centroid untouched, so the within-sample
@@ -198,28 +197,23 @@ def cluster_centroids(adata, name):
     and 198 for the other. Centroids built that way are on a per-sample scale and could not
     be compared across samples or against an external atlas; CP10K can.
     """
-    counts = adata.layers["counts"]
+    # CP10K into its own layer, so `counts` stays the untouched ground truth. Every cell is
+    # past cluster_sdata's min_counts=10 cut, so no cell total is zero.
+    adata.layers["cp10k"] = adata.layers["counts"].copy()
+    sc.pp.normalize_total(adata, layer="cp10k", target_sum=1e4)
 
-    # CP10K. Every cell is past cluster_sdata's min_counts=10 cut, so no total is zero and
-    # the division is safe. Scaling by a diagonal keeps a sparse matrix sparse; a dense
-    # broadcast would materialize the whole thing.
-    totals = np.asarray(counts.sum(axis=1)).ravel()
-    scale = 1e4 / totals
-    cp10k = sp.diags(scale) @ counts if sp.issparse(counts) else counts * scale[:, None]
+    # Group mean of the LINEAR CP10K, log1p'd after — mean-then-log is the whole point.
+    # sc.get.aggregate returns its result in .layers["mean"], not .X.
+    agg = sc.get.aggregate(adata, by=name, func="mean", layer="cp10k")
 
-    labels = adata.obs[name]
-    rows = []
-    for level in labels.cat.categories:
-        cells = np.flatnonzero((labels == level).to_numpy())
-        # np.asarray().ravel() because a sparse .mean(axis=0) returns a 1 x n np.matrix,
-        # while a dense one returns a 1-D array — this normalizes both. log1p AFTER the
-        # mean is the whole point of the recipe.
-        rows.append(np.log1p(np.asarray(cp10k[cells].mean(axis=0)).ravel()))
-
-    del cp10k
+    # Drop the second copy of the matrix now rather than at the end of the sample: the
+    # figures that follow do not need it, and it is the largest thing in the deck.
+    del adata.layers["cp10k"]
     gc.collect()
+
     # Index is the 1..n id, matching the UMAP and violin labels.
-    return pd.DataFrame(rows, index=list(labels.cat.categories), columns=adata.var_names)
+    return pd.DataFrame(np.log1p(agg.layers["mean"]),
+                        index=list(agg.obs_names), columns=agg.var_names)
 
 
 def dendrogram_order(values):
