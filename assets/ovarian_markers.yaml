@@ -1,0 +1,74 @@
+tissue: "Ovary"
+description: "Marker genes for cell types in the human ovary."
+
+cell_types:
+  cumulus_granulosa_cell:
+    cl_id: "0000711"
+    markers:
+      mouse: [Col18a1, Cyp19a1, Elobl, Fndc5, Gatm, Gdf9, H1foo, Kctd14, Khdc1b, Nlrp14, Npm2, Nupr1, Padi6, Uchl1, Wt1, Zbed3]
+      human: [FST, HTRA1, IGFBP2, IHH, INHBB, VCAN]
+  early_luteal_cell:
+    cl_id: "4052046"
+    markers:
+      mouse: [Lhcgr, Parm1, Prlr, Star]
+      human: []
+  externa_theca_cell:
+    cl_id: "4052013"
+    markers:
+      mouse: []
+      human: [STAT3]
+  granulosa_cell:
+    cl_id: "0000501"
+    markers:
+      mouse: [Amh, Areg, Bex4, Btc, Cyp19a1, Ereg, Fam13a, Fgfr1, Foxl2, Foxp2, Fshr, Gdf7, Gja4, Grem2, Hsd17b1, Inha, Ivns1abp, Kcnq5, Lect1, Nr5a2, Pgr, Prkar2b, Sema5a, Serpine2, Slc18a2, Socs2, Star, Tuba1a, Wt1]
+      human: [AMH, ATPIF1, BEX1, CDH2, COL1A2, CYP11A1, DCN, EMX2, FOXL2, FST, GATA4, GATM, GSTA1, HSD17B1, INHBA, INHBB, IRX3, IVNS1ABP, MIR202HG, PRKAR2B, REEP6, SERPINE2, SPINT2, STAR, TNNI3, WIPF3, WT1]
+  hilar_cell:
+    cl_id: "0002095"
+    markers:
+      mouse: []
+      human: [CALB2, INHA, INHBA, INHBB, INHBC, INHBE, MLANA]
+  interna_theca_cell:
+    cl_id: "4052012"
+    markers:
+      mouse: [Apoa1, Cyp17a1, Plin2]
+      human: [ANPEP, FDX1, INSL3]
+  late_luteal_cell:
+    cl_id: "4052047"
+    markers:
+      mouse: [Akr1c18, Nupr1, Ptgfr]
+      human: []
+  luteal_cell:
+    cl_id: "0000175"
+    markers:
+      mouse: [Adamts1, Cdkn1a, Cemip, Cyp11a1, Loxl2, Mrap, Mt2, Onecut2, Parm1, Prss35, Ptgfr, S100a6, Tinagl1]
+      human: []
+  oocyte:
+    cl_id: "0000023"
+    markers:
+      mouse: [Gdf9, Kit, Lhx8, Nobox, Ooep, Oope, Sohlh1, Sohlh2, Zp3]
+      human: [ATG7, C15orf60, C6orf52, DPPA3, FIGLA, GDF9, H1-1, HIST1H2BK, KCNQ1-AS1, LHX8, OOSP2, PADI6, PDCD5, REC114, STAG3, TUBB8, UCHL1, WEE2, ZFAND2A, ZP3, ZP4]
+  ovarian_surface_epithelial_cell:
+    cl_id: "2000064"
+    markers:
+      mouse: [Epcam, Ildr2, Krt18, Krt19, Krt7, Lgals7, Upk1b, Upk3b]
+      human: [CALB2, CDH1, CLDN1, COBL, ERBB4, FYB2, MSLN, OVGP1, PAX8]
+  pre_granulosa_cell:
+    cl_id: "4033066"
+    markers:
+      mouse: [Foxl2, Kitl, Krt19, Upk3b, Wnt4, Wnt6]
+      human: [FOXL2, SOX15, SOX17, WNT6]
+  pre_theca_cell:
+    cl_id: "4052010"
+    markers:
+      mouse: [Enpep, Hhip, Ptch1]
+      human: [HHIP, PTCH1]
+  steroidogenic_stromal_cell_of_ovary:
+    cl_id: "4052045"
+    markers:
+      mouse: [Ptch1]
+      human: []
+  theca_cell:
+    cl_id: "0000503"
+    markers:
+      mouse: [Aldh1a1, Cyp11a1, Dlk1, Lhcgr, Mgarp, Notch3, Ptch1, Srd5a1, Star]
+      human: [CYP11A1, ENAH, LAMB1, LINC02476, MEG8, OSBPL1A, PPP3CA, PSD3, PTCH2, STAR, SULF2]

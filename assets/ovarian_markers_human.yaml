@@ -1,0 +1,117 @@
+tissue: Ovary
+species: human
+description: >-
+  Ovary cell type markers from the CZI Reproductive Biology Cell
+  Annotation Jamboree compilation (jamboree_markers.xlsx, 'Ovary' sheet).
+  Cell state / subtype qualified entries and negative markers are excluded.
+  `nonspecific` lists markers the sheet flags as also labelling other cell
+  types; they remain in `markers` and are informational only. Its absence
+  means unannotated, not specific -- the sheet leaves uniqueness blank for
+  most entries.
+
+cell_types:
+  cumulus_granulosa_cell:
+    cl_id: "0000711"
+    cl_label: "Cumulus granulosa cell"
+    markers: [FST, HTRA1, IGFBP2, IHH, INHBB, VCAN]
+  endothelial_cell:
+    cl_id: "0000115"
+    cl_label: "Endothelial cell"
+    markers: [CD34, CDH5, EMCN, FLI1, FLT1, NES, NUAK1, PALMD, PECAM1, PIK3R3, PODXL]
+  endothelial_cell_of_vascular_tree:
+    cl_id: "0002139"
+    cl_label: "Endothelial cell of vascular tree"
+    markers: [APOD, CLDN5, CLEC14A, CTGF, EGFL7, EPAS1, GNG11, LIFR, MEF2C, RAMP2, RBP7, SLC9A3R2, TXNIP, VWF]
+  fibroblast:
+    cl_id: "0000057"
+    cl_label: "Fibroblast"
+    markers: [BNC2, CCL2, CFD, CXCL1, CXCL9, DCN, ENPP2, IGFBP5, IL24, LUM, PDGFRA, RAMP1, VIM]
+  granulosa_cell:
+    cl_id: "0000501"
+    cl_label: "Granulosa cell"
+    markers: [AMH, ATPIF1, BEX1, CDH2, COL1A2, CYP11A1, DCN, EMX2, FOXL2, FST, GATA4, GATM, GSTA1, HSD17B1, INHBA, INHBB, IRX3, IVNS1ABP, MIR202HG, PRKAR2B, REEP6, SERPINE2, SPINT2, STAR, TNNI3, WIPF3, WT1]
+    nonspecific:
+      CDH2: ~
+      COL1A2: "Oocytes, theca cells"
+      DCN: "Oocytes, theca cells"
+      INHBB: ~
+      IRX3: ~
+      SPINT2: ~
+      STAR: "Oocytes, theca cells"
+      TNNI3: ~
+  hilar_cell:
+    cl_id: "0002095"
+    cl_label: "Hilar cell"
+    markers: [CALB2, INHA, INHBA, INHBB, INHBC, INHBE, MLANA]
+  interna_theca_cell:
+    cl_id: "4052012"
+    cl_label: "Interna theca cell"
+    markers: [ANPEP, FDX1, INSL3]
+  leukocyte:
+    cl_id: "0000738"
+    cl_label: "Leukocyte"
+    markers: [C1QA, CCL3, CCL4, CCL5, CD69, HCST, IL8, NKG7, RGS1, TYROBP]
+  lymphatic_endothelial_cell:
+    cl_id: "0002138"
+    cl_label: "Lymphatic endothelial cell"
+    markers: [ANGPT2, APOD, FABP5, JMJD1C, LIMS1, LMO2, LOX, MMRN1, PPFIBP1, PTX3, RAB11A, SEMA3A, SMAD1, SPTBN1, TFPI]
+  macrophage:
+    cl_id: "0000235"
+    cl_label: "Macrophage"
+    markers: [AKAP13, CD14, CD68, DPYD, FKBP5, FOLR2, KANSL1]
+  mesenchymal_stem_cell:
+    cl_id: "0000134"
+    cl_label: "Mesenchymal stem cell"
+    markers: [GATA2, NR2F1, TCF21]
+  neuron:
+    cl_id: "0000540"
+    cl_label: "Neuron"
+    markers: [CDH19, NRXN1]
+  oocyte:
+    cl_id: "0000023"
+    cl_label: "Oocyte"
+    markers: [ATG7, C15orf60, C6orf52, DPPA3, FIGLA, GDF9, H1-1, HIST1H2BK, KCNQ1-AS1, LHX8, OOSP2, PADI6, PDCD5, REC114, STAG3, TUBB8, UCHL1, WEE2, ZFAND2A, ZP3, ZP4]
+    nonspecific:
+      GDF9: ~
+      TUBB8: ~
+  ovarian_surface_epithelial_cell:
+    cl_id: "2000064"
+    cl_label: "Ovarian surface epithelial cell"
+    markers: [CALB2, CDH1, CLDN1, COBL, ERBB4, FYB2, MSLN, OVGP1, PAX8]
+  pericyte:
+    cl_id: "0000669"
+    cl_label: "Pericyte"
+    markers: [NOTCH3, PDGFRB]
+  pre_granulosa_cell:
+    cl_id: "4033066"
+    cl_label: "Pre-granulosa cell"
+    markers: [FOXL2, SOX15, SOX17, WNT6]
+  pre_theca_cell:
+    cl_id: "4052010"
+    cl_label: "Pre-theca cell"
+    markers: [HHIP, PTCH1]
+  smooth_muscle_cell:
+    cl_id: "0000192"
+    cl_label: "Smooth muscle cell"
+    markers: [ACTA2, CDC42EP3, ESR1, JAZF1, LITAF, LONRF2, NRIP1, PAWR, PLAT, PRLR, RAMP1, RGS5, TAGLN]
+    nonspecific:
+      ACTA2: "Activated myofibroblasts"
+      RGS5: "Pericytes"
+  t_cell:
+    cl_id: "0000084"
+    cl_label: "T cell"
+    markers: [CD3E, CD3G]
+  theca_cell:
+    cl_id: "0000503"
+    cl_label: "Theca cell"
+    markers: [CYP11A1, ENAH, LAMB1, LINC02476, MEG8, OSBPL1A, PPP3CA, PSD3, PTCH2, STAR, SULF2]
+    nonspecific:
+      CYP11A1: "Luteal cells, early/mural/cumus GC"
+  tissue_resident_macrophage:
+    cl_id: "0000864"
+    cl_label: "Tissue-resident macrophage"
+    markers: [LYVE1, MAF, NRP1]
+    nonspecific:
+      LYVE1: "Lymphatic endothelial cells"
+      MAF: ~
+      NRP1: ~

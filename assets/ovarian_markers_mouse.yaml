@@ -1,0 +1,177 @@
+tissue: Ovary
+species: mouse
+description: >-
+  Ovary cell type markers from the CZI Reproductive Biology Cell
+  Annotation Jamboree compilation (jamboree_markers.xlsx, 'Ovary' sheet).
+  Cell state / subtype qualified entries and negative markers are excluded.
+  `nonspecific` lists markers the sheet flags as also labelling other cell
+  types; they remain in `markers` and are informational only. Its absence
+  means unannotated, not specific -- the sheet leaves uniqueness blank for
+  most entries.
+
+cell_types:
+  b_cell:
+    cl_id: "0000236"
+    cl_label: "B cell"
+    markers: [Cd19, Cd79a, Ptprc]
+    nonspecific:
+      Ptprc: "All immune"
+  cd8_positive_alpha_beta_regulatory_t_cell:
+    cl_id: "0000795"
+    cl_label: "CD8-positive, alpha-beta regulatory T cell"
+    markers: [Cd8b1]
+  cumulus_granulosa_cell:
+    cl_id: "0000711"
+    cl_label: "Cumulus granulosa cell"
+    markers: [Col18a1, Cyp19a1, Elobl, Fndc5, Gatm, Gdf9, H1foo, Kctd14, Khdc1b, Nlrp14, Npm2, Nupr1, Padi6, Uchl1, Wt1, Zbed3]
+  dendritic_cell:
+    cl_id: "0000451"
+    cl_label: "Dendritic cell"
+    markers: [Clec10a, Clec9a, Fscn1, Itgax]
+    nonspecific:
+      Itgax: ~
+  double_negative_t_regulatory_cell:
+    cl_id: "0011024"
+    cl_label: "Double negative T regulatory cell"
+    markers: [Cd3e, Il7r, Tcrgc2, Tmem176b]
+    nonspecific:
+      Il7r: "Innate lymphoid cells"
+      Tmem176b: "DCs, macrophages, innate lymphoid cells"
+  early_luteal_cell:
+    cl_id: "4052046"
+    cl_label: "Early luteal cell"
+    markers: [Lhcgr, Parm1, Prlr, Star]
+    nonspecific:
+      Lhcgr: "Theca cells"
+      Parm1: ~
+      Prlr: ~
+      Star: ~
+  effector_cd4_positive_alpha_beta_t_cell:
+    cl_id: "0001044"
+    cl_label: "Effector CD4-positive, alpha-beta T cell"
+    markers: [Cd28, Cd4]
+    nonspecific:
+      Cd28: ~
+  eosinophil:
+    cl_id: "0000771"
+    cl_label: "Eosinophil"
+    markers: [S100a8, S100a9]
+  granulosa_cell:
+    cl_id: "0000501"
+    cl_label: "Granulosa cell"
+    markers: [Amh, Areg, Bex4, Btc, Cyp19a1, Ereg, Fam13a, Fgfr1, Foxl2, Foxp2, Fshr, Gdf7, Gja4, Grem2, Hsd17b1, Inha, Ivns1abp, Kcnq5, Lect1, Nr5a2, Pgr, Prkar2b, Sema5a, Serpine2, Slc18a2, Socs2, Star, Tuba1a, Wt1]
+    nonspecific:
+      Foxp2: ~
+      Grem2: ~
+      Hsd17b1: ~
+      Inha: ~
+      Kcnq5: ~
+      Prkar2b: ~
+      Sema5a: ~
+      Serpine2: "Oocytes, SMCs, stromal cells"
+      Star: "Luteal"
+  group_2_innate_lymphoid_cell:
+    cl_id: "0001069"
+    cl_label: "Group 2 innate lymphoid cell"
+    markers: [Il17rb]
+  group_3_innate_lymphoid_cell:
+    cl_id: "0001071"
+    cl_label: "Group 3 innate lymphoid cell"
+    markers: [Tmem176b]
+    nonspecific:
+      Tmem176b: "DCs, macrophages, DNT"
+  interna_theca_cell:
+    cl_id: "4052012"
+    cl_label: "Interna theca cell"
+    markers: [Apoa1, Cyp17a1, Plin2]
+    nonspecific:
+      Cyp17a1: "Luteal cells"
+  late_luteal_cell:
+    cl_id: "4052047"
+    cl_label: "Late luteal cell"
+    markers: [Akr1c18, Nupr1, Ptgfr]
+  leukocyte:
+    cl_id: "0000738"
+    cl_label: "Leukocyte"
+    markers: [Ptprc]
+  luteal_cell:
+    cl_id: "0000175"
+    cl_label: "Luteal cell"
+    markers: [Adamts1, Cyp11a1, Loxl2, Mrap, Mt2, Onecut2, Parm1, Prss35, Ptgfr, S100a6, Tinagl1]
+  macrophage:
+    cl_id: "0000235"
+    cl_label: "Macrophage"
+    markers: [Adgre1, Cd68, Csf1r, Itgam, Ly6c2, Mrc1]
+    nonspecific:
+      Itgam: "Subset of DCs"
+      Ly6c2: "Monocytes"
+  mature_nk_t_cell:
+    cl_id: "0000814"
+    cl_label: "Mature NK T cell"
+    markers: [Ly6c2]
+    nonspecific:
+      Ly6c2: "NK"
+  monocyte:
+    cl_id: "0000576"
+    cl_label: "Monocyte"
+    markers: [Ccr2, Treml4]
+    nonspecific:
+      Ccr2: ~
+      Treml4: ~
+  natural_killer_cell:
+    cl_id: "0000623"
+    cl_label: "Natural killer cell"
+    markers: [Klrb1c, Ly6c2]
+    nonspecific:
+      Klrb1c: "Innate lymphoid cells"
+      Ly6c2: "NKT"
+  neutrophil:
+    cl_id: "0000775"
+    cl_label: "Neutrophil"
+    markers: [S100a, S100a8, S100a9]
+    nonspecific:
+      S100a: "Other granulocytes (ref 1)"
+  oocyte:
+    cl_id: "0000023"
+    cl_label: "Oocyte"
+    markers: [Gdf9, Kit, Lhx8, Nobox, Ooep, Oope, Sohlh1, Sohlh2, Zp3]
+    nonspecific:
+      Kit: "Blood cells"
+  ovarian_surface_epithelial_cell:
+    cl_id: "2000064"
+    cl_label: "Ovarian surface epithelial cell"
+    markers: [Epcam, Ildr2, Krt18, Krt19, Krt7, Lgals7, Upk1b, Upk3b]
+  pre_granulosa_cell:
+    cl_id: "4033066"
+    cl_label: "Pre-granulosa cell"
+    markers: [Foxl2, Kitl, Krt19, Upk3b, Wnt4, Wnt6]
+    nonspecific:
+      Foxl2: "Blood cells"
+      Wnt4: "\"Mesenchyme\" fo fetal gonadal ridge"
+  pre_theca_cell:
+    cl_id: "4052010"
+    cl_label: "Pre-theca cell"
+    markers: [Enpep, Hhip, Ptch1]
+  smooth_muscle_cell:
+    cl_id: "0000192"
+    cl_label: "Smooth muscle cell"
+    markers: [Myh11]
+    nonspecific:
+      Myh11: "Activated myofibroblasts"
+  steroidogenic_stromal_cell_of_ovary:
+    cl_id: "4052045"
+    cl_label: "Steroidogenic stromal cell of ovary"
+    markers: [Ptch1]
+  t_cell:
+    cl_id: "0000084"
+    cl_label: "T cell"
+    markers: [Cd3e, Ptprc]
+    nonspecific:
+      Ptprc: "All immune"
+  theca_cell:
+    cl_id: "0000503"
+    cl_label: "Theca cell"
+    markers: [Aldh1a1, Cyp11a1, Dlk1, Lhcgr, Mgarp, Notch3, Ptch1, Srd5a1, Star]
+    nonspecific:
+      Cyp11a1: "Luteal cells, early/mural/cumus GC"
+      Lhcgr: "Luteal cells"
