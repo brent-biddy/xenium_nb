@@ -38,7 +38,6 @@ import scipy.sparse as sp
 from IPython.display import display, Markdown
 from scipy.cluster.hierarchy import leaves_list, linkage
 from scipy.spatial.distance import squareform
-from scipy.stats import rankdata
 
 # The reference template is 16:9 at 10 x 5.625in; leave room for a slide title.
 FIGSIZE = (9.0, 4.3)
@@ -202,18 +201,6 @@ def cluster_centroids(adata, name):
     gc.collect()
     # Index is the 1..n id, matching the UMAP and violin labels.
     return pd.DataFrame(rows, index=list(labels.cat.categories), columns=adata.var_names)
-
-
-def rank_corr(centroids):
-    """Spearman r between every pair of centroid rows.
-
-    Spearman = Pearson of gene ranks: rank each centroid across genes, then correlate.
-    Rank-based rather than Pearson on the values because a targeted panel's centroids are
-    dominated by a few very high-expressing genes — those set a Pearson r almost on their
-    own, while ranks weight the whole panel.
-    """
-    ranked = np.vstack([rankdata(v) for v in centroids.to_numpy()])
-    return np.corrcoef(ranked)
 
 
 def dendrogram_order(values):
@@ -470,7 +457,14 @@ for path in ZARRS:
         # function: both the heatmap and the dendrogram-ordered numbering need the
         # ordering, and the counts layer is by far the most expensive thing this deck
         # touches.
-        corr = rank_corr(cluster_centroids(adata, "cluster_size"))
+        #
+        # Spearman rather than Pearson on the values: a targeted panel's centroids are
+        # dominated by a few very high-expressing genes, which set a Pearson r almost on
+        # their own, while ranks weight the whole panel. Via pandas rather than
+        # scipy.stats.spearmanr or np.corrcoef, both of which collapse to a bare float
+        # instead of a matrix at small n (spearmanr at two clusters, corrcoef at one) —
+        # counts the low end of the sweep routinely produces. .corr is always square.
+        corr = cluster_centroids(adata, "cluster_size").T.corr(method="spearman").to_numpy()
         order = dendrogram_order(corr)
         add_cluster_ids(adata, key, [levels[i] for i in order], "cluster_dendro")
 
