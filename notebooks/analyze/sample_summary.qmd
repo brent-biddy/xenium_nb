@@ -239,74 +239,75 @@ def dendrogram_order(values):
     return leaves_list(linkage(squareform(distance, checks=False), method="average"))
 
 
-def centroid_correlation(sample, corr, order, numbering):
-    """One slide's figure: cluster-by-cluster Spearman correlation of centroids.
+def plot_corr_heatmap(matrix, row_labels, col_labels, xlabel, ylabel, ax, title=None,
+                      vmin=None, vmax=None):
+    """Draw a matrix as an annotated viridis heatmap on `ax`; return the image.
 
-    Self-self, so the diagonal is 1 by construction and carries no information. The colour
-    scale is set from the OFF-diagonal values alone: including the diagonal pins the top
-    of the ramp at 1.0 and squashes every real comparison — which on a targeted panel all
-    sit high and close together — into the top slice of the colormap.
+    Ported from sammy_r21's sample_summary so the two decks' correlation panels read the
+    same. The printed label flips black-on-light / white-on-dark with the cell's viridis
+    brightness so it reads at either end, and the leading zero is dropped to keep labels
+    narrow. vmin/vmax default to the matrix's own range. The caller adds the colorbar.
+    """
+    if vmin is None:
+        vmin = float(np.nanmin(matrix))
+    if vmax is None:
+        vmax = float(np.nanmax(matrix))
+    im = ax.imshow(matrix, cmap="viridis", aspect="auto", vmin=vmin, vmax=vmax)
+    for i in range(matrix.shape[0]):
+        for j in range(matrix.shape[1]):
+            light = (matrix[i, j] - vmin) / (vmax - vmin) > 0.5 if vmax > vmin else True
+            ax.text(j, i, f"{matrix[i, j]:.2f}".replace("0.", "."),
+                    ha="center", va="center", fontsize=7,
+                    color="black" if light else "white")
+    ax.set_xticks(range(len(col_labels)))
+    ax.set_xticklabels([str(c) for c in col_labels], fontsize=8)
+    ax.set_yticks(range(len(row_labels)))
+    ax.set_yticklabels([str(c) for c in row_labels], fontsize=8)
+    ax.set_xlabel(xlabel, fontsize=9)
+    ax.set_ylabel(ylabel, fontsize=9)
+    if title is not None:
+        ax.set_title(title, fontsize=8)
+    return im
+
+
+def centroid_correlation(sample, corr, order):
+    """One slide's figure: the same correlation matrix under both numberings, side by side.
 
     Rows and columns are ordered by hierarchical clustering, symmetrically, so the matrix
-    stays symmetric and transcriptionally similar clusters sit adjacent as blocks. Only
-    the TICKS differ between the two numberings — the matrix itself is identical, drawn in
-    dendrogram order both times, so the two slides can be read against each other cell for
-    cell.
+    stays symmetric and transcriptionally similar clusters sit adjacent as blocks. Only the
+    TICKS differ between the two panels — the matrix is identical, drawn in dendrogram
+    order both times.
 
-    numbering="size"    ticks are the size-ranked ids, so they read out of sequence
-                        (dendrogram order applied to size-ranked names).
-    numbering="dendro"  ticks are the new ids, which read 1..n by construction — that
-                        numbering IS this ordering.
+    Left is keyed by the size-ranked ids, which therefore read out of numeric sequence;
+    right by the dendrogram ids, which read 1..n because that numbering IS this ordering.
+    Side by side rather than on consecutive slides so the rename is visible in place — a
+    reader sees which size-ranked cluster each new id renames without chasing a mapping
+    line in the caption.
+
+    The diagonal is kept rather than blanked. It is 1 by construction, but on this data the
+    off-diagonal already reaches ~0.99, so including it moves vmax by about a point and
+    costs nothing; blanking it was making the panels harder to compare with sammy_r21's.
     """
     values = corr[np.ix_(order, order)]
-    if numbering == "size":
-        # order[p] is a 0-based size-rank position; +1 makes it the printed size id.
-        ids = [int(p) + 1 for p in order]
-    else:
-        ids = list(range(1, len(order) + 1))
+    # order[p] is a 0-based size-rank position; +1 makes it the printed size id.
+    size_ids = [int(p) + 1 for p in order]
+    dendro_ids = list(range(1, len(order) + 1))
 
-    off_diagonal = values[~np.eye(len(ids), dtype=bool)]
-    vmin, vmax = float(off_diagonal.min()), float(off_diagonal.max())
+    fig, (ax_size, ax_dendro) = plt.subplots(1, 2, figsize=(12.5, 5.2),
+                                             constrained_layout=True)
+    plot_corr_heatmap(values, size_ids, size_ids,
+                      "Cluster (size-ranked)", "Cluster (size-ranked)", ax_size,
+                      title="size-ranked ids")
+    im = plot_corr_heatmap(values, dendro_ids, dendro_ids,
+                           "Cluster (dendrogram)", "Cluster (dendrogram)", ax_dendro,
+                           title="dendrogram-ordered ids")
 
-    # Blank the diagonal rather than drawing it. It is 1.0 by construction, above the
-    # scale's top, so it renders in the same saturated colour as the highest real pair —
-    # here 0.97 and 1.00 come out identical yellow while being a meaningful step apart.
-    # Grey says "not a comparison" and leaves the ramp entirely to the off-diagonal.
-    masked = values.copy()
-    np.fill_diagonal(masked, np.nan)
+    # One shared colorbar — both panels are the same matrix on the same scale.
+    cbar = fig.colorbar(im, ax=[ax_size, ax_dendro], fraction=0.046, pad=0.02)
+    cbar.ax.set_ylabel("Spearman r", fontsize=8)
+    cbar.ax.tick_params(labelsize=7)
 
-    cmap = plt.get_cmap("viridis").copy()
-    cmap.set_bad("#e8e8e8")
-
-    fig, ax = plt.subplots(figsize=(FIGSIZE[1], FIGSIZE[1]))
-    image = ax.imshow(masked, cmap=cmap, vmin=vmin, vmax=vmax)
-
-    ticks = range(len(ids))
-    ax.set_xticks(ticks, [str(c) for c in ids], fontsize=6)
-    ax.set_yticks(ticks, [str(c) for c in ids], fontsize=6)
-    ax.set_xlabel("Cluster", size=7)
-    ax.set_ylabel("Cluster", size=7)
-
-    # Print the numbers while they still fit. Past ~12 clusters the cells are too small
-    # for two decimals and the colour alone has to carry it.
-    if len(ids) <= 12:
-        for i in range(len(ids)):
-            for j in range(len(ids)):
-                if i == j:
-                    continue  # blanked above; a printed 1.00 would only re-clutter it
-                # Threshold on the colour, not the value: mid-viridis is light enough that
-                # black reads better, and the ramp is stretched to the off-diagonal range.
-                shade = (values[i, j] - vmin) / (vmax - vmin) if vmax > vmin else 0.5
-                ax.text(j, i, f"{values[i, j]:.2f}", ha="center", va="center",
-                        fontsize=5, color="white" if shade < 0.5 else "black")
-
-    cbar = fig.colorbar(image, ax=ax, fraction=0.045, pad=0.02)
-    cbar.ax.tick_params(labelsize=6)
-    cbar.set_label("Spearman r", size=7)
-
-    label = "size-ranked ids" if numbering == "size" else "dendrogram-ordered ids"
-    fig.suptitle(f"{sample} · {len(ids)} clusters · {label}", fontsize=9, x=0.01, ha="left")
-    fig.tight_layout()
+    fig.suptitle(f"{sample} · {len(order)} clusters", fontsize=9)
     plt.show()
     plt.close(fig)
 
@@ -513,29 +514,20 @@ for path in ZARRS:
         ))
         umap_clusters(adata, sample, "cluster_size")
 
-        display(Markdown("## Cluster centroid correlation — size-ranked ids"))
+        display(Markdown("## Cluster centroid correlation"))
         display(Markdown(
             "Spearman correlation between every pair of cluster centroids within this "
             "sample, across all genes. Centroids are CP10K pseudobulk, averaged linearly "
-            "over each cluster's cells and then log1p'd. Rows and columns are ordered by "
-            "hierarchical clustering, so similar clusters sit adjacent as blocks — the "
-            "size-ranked ticks therefore read out of numeric sequence. The diagonal is 1 "
-            "by construction and is left blank, so the colour scale covers the "
-            "off-diagonal values only. High off-diagonal pairs are clusters the chosen "
-            "resolution split that are transcriptionally near-identical."
+            "over each cluster's cells and then log1p'd. Both panels are the same matrix, "
+            "cell for cell — only the tick labels differ. Rows and columns are ordered by "
+            "hierarchical clustering, so similar clusters sit adjacent as blocks: the "
+            "size-ranked ids on the left therefore read out of numeric sequence, while "
+            "the dendrogram ids on the right read 1-n. Reading across the two shows which "
+            "size-ranked cluster each dendrogram id renames. High off-diagonal pairs are "
+            "clusters the chosen resolution split that are transcriptionally "
+            "near-identical."
         ))
-        centroid_correlation(sample, corr, order, "size")
-
-        display(Markdown("## Cluster centroid correlation — dendrogram-ordered ids"))
-        display(Markdown(
-            "The same matrix as the previous slide, cell for cell — only the tick labels "
-            "differ. Clusters are renumbered 1-n along the dendrogram order, so the ticks "
-            "now read in sequence and adjacent numbers are transcriptionally adjacent. "
-            "The mapping is "
-            + ", ".join(f"{p + 1}←{int(order[p]) + 1}" for p in range(len(order)))
-            + " (dendrogram←size)."
-        ))
-        centroid_correlation(sample, corr, order, "dendro")
+        centroid_correlation(sample, corr, order)
 
         # The dendrogram-ordered UMAP follows the heatmaps, since they are what define
         # this numbering — reading it before the matrix that produced it would be
