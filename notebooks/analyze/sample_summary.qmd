@@ -91,17 +91,6 @@ if RESOLUTIONS_CSV.exists():
     OVERRIDES = dict(zip(chosen["sample"].astype(str), chosen["resolution"].astype(float)))
 
 
-def resolution_columns(adata):
-    """The sweep's leiden columns, ordered by resolution rather than by string.
-
-    Discovered from obs rather than hardcoded: --resolutions is a pipeline param, so the
-    set of columns is whatever the run that produced these zarrs chose. Sorting on the
-    float matters — a plain sort puts leiden_res_1.00 before leiden_res_0.20.
-    """
-    cols = [c for c in adata.obs.columns if c.startswith("leiden_res_")]
-    return sorted(cols, key=lambda c: float(c.removeprefix("leiden_res_")))
-
-
 def size_ranked(labels):
     """Leiden labels ordered largest cluster first, for renumbering to 1..n.
 
@@ -465,110 +454,89 @@ for path in ZARRS:
 
     display(Markdown(f"# {sample}"))
 
-    # Whichever resolution a sample lands on, it must name a leiden column that exists —
-    # a default of 0.5 is no help if the run that produced these zarrs swept 0.6 to 1.0.
-    # Reported as this sample's own slide rather than raised: the render then shows every
-    # such sample in one pass, instead of failing on the first and hiding the rest.
-    if key not in adata.obs.columns:
-        source = "override" if sample in OVERRIDES else "default"
-        available = ", ".join(resolution_columns(adata)) or "none"
-        display(Markdown("## No clusters at the chosen resolution"))
+    # One try around the whole sample. This loop is a single cell, so anything raising
+    # here without being caught aborts the cell and drops every LATER sample from the deck
+    # too — with the render still exiting 0 under `error: true`. Catching per sample keeps
+    # the rest of the cohort. The cost is that the first failure ends this sample: its
+    # section gets a traceback instead of its remaining slides.
+    try:
+        # The two numberings, both written into obs up front so every plot below is a
+        # column name away from either. `levels` holds the original leiden labels in size
+        # order; applying the dendrogram order to it gives the second numbering.
+        levels = size_ranked(adata.obs[key])
+        add_cluster_ids(adata, key, levels, "cluster_size")
+
+        # Centroids and their correlation, computed once here rather than inside a slide
+        # function: both the heatmap and the dendrogram-ordered numbering need the
+        # ordering, and the counts layer is by far the most expensive thing this deck
+        # touches.
+        corr = rank_corr(cluster_centroids(adata, "cluster_size"))
+        order = dendrogram_order(corr)
+        add_cluster_ids(adata, key, [levels[i] for i in order], "cluster_dendro")
+
+        # The UMAP comes first: it establishes what each cluster number and colour refers
+        # to, which the violin slide then reads against.
+        display(Markdown("## Clusters on the UMAP — size-ranked ids"))
         display(Markdown(
-            f"{source} resolution {resolution:g} names `{key}`, which is not in this "
-            f"sample's obs. Available: {available}. Set a per-sample resolution in "
-            "chosen_resolutions.csv, or change DEFAULT_RESOLUTION."
+            "Cells in UMAP coordinates, coloured by cluster at this sample's Leiden "
+            "resolution. Clusters are renumbered 1-n by descending cell count, so cluster "
+            "1 is the largest — these ids are this deck's own and do not match the raw "
+            "Leiden labels cluster_report uses. Each number sits at its cluster's median "
+            "position."
         ))
-        del adata
-        gc.collect()
-        continue
-
-    # The two numberings, both written into obs up front so every plot below is a column
-    # name away from either. LEVELS holds the original leiden labels in size order;
-    # applying the dendrogram order to it gives the second numbering.
-    levels = size_ranked(adata.obs[key])
-    add_cluster_ids(adata, key, levels, "cluster_size")
-
-    # Centroids and their correlation, computed once here rather than inside a slide
-    # function: both the heatmap and the dendrogram-ordered numbering need the ordering,
-    # and the counts layer is by far the most expensive thing this deck touches.
-    corr = rank_corr(cluster_centroids(adata, "cluster_size"))
-    order = dendrogram_order(corr)
-    add_cluster_ids(adata, key, [levels[i] for i in order], "cluster_dendro")
-
-    # The UMAP comes first: it establishes what each cluster number and colour refers to,
-    # which the violin slide then reads against.
-    display(Markdown("## Clusters on the UMAP — size-ranked ids"))
-    display(Markdown(
-        "Cells in UMAP coordinates, coloured by cluster at this sample's Leiden "
-        "resolution. Clusters are renumbered 1-n by descending cell count, so cluster 1 "
-        "is the largest — these ids are this deck's own and do not match the raw Leiden "
-        "labels cluster_report uses. Each number sits at its cluster's median position."
-    ))
-    try:
         umap_clusters(adata, sample, "cluster_size")
-    except Exception:
-        display(Markdown(f"```\n{traceback.format_exc()}\n```"))
 
-    display(Markdown("## Cluster centroid correlation — size-ranked ids"))
-    display(Markdown(
-        "Spearman correlation between every pair of cluster centroids within this "
-        "sample, across all genes. Centroids are CP10K pseudobulk, averaged linearly "
-        "over each cluster's cells and then log1p'd. Rows and columns are ordered by "
-        "hierarchical clustering, so similar clusters sit adjacent as blocks — the "
-        "size-ranked ticks therefore read out of numeric sequence. The diagonal is 1 by "
-        "construction and is left blank, so the colour scale covers the off-diagonal "
-        "values only. High off-diagonal pairs are clusters the chosen resolution split "
-        "that are transcriptionally near-identical."
-    ))
-    try:
+        display(Markdown("## Cluster centroid correlation — size-ranked ids"))
+        display(Markdown(
+            "Spearman correlation between every pair of cluster centroids within this "
+            "sample, across all genes. Centroids are CP10K pseudobulk, averaged linearly "
+            "over each cluster's cells and then log1p'd. Rows and columns are ordered by "
+            "hierarchical clustering, so similar clusters sit adjacent as blocks — the "
+            "size-ranked ticks therefore read out of numeric sequence. The diagonal is 1 "
+            "by construction and is left blank, so the colour scale covers the "
+            "off-diagonal values only. High off-diagonal pairs are clusters the chosen "
+            "resolution split that are transcriptionally near-identical."
+        ))
         centroid_correlation(sample, corr, order, "size")
-    except Exception:
-        display(Markdown(f"```\n{traceback.format_exc()}\n```"))
 
-    display(Markdown("## Cluster centroid correlation — dendrogram-ordered ids"))
-    display(Markdown(
-        "The same matrix as the previous slide, cell for cell — only the tick labels "
-        "differ. Clusters are renumbered 1-n along the dendrogram order, so the ticks "
-        "now read in sequence and adjacent numbers are transcriptionally adjacent. The "
-        "mapping is "
-        + ", ".join(f"{p + 1}←{int(order[p]) + 1}" for p in range(len(order)))
-        + " (dendrogram←size)."
-    ))
-    try:
+        display(Markdown("## Cluster centroid correlation — dendrogram-ordered ids"))
+        display(Markdown(
+            "The same matrix as the previous slide, cell for cell — only the tick labels "
+            "differ. Clusters are renumbered 1-n along the dendrogram order, so the ticks "
+            "now read in sequence and adjacent numbers are transcriptionally adjacent. "
+            "The mapping is "
+            + ", ".join(f"{p + 1}←{int(order[p]) + 1}" for p in range(len(order)))
+            + " (dendrogram←size)."
+        ))
         centroid_correlation(sample, corr, order, "dendro")
-    except Exception:
-        display(Markdown(f"```\n{traceback.format_exc()}\n```"))
 
-    # The dendrogram-ordered UMAP follows the heatmaps, since they are what define this
-    # numbering — reading it before the matrix that produced it would be backwards.
-    display(Markdown("## Clusters on the UMAP — dendrogram-ordered ids"))
-    display(Markdown(
-        "The same cells and the same clusters as the first UMAP, carrying the "
-        "dendrogram-ordered ids from the heatmap above, so adjacent numbers are "
-        "transcriptionally adjacent. Colours follow the new numbering, so a given "
-        "cluster is not the same colour here as on the size-ranked UMAP — the number "
-        "identifies it, not the colour."
-    ))
-    try:
+        # The dendrogram-ordered UMAP follows the heatmaps, since they are what define
+        # this numbering — reading it before the matrix that produced it would be
+        # backwards.
+        display(Markdown("## Clusters on the UMAP — dendrogram-ordered ids"))
+        display(Markdown(
+            "The same cells and the same clusters as the first UMAP, carrying the "
+            "dendrogram-ordered ids from the heatmap above, so adjacent numbers are "
+            "transcriptionally adjacent. Colours follow the new numbering, so a given "
+            "cluster is not the same colour here as on the size-ranked UMAP — the number "
+            "identifies it, not the colour."
+        ))
         umap_clusters(adata, sample, "cluster_dendro")
-    except Exception:
-        display(Markdown(f"```\n{traceback.format_exc()}\n```"))
 
-    display(Markdown("## Per-cell QC by cluster — dendrogram-ordered ids"))
-    display(Markdown(
-        "Per-cell QC distributions, one violin per cluster, at this sample's Leiden "
-        "resolution. Clusters carry the dendrogram-ordered ids and colours, matching the "
-        "heatmap and UMAP above, so adjacent violins are transcriptionally adjacent. "
-        "Transcripts, genes, and cell area are on log axes; the box inside each violin is "
-        "its interquartile range and median."
-    ))
-    try:
+        display(Markdown("## Per-cell QC by cluster — dendrogram-ordered ids"))
+        display(Markdown(
+            "Per-cell QC distributions, one violin per cluster, at this sample's Leiden "
+            "resolution. Clusters carry the dendrogram-ordered ids and colours, matching "
+            "the heatmap and UMAP above, so adjacent violins are transcriptionally "
+            "adjacent. Transcripts, genes, and cell area are on log axes; the box inside "
+            "each violin is its interquartile range and median."
+        ))
         qc_violins(adata, sample, "cluster_dendro", resolution)
     except Exception:
         display(Markdown(f"```\n{traceback.format_exc()}\n```"))
 
     # Drop this sample before the next zarr is opened. The counts layer dominates the
     # deck's footprint, so holding two at once would double it for no reason.
-    del adata, corr
+    del adata
     gc.collect()
 ```
