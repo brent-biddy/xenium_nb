@@ -122,21 +122,6 @@ def add_cluster_ids(adata, key, levels, name):
     ]
 
 
-def point_size(ax, n_cells, coverage=0.35):
-    """Marker area (pt²) that lets n_cells cover `coverage` of these axes, once.
-
-    A fixed size cannot serve a cohort whose samples differ tenfold in cell count: at s=3
-    a 20k-cell sample reads well but a 200k-cell one is a solid mat. Taking the axes' own
-    area covers both — get_position() is the pre-tight_layout fraction of the figure,
-    close enough for a marker size. 72 pt to the inch, squared, converts inches² to the
-    pt² units scatter's `s` is in.
-    """
-    w, h = ax.get_figure().get_size_inches()
-    pos = ax.get_position()
-    area_pt2 = (pos.width * w) * (pos.height * h) * 72 ** 2
-    return float(np.clip(coverage * area_pt2 / n_cells, 0.5, 6.0))
-
-
 def cluster_centroids(adata, name):
     """Per-cluster centroids (clusters x genes), rows in `name`'s 1..n order.
 
@@ -292,6 +277,8 @@ def umap_clusters(adata, sample, name):
     drawn last and land on top. scanpy draws one scatter in row order, and the reverse
     buries a 300-cell cluster under a 16,000-cell one wherever they overlap. The sort is a
     view, so no count matrix is copied to do it.
+
+    Marker size is left to scanpy, which already scales it as 120000 / n_cells.
     """
     fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.6, FIGSIZE[1]))
 
@@ -301,7 +288,6 @@ def umap_clusters(adata, sample, name):
     sc.pl.umap(
         adata[order],
         color=name,
-        size=point_size(ax, adata.n_obs),
         legend_loc="on data",
         legend_fontsize=7,
         legend_fontweight="bold",
