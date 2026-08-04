@@ -49,6 +49,9 @@ jobs:
       - name: Stub cluster_sdata_gpu_ooc
         run: nextflow run main.nf --step cluster_sdata_gpu_ooc -stub --samplesheet assets/ci_analyze_samplesheet.csv
 
+      - name: Stub annotate_sdata
+        run: nextflow run main.nf --step annotate_sdata -stub --samplesheet assets/ci_analyze_samplesheet.csv --markers assets/ovarian_markers_human.yaml
+
       - name: Stub cluster_report
         run: nextflow run main.nf --step cluster_report -stub --samplesheet assets/ci_analyze_samplesheet.csv
 

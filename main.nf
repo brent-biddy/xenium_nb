@@ -11,6 +11,7 @@
 //   cluster_sdata             samplesheet: sample, path  (+ --resolutions)
 //   cluster_sdata_gpu         samplesheet: sample, path  (+ --resolutions)
 //   cluster_sdata_gpu_ooc     samplesheet: sample, path  (+ --chunk_size, --n_top_genes, --resolutions)
+//   annotate_sdata            samplesheet: sample, path  (clustered zarrs; + --markers, --resolutions, --exclude_nonspecific)
 //   cluster_report            samplesheet: sample, path  (clustered zarrs; one deck for the cohort)
 //   qc_report                 samplesheet: sample, path  (raw create_sdata zarrs; one deck for the cohort)
 //   concat_sdata              samplesheet: path
@@ -24,6 +25,7 @@ include { CREATE_FOLLICLE_SDATA }    from './modules/create_follicle_sdata'
 include { CLUSTER_SDATA }            from './modules/cluster_sdata'
 include { CLUSTER_SDATA_GPU }        from './modules/cluster_sdata_gpu'
 include { CLUSTER_SDATA_GPU_OOC }    from './modules/cluster_sdata_gpu_ooc'
+include { ANNOTATE_SDATA }           from './modules/annotate_sdata'
 include { CLUSTER_REPORT }           from './modules/cluster_report'
 include { QC_REPORT }                from './modules/qc_report'
 include { CONCAT_SDATA }             from './modules/concat_sdata'
@@ -34,7 +36,7 @@ include { paramsFile }               from './modules/quarto_params'
 // ── Entry workflow ────────────────────────────────────────────────────────────
 
 workflow {
-    if (!params.step) error "Please provide --step <name>. Valid steps: downsample_xenium_region, create_sdata, create_adata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, cluster_report, qc_report, concat_sdata, downsample_sdata, plot_follicle"
+    if (!params.step) error "Please provide --step <name>. Valid steps: downsample_xenium_region, create_sdata, create_adata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, annotate_sdata, cluster_report, qc_report, concat_sdata, downsample_sdata, plot_follicle"
 
     if      (params.step == 'downsample_xenium_region')  downsample_xenium_region()
     else if (params.step == 'create_sdata')              create_sdata()
@@ -43,12 +45,13 @@ workflow {
     else if (params.step == 'cluster_sdata')             cluster_sdata()
     else if (params.step == 'cluster_sdata_gpu')         cluster_sdata_gpu()
     else if (params.step == 'cluster_sdata_gpu_ooc')     cluster_sdata_gpu_ooc()
+    else if (params.step == 'annotate_sdata')            annotate_sdata()
     else if (params.step == 'cluster_report')            cluster_report()
     else if (params.step == 'qc_report')                 qc_report()
     else if (params.step == 'concat_sdata')              concat_sdata()
     else if (params.step == 'downsample_sdata')          downsample_sdata()
     else if (params.step == 'plot_follicle')             plot_follicle()
-    else error "Unknown --step '${params.step}'. Valid steps: downsample_xenium_region, create_sdata, create_adata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, cluster_report, qc_report, concat_sdata, downsample_sdata, plot_follicle"
+    else error "Unknown --step '${params.step}'. Valid steps: downsample_xenium_region, create_sdata, create_adata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, annotate_sdata, cluster_report, qc_report, concat_sdata, downsample_sdata, plot_follicle"
 }
 
 // ── downsample_xenium_region ──────────────────────────────────────────────────
@@ -252,6 +255,43 @@ workflow cluster_sdata_gpu_ooc {
     CLUSTER_SDATA_GPU_OOC.out.samplesheet_row
         .map { it.text }             // read row content so collectFile's sort is deterministic
         .collectFile(name: 'cluster_sdata_gpu_ooc_samplesheet.csv', storeDir: params.outdir,
+                     seed: 'sample,path', newLine: true, sort: true)
+}
+
+// ── annotate_sdata ────────────────────────────────────────────────────────────
+
+workflow annotate_sdata {
+    if (!params.samplesheet) error "Please provide --samplesheet"
+    // No default marker file: the YAML is species- and tissue-specific, and silently
+    // annotating a human cohort against whatever happened to be shipped would be worse
+    // than refusing to run.
+    if (!params.markers)     error "Please provide --markers <marker YAML> (e.g. assets/ovarian_markers_human.yaml)"
+
+    def inputs = channel
+        .fromPath(params.samplesheet)
+        .splitCsv(header: true)      // Map(sample, path)
+        .map { row ->
+            if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
+            if (!row.path)   error "Samplesheet row missing 'path': ${row}"
+            tuple(row.sample, file(row.path))
+        }                            // tuple(sample, path)
+
+    // One marker file shared by every sample, so a plain value channel — Nextflow
+    // recycles it across all tasks rather than consuming it after the first.
+    def markers = file(params.markers)
+
+    // Which resolutions to annotate. Null by default (see nextflow.config) so the
+    // "every leiden_res_* column present" default lives only in the script; a `val`
+    // process input cannot be null, so pass an empty string and let the module's
+    // conditional append omit the flag.
+    def resolutions = params.resolutions ?: ''
+
+    ANNOTATE_SDATA(inputs, markers, resolutions, params.exclude_nonspecific)
+
+    // Handoff samplesheet of the annotated zarrs (see create_sdata for rationale).
+    ANNOTATE_SDATA.out.samplesheet_row
+        .map { it.text }             // read row content so collectFile's sort is deterministic
+        .collectFile(name: 'annotate_sdata_samplesheet.csv', storeDir: params.outdir,
                      seed: 'sample,path', newLine: true, sort: true)
 }
 
