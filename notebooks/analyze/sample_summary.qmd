@@ -30,12 +30,14 @@ import traceback
 from pathlib import Path
 
 import anndata as ad
+import matplotlib.patheffects as patheffects
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scanpy as sc
 import scipy.sparse as sp
 from IPython.display import display, Markdown
+from matplotlib.colors import to_hex
 from scipy.cluster.hierarchy import leaves_list, linkage
 from scipy.spatial.distance import squareform
 
@@ -90,15 +92,68 @@ if RESOLUTIONS_CSV.exists():
     OVERRIDES = dict(zip(chosen["sample"].astype(str), chosen["resolution"].astype(float)))
 
 
-def cluster_palette(n):
-    """n colours, matching cluster_report's palette so a cluster keeps its colour.
+# Cluster-id colours here encode ORDER, not identity: the dendrogram ids are 1..n in
+# dendrogram order, so adjacent ids are transcriptionally adjacent. Sampling a multi-hue
+# ordered colormap ALONG that order makes proximity read as colour similarity — the
+# opposite of a categorical palette like tab20, which maximises adjacent contrast and so
+# hides the very ordering the relabel created. The numeric id is always drawn on the UMAP
+# (legend on data), so colour is never the sole identity channel.
+#
+# Matches sammy_r21's sample_summary deck (see oir-analysis HANDOFF.md, "Palette"). turbo,
+# trimmed off both ends because its extremes are near-black and near-maroon; kept off the
+# correlation heatmap's viridis to avoid a same-colour collision.
+CLUSTER_CMAP = "turbo"
+CLUSTER_CMAP_RANGE = (0.05, 0.95)
 
-    tab10 below 11 clusters, tab20 above: tab20 is ten dark/light *pairs*, so a 2-cluster
-    panel drawn from it is navy against pale blue. tab10's first two are blue and orange.
-    Past 20 the palette cycles, which the numeric labels compensate for.
+
+def _srgb_to_lab(rgb):
+    """sRGB triples in [0, 1] -> CIE Lab (D65).
+
+    Only used to space the cluster palette; nothing else in the deck needs Lab.
     """
-    cmap = plt.get_cmap("tab10" if n <= 10 else "tab20")
-    return [cmap(i % cmap.N) for i in range(n)]
+    rgb = np.asarray(rgb, dtype=float)
+    lin = np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
+    xyz = lin @ np.array([[0.4124564, 0.3575761, 0.1804375],
+                          [0.2126729, 0.7151522, 0.0721750],
+                          [0.0193339, 0.1191920, 0.9503041]]).T
+    t = xyz / np.array([0.95047, 1.0, 1.08883])
+    d = 6 / 29
+    f = np.where(t > d ** 3, np.cbrt(t), t / (3 * d ** 2) + 4 / 29)
+    return np.stack([116 * f[..., 1] - 16,
+                     500 * (f[..., 0] - f[..., 1]),
+                     200 * (f[..., 1] - f[..., 2])], axis=-1)
+
+
+def gradient_colors(n, cmap_name=CLUSTER_CMAP, span=CLUSTER_CMAP_RANGE):
+    """n ordered hex colours, spaced at equal PERCEPTUAL distance along the colormap.
+
+    Sampling a colormap at equal steps of its own parameter leaves some neighbours far
+    closer than others — across turbo the greens crowd together while the blues spread.
+    Walking the colormap at constant CIE Lab arc length instead evens those gaps out, which
+    matters here because adjacent ids are transcriptionally adjacent and so are the ones a
+    reader compares.
+    """
+    lo, hi = span
+    cmap = plt.get_cmap(cmap_name)
+    # Dense walk of the ramp, then invert its cumulative arc length: interpolating n equally
+    # spaced arc lengths back to colormap positions gives the perceptually even sample points.
+    ts = np.linspace(lo, hi, 2000)
+    lab = _srgb_to_lab([cmap(t)[:3] for t in ts])
+    cumulative = np.concatenate([[0], np.cumsum(np.linalg.norm(np.diff(lab, axis=0), axis=1))])
+    return [to_hex(cmap(t)) for t in np.interp(np.linspace(0, cumulative[-1], n), cumulative, ts)]
+
+
+def style_on_data_labels(ax, color="white", outline="black", linewidth=2.5):
+    """Restyle scanpy's on-data cluster labels to `color` text with an `outline` stroke.
+
+    scanpy's legend_fontoutline hardcodes a white stroke around black text, which is hard to
+    read on light clusters — and turbo's middle is pale yellow-green. Flip it to white text
+    with a black outline, which reads on both ends of the ramp. The cluster labels are the
+    only Text artists scanpy adds to the axes body, so restyling ax.texts hits exactly them.
+    """
+    for t in ax.texts:
+        t.set_color(color)
+        t.set_path_effects([patheffects.withStroke(linewidth=linewidth, foreground=outline)])
 
 
 def add_cluster_ids(adata, key, levels, name):
@@ -117,9 +172,7 @@ def add_cluster_ids(adata, key, levels, name):
     ids = [str(i + 1) for i in range(len(levels))]
     mapping = {level: str(i + 1) for i, level in enumerate(levels)}
     adata.obs[name] = pd.Categorical(adata.obs[key].map(mapping), categories=ids)
-    adata.uns[f"{name}_colors"] = [
-        plt.matplotlib.colors.to_hex(c) for c in cluster_palette(len(levels))
-    ]
+    adata.uns[f"{name}_colors"] = gradient_colors(len(levels))
 
 
 def cluster_centroids(adata, name):
@@ -267,11 +320,11 @@ def umap_clusters(adata, sample, name):
 
     legend_loc="on data" puts each cluster's id at its cluster's MEDIAN position, which is
     what we want: a cluster split across two lobes of the embedding puts its mean in the
-    empty space between them, where the label sits on no cells at all. legend_fontoutline
-    keeps the number legible on both the dark and the light end of the palette. Labels on
-    the data rather than a legend because past ~10 clusters a legend eats the panel, and
-    tab20 has to cycle anyway — the number identifies a cluster, colour only separates
-    neighbours.
+    empty space between them, where the label sits on no cells at all. The labels are then
+    restyled to white-on-black by style_on_data_labels, since scanpy's own outline is the
+    wrong way round for turbo's pale middle. Labels on the data rather than a legend because
+    past ~10 clusters a legend eats the panel — and here the number carries the identity
+    while colour carries the ORDER, so both channels are doing work.
 
     Cells are handed over sorted by descending cluster size, so the small clusters are
     drawn last and land on top. scanpy draws one scatter in row order, and the reverse
@@ -291,7 +344,6 @@ def umap_clusters(adata, sample, name):
         legend_loc="on data",
         legend_fontsize=7,
         legend_fontweight="bold",
-        legend_fontoutline=2,
         # UMAP axes carry no interpretable units — drop the frame entirely.
         frameon=False,
         title="",
@@ -299,6 +351,7 @@ def umap_clusters(adata, sample, name):
         ax=ax,
         show=False,
     )
+    style_on_data_labels(ax)
 
     n_clusters = adata.obs[name].nunique()
     fig.suptitle(f"{sample} · {adata.n_obs:,} cells · {n_clusters} clusters",
