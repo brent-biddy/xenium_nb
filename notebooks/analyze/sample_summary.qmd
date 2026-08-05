@@ -174,37 +174,6 @@ def add_cluster_ids(adata, key, levels, name):
     adata.uns[f"{name}_colors"] = gradient_colors(len(levels))
 
 
-def plot_corr_heatmap(matrix, row_labels, col_labels, xlabel, ylabel, ax, title=None,
-                      vmin=None, vmax=None):
-    """Draw a matrix as an annotated viridis heatmap on `ax`; return the image.
-
-    Ported from sammy_r21's sample_summary so the two decks' correlation panels read the
-    same. The printed label flips black-on-light / white-on-dark with the cell's viridis
-    brightness so it reads at either end, and the leading zero is dropped to keep labels
-    narrow. vmin/vmax default to the matrix's own range. The caller adds the colorbar.
-    """
-    if vmin is None:
-        vmin = float(np.nanmin(matrix))
-    if vmax is None:
-        vmax = float(np.nanmax(matrix))
-    im = ax.imshow(matrix, cmap="viridis", aspect="auto", vmin=vmin, vmax=vmax)
-    for i in range(matrix.shape[0]):
-        for j in range(matrix.shape[1]):
-            light = (matrix[i, j] - vmin) / (vmax - vmin) > 0.5 if vmax > vmin else True
-            ax.text(j, i, f"{matrix[i, j]:.2f}".replace("0.", "."),
-                    ha="center", va="center", fontsize=7,
-                    color="black" if light else "white")
-    ax.set_xticks(range(len(col_labels)))
-    ax.set_xticklabels([str(c) for c in col_labels], fontsize=8)
-    ax.set_yticks(range(len(row_labels)))
-    ax.set_yticklabels([str(c) for c in row_labels], fontsize=8)
-    ax.set_xlabel(xlabel, fontsize=9)
-    ax.set_ylabel(ylabel, fontsize=9)
-    if title is not None:
-        ax.set_title(title, fontsize=8)
-    return im
-
-
 def centroid_correlation(sample, corr, order):
     """One slide's figure: the same correlation matrix under both numberings, side by side.
 
@@ -221,24 +190,44 @@ def centroid_correlation(sample, corr, order):
 
     The diagonal is kept rather than blanked. It is 1 by construction, but on this data the
     off-diagonal already reaches ~0.99, so including it moves vmax by about a point and
-    costs nothing; blanking it was making the panels harder to compare with sammy_r21's.
+    costs nothing.
+
+    The drawing is a loop over the two panels rather than a general heatmap helper: both
+    panels take the same square symmetric matrix and differ only in their tick labels, so a
+    helper's row/col-label and x/y-label pairs would carry no information here. (sammy_r21
+    keeps such a helper because it also draws non-square cross-sample matrices; this deck
+    has only the self-self case.)
     """
     values = corr[np.ix_(order, order)]
-    # order[p] is a 0-based size-rank position; +1 makes it the printed size id.
-    size_ids = [int(p) + 1 for p in order]
-    dendro_ids = list(range(1, len(order) + 1))
+    # Derived once, so both panels and the shared colorbar are on the same ramp by
+    # construction rather than by each panel happening to compute it from the same matrix.
+    vmin, vmax = float(values.min()), float(values.max())
 
-    fig, (ax_size, ax_dendro) = plt.subplots(1, 2, figsize=(12.5, 5.2),
-                                             constrained_layout=True)
-    plot_corr_heatmap(values, size_ids, size_ids,
-                      "Cluster (size-ranked)", "Cluster (size-ranked)", ax_size,
-                      title="size-ranked ids")
-    im = plot_corr_heatmap(values, dendro_ids, dendro_ids,
-                           "Cluster (dendrogram)", "Cluster (dendrogram)", ax_dendro,
-                           title="dendrogram-ordered ids")
+    # order[p] is a 0-based size-rank position; +1 makes it the printed size id.
+    panels = (
+        ([int(p) + 1 for p in order], "Cluster (size-ranked)", "size-ranked ids"),
+        (list(range(1, len(order) + 1)), "Cluster (dendrogram)", "dendrogram-ordered ids"),
+    )
+
+    fig, axes = plt.subplots(1, 2, figsize=(12.5, 5.2), constrained_layout=True)
+    for ax, (ids, axis_label, title) in zip(axes, panels):
+        im = ax.imshow(values, cmap="viridis", aspect="auto", vmin=vmin, vmax=vmax)
+        for i in range(len(ids)):
+            for j in range(len(ids)):
+                # Threshold on the colour, not the value: mid-viridis is light enough that
+                # black reads better. The leading zero is dropped to keep labels narrow.
+                light = (values[i, j] - vmin) / (vmax - vmin) > 0.5 if vmax > vmin else True
+                ax.text(j, i, f"{values[i, j]:.2f}".replace("0.", "."),
+                        ha="center", va="center", fontsize=7,
+                        color="black" if light else "white")
+        ax.set_xticks(range(len(ids)), [str(c) for c in ids], fontsize=8)
+        ax.set_yticks(range(len(ids)), [str(c) for c in ids], fontsize=8)
+        ax.set_xlabel(axis_label, fontsize=9)
+        ax.set_ylabel(axis_label, fontsize=9)
+        ax.set_title(title, fontsize=8)
 
     # One shared colorbar — both panels are the same matrix on the same scale.
-    cbar = fig.colorbar(im, ax=[ax_size, ax_dendro], fraction=0.046, pad=0.02)
+    cbar = fig.colorbar(im, ax=list(axes), fraction=0.046, pad=0.02)
     cbar.ax.set_ylabel("Spearman r", fontsize=8)
     cbar.ax.tick_params(labelsize=7)
 
