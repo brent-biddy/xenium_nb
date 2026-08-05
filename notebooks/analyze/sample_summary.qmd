@@ -174,67 +174,6 @@ def add_cluster_ids(adata, key, levels, name):
     adata.uns[f"{name}_colors"] = gradient_colors(len(levels))
 
 
-def cluster_centroids(adata, name):
-    """Per-cluster centroids (clusters x genes), rows in `name`'s 1..n order.
-
-    Follows the sammy_r21 / PNAS atlas pseudobulk (Seurat AverageExpression + ln(avg + 1)):
-    normalize each cell to CP10K, average the *linear* CP10K over the cells in a cluster,
-    then log1p that average — mean-then-log, not log-then-mean, since ln is nonlinear and
-    the two differ (up to 1.8 on this data). Built from the raw counts in layers["counts"]
-    (ground truth), which cluster_sdata stashes before normalizing, rather than expm1(X),
-    which round-trips the log transform.
-
-    Still not handed to sc.tl.dendrogram / sc.pl.correlation_matrix: those average a
-    *representation* (X_pca by default) and correlate with Pearson, i.e. log-then-mean in a
-    reduced space. That is a different quantity from this recipe, not a different spelling
-    of it. The two scanpy calls used here do the recipe's own steps and nothing else.
-
-    The CP10K target itself does not affect the numbers on this slide: a uniform per-cell
-    scale factor leaves the gene ranks within a centroid untouched, so the within-sample
-    Spearman is identical (to 1e-7) under any target_sum. It matters for comparability
-    only — cluster_sdata's normalize_total takes no target_sum, and its default is not a
-    constant but the median pre-normalization total, which is 226 for one of these samples
-    and 198 for the other. Centroids built that way are on a per-sample scale and could not
-    be compared across samples or against an external atlas; CP10K can.
-    """
-    # CP10K into its own layer, so `counts` stays the untouched ground truth. Every cell is
-    # past cluster_sdata's min_counts=10 cut, so no cell total is zero.
-    adata.layers["cp10k"] = adata.layers["counts"].copy()
-    sc.pp.normalize_total(adata, layer="cp10k", target_sum=1e4)
-
-    # Group mean of the LINEAR CP10K, log1p'd after — mean-then-log is the whole point.
-    # sc.get.aggregate returns its result in .layers["mean"], not .X.
-    agg = sc.get.aggregate(adata, by=name, func="mean", layer="cp10k")
-
-    # Drop the second copy of the matrix now rather than at the end of the sample: the
-    # figures that follow do not need it, and it is the largest thing in the deck.
-    del adata.layers["cp10k"]
-    gc.collect()
-
-    # Index is the 1..n id, matching the UMAP and violin labels.
-    return pd.DataFrame(np.log1p(agg.layers["mean"]),
-                        index=list(agg.obs_names), columns=agg.var_names)
-
-
-def dendrogram_order(values):
-    """Leaf order of an average-linkage tree on 1 - r, as indices into `values`.
-
-    squareform wants a condensed vector and rejects any asymmetry or nonzero diagonal, so
-    the diagonal is zeroed explicitly: 1 - r leaves it at ~1e-16 rather than exactly 0 and
-    squareform raises on that. checks=False would skip the validation but also skip
-    catching a genuinely malformed matrix, so the diagonal is fixed instead.
-
-    Two clusters need no special case — linkage builds the single merge and leaves_list
-    returns [0, 1]. One cluster raises on the empty distance matrix, deliberately: a
-    correlation slide for a sample with a single cluster has nothing to correlate, and the
-    per-sample try turns that into a traceback on that sample's section rather than a
-    heatmap of one cell reading 1.00, which looks like a result.
-    """
-    distance = 1 - values
-    np.fill_diagonal(distance, 0.0)
-    return leaves_list(linkage(squareform(distance, checks=False), method="average"))
-
-
 def plot_corr_heatmap(matrix, row_labels, col_labels, xlabel, ylabel, ax, title=None,
                       vmin=None, vmax=None):
     """Draw a matrix as an annotated viridis heatmap on `ax`; return the image.
@@ -483,19 +422,57 @@ for path in ZARRS:
         levels = sorted(counts.index, key=lambda level: (-counts[level], int(level)))
         add_cluster_ids(adata, key, levels, "cluster_size")
 
-        # Centroids and their correlation, computed once here rather than inside a slide
-        # function: both the heatmap and the dendrogram-ordered numbering need the
-        # ordering, and the counts layer is by far the most expensive thing this deck
-        # touches.
+        # Centroids, their correlation, and the dendrogram order, computed once here rather
+        # than inside a slide function: both the heatmap and the dendrogram-ordered
+        # numbering need the ordering, and the counts layer is by far the most expensive
+        # thing this deck touches.
         #
+        # Centroids follow the sammy_r21 / PNAS atlas pseudobulk (Seurat AverageExpression
+        # + ln(avg + 1)): normalize each cell to CP10K, average the *linear* CP10K over a
+        # cluster's cells, then log1p that average — mean-then-log, not log-then-mean.
+        # Built from layers["counts"] (ground truth, stashed by cluster_sdata before
+        # normalizing) rather than expm1(X), which would round-trip the log transform.
+        #
+        # The log1p does not affect this slide: Spearman ranks genes within a centroid and
+        # log1p is monotonic, so the correlation is identical with or without it. It is
+        # kept because these centroids are the form to reuse elsewhere. Nor does the CP10K
+        # target — a uniform per-cell scale leaves within-centroid ranks untouched. CP10K
+        # matters for comparability only: cluster_sdata's normalize_total takes no
+        # target_sum, and its default is the median pre-normalization total (226 for one of
+        # these samples, 198 for the other), which is a per-sample scale that could not be
+        # compared across samples or against an external atlas.
+        #
+        # Not sc.tl.dendrogram / sc.pl.correlation_matrix: those average a *representation*
+        # (X_pca by default) and correlate with Pearson — log-then-mean in a reduced space,
+        # a different quantity. The scanpy calls used here do the recipe's own steps.
+        adata.layers["cp10k"] = adata.layers["counts"].copy()
+        sc.pp.normalize_total(adata, layer="cp10k", target_sum=1e4)
+        # sc.get.aggregate returns its result in .layers["mean"], not .X.
+        agg = sc.get.aggregate(adata, by="cluster_size", func="mean", layer="cp10k")
+        centroids = pd.DataFrame(np.log1p(agg.layers["mean"]),
+                                 index=list(agg.obs_names), columns=agg.var_names)
+        # Drop the second copy of the matrix now: the figures below do not need it.
+        del adata.layers["cp10k"]
+        gc.collect()
+
         # Spearman rather than Pearson on the values: a targeted panel's centroids are
         # dominated by a few very high-expressing genes, which set a Pearson r almost on
         # their own, while ranks weight the whole panel. Via pandas rather than
         # scipy.stats.spearmanr or np.corrcoef, both of which collapse to a bare float
         # instead of a matrix at small n (spearmanr at two clusters, corrcoef at one) —
         # counts the low end of the sweep routinely produces. .corr is always square.
-        corr = cluster_centroids(adata, "cluster_size").T.corr(method="spearman").to_numpy()
-        order = dendrogram_order(corr)
+        corr = centroids.T.corr(method="spearman").to_numpy()
+
+        # Leaf order of an average-linkage tree on 1 - r. squareform rejects a nonzero
+        # diagonal and 1 - r leaves it at ~1e-16, so it is zeroed explicitly rather than
+        # passing checks=False, which would also skip catching a malformed matrix. Two
+        # clusters need no special case; one raises on the empty distance matrix, which the
+        # per-sample try turns into a traceback for that sample — a correlation slide for a
+        # single cluster has nothing to correlate.
+        distance = 1 - corr
+        np.fill_diagonal(distance, 0.0)
+        order = leaves_list(linkage(squareform(distance, checks=False), method="average"))
+
         add_cluster_ids(adata, key, [levels[i] for i in order], "cluster_dendro")
 
         # The UMAP comes first: it establishes what each cluster number and colour refers
