@@ -66,17 +66,6 @@ CLUSTER_SLIDES = 2
 # resolution wins, so a run with a custom --resolutions still renders.
 SPATIAL_RESOLUTION = 1.0
 
-# obs columns holding the five Xenium control/codeword counters. Summed for the
-# negative-control panel; each one alone is too sparse to read on a UMAP.
-CONTROL_COLS = [
-    "control_probe_counts",
-    "genomic_control_counts",
-    "control_codeword_counts",
-    "unassigned_codeword_counts",
-    "deprecated_codeword_counts",
-]
-
-
 def load_sample(path):
     """Read one zarr's obs, UMAP, and spatial coords without pulling X into memory.
 
@@ -93,20 +82,22 @@ def load_sample(path):
     df["spatial_x"] = spatial[:, 0]
     df["spatial_y"] = spatial[:, 1]
 
-    # Negative-control fraction now comes from create_sdata, which computes it at the
-    # one point X and the reader's own columns are together in memory. This function
-    # used to derive it — as did qc_report — which was two definitions of one number.
+    # This deck computes no QC metric of its own. Every column it plots — including
+    # pct_control, which it used to derive here — comes from create_sdata, which
+    # annotates them at the one point X and the reader's own columns are together in
+    # memory. A report that recomputes a metric is a second definition of it, and the
+    # two drift silently.
     #
-    # Kept as a fallback for zarrs written before create_sdata emitted the column, since
-    # re-running create_sdata over a cohort is expensive and this deck is cheap. The
-    # denominator is rebuilt from transcript_counts rather than read from total_counts:
-    # transcript_counts always equals the row sum of X, whereas total_counts means
-    # transcripts + all five counters on a raw zarr but a plain row sum after
-    # cluster_sdata_gpu_ooc has run.
-    present = [c for c in CONTROL_COLS if c in df.columns]
-    if "pct_control" not in df.columns and present:
-        controls = df[present].sum(axis=1)
-        df["pct_control"] = 100 * controls / (df["transcript_counts"] + controls)
+    # Deliberately no fallback for zarrs written before create_sdata emitted a column:
+    # a fallback is that second definition wearing a disguise, and it would let a stale
+    # cohort render a deck whose numbers came from somewhere other than the pipeline.
+    # Failing here instead names the fix, which is to re-run create_sdata.
+    missing = [c for c, _, _ in QC_METRICS if c not in df.columns]
+    if missing:
+        raise KeyError(
+            f"{Path(path).name}: obs is missing {missing}. These come from create_sdata "
+            "— re-run it over this sample rather than deriving them here."
+        )
 
     return df
 
