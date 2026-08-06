@@ -67,10 +67,14 @@ def main():
     with timer("Move to GPU"):
         rsc.get.anndata_to_GPU(adata)
 
-    with timer("QC"):
-        # rapids-singlecell's calculate_qc_metrics writes in place and does not
-        # support scanpy's percent_top; the downstream filters below don't use it.
-        rsc.pp.calculate_qc_metrics(adata)
+    with timer("Filter"):
+        # No calculate_qc_metrics call here, matching cluster_sdata — create_sdata
+        # already annotated every per-cell and per-gene metric, and recomputing them
+        # overwrote the Xenium-native obs["total_counts"] with a plain row sum. See
+        # cluster_sdata.py's Filter block for the full argument.
+        #
+        # Dropping it is safe: rsc.pp.filter_cells and filter_genes both derive their
+        # thresholds from X via _basic_qc and never read obs, so the cut is unchanged.
         n_before = adata.n_obs
         rsc.pp.filter_cells(adata, min_counts=10)
         rsc.pp.filter_genes(adata, min_cells=5)

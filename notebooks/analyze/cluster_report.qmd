@@ -241,7 +241,11 @@ def cluster_colors(labels):
 # read 0.0 for every cell, and no doublet caller runs in this pipeline.
 QC_METRICS = [
     ("transcript_counts", "Transcripts", True),
-    ("n_genes_by_counts", "Genes detected", False),
+    # n_genes_by_transcripts, not n_genes_by_counts: the latter existed only because
+    # cluster_sdata* re-ran calculate_qc_metrics with the default expr_type. That call
+    # is gone, and create_sdata's own column — computed once, before any filtering — is
+    # what clustered zarrs now carry.
+    ("n_genes_by_transcripts", "Genes detected", False),
     ("cell_area", "Cell area (µm²)", False),
     ("pct_control", "Negative control %", False),
 ]

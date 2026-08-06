@@ -64,8 +64,25 @@ def main():
 
     print(f"Table:   {adata.n_obs:,} cells × {adata.n_vars:,} genes  (key: '{table_key}')")
 
-    with timer("QC"):
-        sc.pp.calculate_qc_metrics(adata, percent_top=(10, 20, 50, 150), inplace=True)
+    with timer("Filter"):
+        # No calculate_qc_metrics call here. create_sdata already annotated every
+        # per-cell and per-gene metric, at the one point X was in memory; recomputing
+        # them produced nothing new and actively did harm.
+        #
+        # With the default expr_type="counts" the call overwrote the Xenium-native
+        # obs["total_counts"] — transcripts plus the five control/codeword counters,
+        # which the reader takes from cells.parquet — with a plain X.sum(axis=1). The
+        # column therefore meant one thing on create_sdata's zarrs and another on
+        # these, silently. Running before filter_genes, it did not even leave a correct
+        # row sum: the value described the full panel while the object shipped only the
+        # genes that survived (4,753 of 5,101 on one ROI, wrong for 802 cells).
+        #
+        # It also carried percent_top=(10, 20, 50, 150), the setting create_sdata moved
+        # off for good reason — at a median 174 genes per cell, top_150 reads ~100% for
+        # a large share of cells and inverts the metric.
+        #
+        # Dropping it is safe: filter_cells and filter_genes derive their thresholds
+        # from X directly and never read obs, so the cut is unchanged.
         n_before = adata.n_obs
         sc.pp.filter_cells(adata, min_counts=10)
         sc.pp.filter_genes(adata, min_cells=5)
