@@ -97,6 +97,16 @@ CONTROL_COLS = [
     "deprecated_codeword_counts",
 ]
 
+# Every obs column this deck reads, checked up front in load_sample. All of them come
+# from create_sdata or the Xenium reader; none is derived here. Listing them in one
+# place means a zarr that predates a column fails on the first sample with the column
+# named, rather than several slides later inside whichever panel happened to want it.
+REQUIRED_OBS = (
+    [col for col, _, _ in QC_COLUMNS]
+    + CONTROL_COLS
+    + ["control_counts", "pct_control", "segmentation_method", "sample"]
+)
+
 
 def load_sample(path):
     """Read one zarr's obs, var, and spatial coords without pulling X into memory.
@@ -117,26 +127,20 @@ def load_sample(path):
     obs["spatial_x"] = spatial[:, 0]
     obs["spatial_y"] = spatial[:, 1]
 
-    # Negative-control fraction: read from obs if a future create_sdata annotates one,
-    # otherwise derived here. The fallback exists because no upstream step emits this
-    # yet and the metric is too central to a pre-clustering QC deck to omit until one
-    # does — a cohort of zarrs written before that change still renders.
+    # This deck computes no QC metric of its own — pct_control included, which
+    # create_sdata now annotates alongside the rest. A report that derives a metric is
+    # a second definition of it, and the two drift without anything saying so.
     #
-    # The denominator is rebuilt from transcript_counts rather than read from
-    # total_counts. On these raw zarrs the two are identical by construction
-    # (create_sdata's total_counts IS transcripts + all five counters), but
-    # cluster_sdata's calculate_qc_metrics overwrites total_counts with X.sum(axis=1),
-    # so the column means different things before and after clustering. transcript_counts
-    # always equals the row sum of X, which makes the rebuilt denominator the one that
-    # cannot silently change meaning.
-    if "pct_control" not in obs.columns:
-        present = [c for c in CONTROL_COLS if c in obs.columns]
-        if present:
-            controls = obs[present].sum(axis=1)
-            total = obs["transcript_counts"] + controls
-            # A cell with no transcripts and no controls has no fraction to report;
-            # 0/0 would be a NaN that silently drops out of every mean below.
-            obs["pct_control"] = 100 * controls / total.replace(0, np.nan)
+    # Deliberately no fallback for zarrs predating a column: a fallback is that second
+    # definition wearing a disguise, and it would let a stale cohort render a deck whose
+    # numbers came from somewhere other than the pipeline. Failing here names the fix,
+    # which is to re-run create_sdata.
+    missing = [c for c in REQUIRED_OBS if c not in obs.columns]
+    if missing:
+        raise KeyError(
+            f"{Path(path).name}: obs is missing {missing}. These come from create_sdata "
+            "— re-run it over this sample rather than deriving them here."
+        )
 
     return obs, var
 
@@ -295,11 +299,10 @@ for path in ZARRS:
             "axes; the red line marks each median. Cells at zero cannot be drawn on a "
             "log axis and are counted in the panel title instead."
         ))
-        metrics = [(c, label, log) for c, label, log in QC_COLUMNS if c in obs.columns]
         fig, axes = plt.subplots(2, 2, figsize=FIGSIZE, squeeze=False)
-        for ax, (col, label, log) in zip(axes.ravel(), metrics):
+        for ax, (col, label, log) in zip(axes.ravel(), QC_COLUMNS):
             log_hist(ax, obs[col], label, log)
-        for ax in axes.ravel()[len(metrics):]:
+        for ax in axes.ravel()[len(QC_COLUMNS):]:
             fig.delaxes(ax)
         fig.suptitle(f"{sample} · {len(obs):,} cells", fontsize=9, x=0.01, ha="left")
         fig.tight_layout()
@@ -392,10 +395,9 @@ for path in ZARRS:
             "carrying at least one control transcript and the mean per-cell control "
             "fraction."
         ))
-        present = [c for c in CONTROL_COLS if c in obs.columns]
         fig, axes = plt.subplots(1, 2, figsize=FIGSIZE, squeeze=False)
         ax = axes[0, 0]
-        totals = obs[present].sum()
+        totals = obs[CONTROL_COLS].sum()
         # Horizontal bars: the category names are long enough that vertical ticks would
         # overlap or need rotating to fit.
         ax.barh(range(len(totals)), totals.to_numpy(), color="#C44E52")
@@ -422,7 +424,7 @@ for path in ZARRS:
         ax.tick_params(labelsize=6)
         ax.spines[["top", "right"]].set_visible(False)
 
-        control_cells = 100 * (obs[present].sum(axis=1) > 0).mean()
+        control_cells = 100 * (obs["control_counts"] > 0).mean()
         mean_pct = obs["pct_control"].mean()
         fig.suptitle(
             f"{sample} · {control_cells:.1f}% of cells carry a control · "
@@ -479,8 +481,7 @@ for path in ZARRS:
         })
         curves[sample] = (cell_curve, gene_curve)
         distributions[sample] = {
-            col: obs[col].to_numpy(dtype=float)
-            for col, _, _ in QC_COLUMNS if col in obs.columns
+            col: obs[col].to_numpy(dtype=float) for col, _, _ in QC_COLUMNS
         }
     except Exception:
         display(Markdown(f"```\n{traceback.format_exc()}\n```"))
@@ -527,11 +528,11 @@ if summaries:
         "value, so a curve lying to the left of the others is a sample with "
         "systematically lower values."
     ))
-    ecdf_metrics = [(c, label, log) for c, label, log in QC_COLUMNS
-                    if any(c in d for d in distributions.values())]
     fig, axes = plt.subplots(2, 2, figsize=FIGSIZE, squeeze=False)
-    for ax, (col, label, log) in zip(axes.ravel(), ecdf_metrics):
+    for ax, (col, label, log) in zip(axes.ravel(), QC_COLUMNS):
         for sample in samples:
+            # A sample whose section raised above never reached `distributions`, so the
+            # cohort panels simply omit it rather than failing on the lookup.
             values = distributions.get(sample, {}).get(col)
             if values is None:
                 continue
@@ -547,7 +548,7 @@ if summaries:
         ax.set_ylabel("Cells at or below (%)", size=7)
         ax.tick_params(labelsize=6)
         ax.spines[["top", "right"]].set_visible(False)
-    for ax in axes.ravel()[len(ecdf_metrics):]:
+    for ax in axes.ravel()[len(QC_COLUMNS):]:
         fig.delaxes(ax)
     # One shared legend rather than one per panel: the sample colours are the same in
     # all four, and four legends would cost more panel area than the curves use.
