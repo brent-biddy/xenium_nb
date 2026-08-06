@@ -3,19 +3,16 @@
 // the data rather than inherited. Like cluster_report this is a terminal fan-in over
 // the whole cohort, so there is no publishDir helper and no `sample,path` handoff row.
 //
-// It does emit one machine-readable artifact: qc_thresholds.csv, a per-sample
-// min_counts/min_cells table pre-filled with the pipeline defaults. That file is a
-// STARTING POINT to edit by hand after reading the slides, not a decision the deck
-// makes — nothing here infers a threshold. Editing it and passing it back via
-// `--thresholds` is what makes a choice take effect in cluster_sdata*.
+// The deck is the only output. It reports what the data looks like and stops there —
+// it neither infers a threshold nor emits one, so acting on it means reading the slides
+// and setting the cut in cluster_sdata* yourself.
 
 process QC_REPORT {
     tag "QC_REPORT"
 
     // No sample in the path — this is one fan-in task over the whole cohort.
-    // 'copy' not 'link': both outputs are small and are the things you scp off the
-    // cluster (and then edit, in the CSV's case), so they should survive the work
-    // dir being cleaned.
+    // 'copy' not 'link': the deck is small and is the thing you scp off the cluster,
+    // so it should survive the work dir being cleaned.
     publishDir "${params.outdir}/qc_report", mode: 'copy'
 
     input:
@@ -37,7 +34,6 @@ process QC_REPORT {
 
     output:
     path "qc_report.pptx", emit: report
-    path "qc_thresholds.csv", emit: thresholds
 
     script:
     """
@@ -51,6 +47,5 @@ process QC_REPORT {
     stub:
     """
     touch qc_report.pptx
-    printf 'sample,min_counts,min_cells\\n' > qc_thresholds.csv
     """
 }
