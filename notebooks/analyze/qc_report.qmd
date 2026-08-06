@@ -31,7 +31,8 @@ from pathlib import Path
 import anndata as ad
 import matplotlib.pyplot as plt
 import numpy as np
-import zarr
+import scanpy as sc
+import squidpy as sq
 from IPython.display import display, Markdown
 from matplotlib.colors import LogNorm
 
@@ -40,8 +41,6 @@ FIGSIZE = (9.0, 4.3)
 # Inches reserved beside the in-tissue plots for their colorbar, which sits outside
 # the axes and would otherwise be cropped by tight_layout.
 LEGEND_WIDTH = 1.4
-# Fraction of the in-tissue axes the cell dots should cover, which sets their size.
-SPATIAL_COVERAGE = 0.45
 
 # Every raw zarr is staged into this notebook's working directory by the Nextflow
 # process, so globbing is the whole input contract — no params to pass or drift.
@@ -54,100 +53,28 @@ ZARRS = sorted(Path(".").glob("*.zarr"))
 if not ZARRS:
     raise FileNotFoundError("No .zarr directories staged next to the notebook.")
 
-# The per-cell QC columns each sample's distribution panel shows, as
-# (obs column, axis label, log scale).
+# The per-cell QC columns each sample's histogram panel shows, as (obs column, axis
+# label). All four come straight from the zarr — create_sdata annotates the transcript
+# and gene counts, and the Xenium reader supplies both areas from cells.parquet. This
+# deck derives nothing.
 #
-# All four come straight from the zarr — create_sdata annotates the transcript and gene
-# counts, and the Xenium reader supplies both areas from cells.parquet. This deck derives
-# nothing.
+# There is no per-metric log flag because all four are counts or areas spanning orders
+# of magnitude, so all four are drawn on a log axis. A metric that wanted a linear axis
+# would need its own zero handling too — the log panels drop zeros and report them,
+# which a linear panel should not — so it belongs in its own slide function rather than
+# behind a flag here.
 QC_COLUMNS = [
-    ("transcript_counts", "Transcripts per cell", True),
-    ("n_genes_by_transcripts", "Genes per cell", True),
-    ("cell_area", "Cell area (µm²)", True),
-    ("nucleus_area", "Nucleus area (µm²)", True),
+    ("transcript_counts", "Transcripts per cell"),
+    ("n_genes_by_transcripts", "Genes per cell"),
+    ("cell_area", "Cell area (µm²)"),
+    ("nucleus_area", "Nucleus area (µm²)"),
 ]
 
 # Every obs column this deck reads, checked against each zarr in the loop below. All of
 # them come from create_sdata or the Xenium reader; none is derived here. Listing them in
 # one place means a zarr that predates a column fails on the first sample with the column
 # named, rather than several slides later inside whichever panel happened to want it.
-REQUIRED_OBS = [col for col, _, _ in QC_COLUMNS] + ["sample"]
-
-
-def log_hist(ax, values, label, log):
-    """One QC distribution panel, with its median marked.
-
-    Non-positive values are dropped from a log panel rather than silently shifting the
-    whole distribution to make them plottable: transcript_counts reaches 0 on real data,
-    and nucleus_area is 0 for every cell segmented without a nucleus. Both are exactly
-    the cells a QC deck must not hide, so the count that fell off is printed in the panel
-    title instead of being folded into the first bin.
-    """
-    values = np.asarray(values, dtype=float)
-    values = values[np.isfinite(values)]
-    if log:
-        positive = values[values > 0]
-        n_dropped = len(values) - len(positive)
-        bins = np.logspace(np.log10(positive.min()), np.log10(positive.max()), 60)
-        ax.set_xscale("log")
-    else:
-        positive, n_dropped, bins = values, 0, 60
-
-    ax.hist(positive, bins=bins, color="#4C72B0")
-    median = float(np.median(values))
-    ax.axvline(median, color="#C44E52", lw=1.2)
-    ax.set_xlabel(label, size=7)
-    ax.set_ylabel("Cells", size=7)
-    title = f"median {median:,.0f}"
-    if n_dropped:
-        title += f" · {n_dropped:,} at zero"
-    ax.set_title(title, size=7)
-    ax.tick_params(labelsize=6)
-    ax.spines[["top", "right"]].set_visible(False)
-
-
-def point_size(ax, n_cells, coverage=SPATIAL_COVERAGE):
-    """Marker area (pt²) that lets n_cells cover `coverage` of these axes, once.
-
-    A fixed size cannot serve every tissue plot: at s=3 a 21k-cell strip reads well but a
-    32k-cell section is a solid mat of dots, and at s=1 the strip is speckle. Taking the
-    axes' own area covers both — get_position() is the pre-tight_layout fraction of the
-    figure, close enough for a marker size. 72 pt to the inch, squared, converts inches²
-    to the pt² units scatter's `s` is in.
-    """
-    w, h = ax.get_figure().get_size_inches()
-    pos = ax.get_position()
-    area_pt2 = (pos.width * w) * (pos.height * h) * 72 ** 2
-    return float(np.clip(coverage * area_pt2 / n_cells, 0.5, 6.0))
-
-
-def tissue_figure(obs, n):
-    """A figure holding `n` tissue panels, laid out and sized to fill the slide.
-
-    A fixed FIGSIZE wastes the slide on anything that is not 2:1: a tall section renders
-    as a sliver down the middle of a wide figure, because set_aspect("equal") is
-    non-negotiable for tissue. Sizing the figure to the data's aspect instead means the
-    image pandoc embeds is all tissue, and PowerPoint centres it on the slide.
-
-    The ORIENTATION has to follow the tissue too, which is why this does not just take a
-    column count. These ROIs are wide strips (~3:1), and two of those side by side make a
-    6:1 figure that pandoc scales to the slide width — leaving two panels about a
-    centimetre tall in a band of whitespace. Stacking the same two panels gives 1.5:1,
-    close to the slide's own proportions, and each panel keeps real estate. A tall tissue
-    inverts the argument, so the layout is chosen per sample rather than fixed: whichever
-    of the two arrangements lands closest to the slide's aspect wins, compared in log
-    space so being twice too wide and half too wide count equally.
-    """
-    aspect = np.ptp(obs["spatial_x"]) / np.ptp(obs["spatial_y"])
-    box_w, box_h = FIGSIZE[0] - LEGEND_WIDTH, FIGSIZE[1]
-    target = box_w / box_h
-
-    nrows, ncols = min([(1, n), (n, 1)],
-                       key=lambda rc: abs(np.log(aspect * rc[1] / rc[0] / target)))
-    combined = aspect * ncols / nrows
-    # Fit the combined block inside the slide's plot box, touching whichever edge binds.
-    w, h = (box_w, box_w / combined) if combined >= target else (box_h * combined, box_h)
-    return plt.subplots(nrows, ncols, figsize=(w + LEGEND_WIDTH, h), squeeze=False)
+REQUIRED_OBS = [col for col, _ in QC_COLUMNS] + ["sample"]
 
 
 # ── Slides ────────────────────────────────────────────────────────────────────
@@ -158,16 +85,22 @@ def tissue_figure(obs, n):
 # together far more often than either is edited alone.
 
 
-def qc_histogram_slide(obs, sample):
+def qc_histogram_slide(adata, sample):
     """Slide: this sample's per-cell QC, one histogram per metric.
+
+    Hand-rolled rather than a scanpy call, because scanpy has no histogram function —
+    the other two slides use sc.pl / sq.pl and let those handle their own point sizing.
 
     A 2x2 grid over QC_COLUMNS, so adding or dropping a metric there changes the slide
     without touching this function. Leftover axes are removed rather than hidden — a
     hidden axes still reserves its cell under tight_layout and squeezes the real panels
     into a fraction of the slide.
 
-    Per-panel scaling, the median line, and the zero handling live in log_hist; what this
-    owns is the grid, the caption, and the slide title.
+    Non-positive values are dropped from each panel rather than the whole distribution
+    being shifted to make them plottable: transcript_counts reaches 0 on real data, and
+    nucleus_area is 0 for every cell segmented without a nucleus. Both are exactly the
+    cells a QC deck must not hide, so the count that fell off is printed in the panel
+    title instead of being folded into the first bin.
     """
     display(Markdown("## Per-cell QC distributions"))
     display(Markdown(
@@ -178,61 +111,176 @@ def qc_histogram_slide(obs, sample):
     ))
 
     fig, axes = plt.subplots(2, 2, figsize=FIGSIZE, squeeze=False)
-    for ax, (col, label, log) in zip(axes.ravel(), QC_COLUMNS):
-        log_hist(ax, obs[col], label, log)
+    for ax, (col, label) in zip(axes.ravel(), QC_COLUMNS):
+        values = adata.obs[col].to_numpy(dtype=float)
+        values = values[np.isfinite(values)]
+        positive = values[values > 0]
+
+        # Bin edges spaced evenly in log space, so the bars are uniform width on the
+        # log axis rather than crowding into the left of each decade.
+        bins = np.logspace(np.log10(positive.min()), np.log10(positive.max()), 60)
+        ax.hist(positive, bins=bins, color="#4C72B0")
+        ax.set_xscale("log")
+
+        # Median over ALL finite values, not just the plotted ones: dropping zeros is a
+        # drawing constraint, and letting it move the median would misreport the sample.
+        median = float(np.median(values))
+        ax.axvline(median, color="#C44E52", lw=1.2)
+
+        title = f"median {median:,.0f}"
+        n_dropped = len(values) - len(positive)
+        if n_dropped:
+            title += f" · {n_dropped:,} at zero"
+        ax.set_title(title, size=7)
+        ax.set_xlabel(label, size=7)
+        ax.set_ylabel("Cells", size=7)
+        ax.tick_params(labelsize=6)
+        ax.spines[["top", "right"]].set_visible(False)
+
     for ax in axes.ravel()[len(QC_COLUMNS):]:
         fig.delaxes(ax)
 
-    fig.suptitle(f"{sample} · {len(obs):,} cells", fontsize=9, x=0.01, ha="left")
+    fig.suptitle(f"{sample} · {adata.n_obs:,} cells", fontsize=9, x=0.01, ha="left")
     fig.tight_layout()
     plt.show()
     plt.close(fig)
 
 
-def qc_tissue_scatter_slide(obs, sample):
+def transcripts_vs_genes_slide(adata, sample):
+    """Slide: genes detected against transcript count, one point per cell.
+
+    The joint view the histogram slide cannot give: the two metrics are strongly coupled,
+    so a cell that is unusual in the pair — many transcripts spread over few genes, or the
+    reverse — sits off the main arm while looking ordinary in either margin alone.
+
+    Drawn by sc.pl.scatter straight from the object: x and y are obs keys, so scanpy
+    reads them itself and picks the marker size from the cell count. That sizing is the
+    reason to use it — a fixed size cannot serve both a 20k-cell ROI and a 100k-cell
+    section, and hand-deriving one from the axes area assumes the points tile the axes,
+    which is true of a tissue plot but not of this thin diagonal arm.
+
+    Log on both axes for the same reason the histograms use it: counts span orders of
+    magnitude, and on linear axes the whole cohort collapses into the bottom-left corner.
+    The scale is set on the axes afterwards because sc.pl.scatter has no log option;
+    matplotlib then drops any cell at zero on either axis, so those are counted from the
+    data and reported in the title rather than vanishing silently.
+    """
+    display(Markdown("## Transcripts vs genes detected"))
+    display(Markdown(
+        "One point per cell: transcript count against the number of genes detected in "
+        "that cell, both on log axes. Cells at zero on either axis cannot be drawn on a "
+        "log axis and are counted in the title instead."
+    ))
+
+    fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.62, FIGSIZE[1]))
+    sc.pl.scatter(
+        adata,
+        x="transcript_counts",
+        y="n_genes_by_transcripts",
+        ax=ax,
+        show=False,
+    )
+
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    # scanpy labels the axes with the raw obs keys; restate them in the deck's wording.
+    ax.set_xlabel("Transcripts per cell", size=7)
+    ax.set_ylabel("Genes detected per cell", size=7)
+    ax.tick_params(labelsize=6)
+    ax.spines[["top", "right"]].set_visible(False)
+
+    x = adata.obs["transcript_counts"].to_numpy(dtype=float)
+    y = adata.obs["n_genes_by_transcripts"].to_numpy(dtype=float)
+    n_dropped = int(((x <= 0) | (y <= 0)).sum())
+
+    title = f"{sample} · {adata.n_obs:,} cells"
+    if n_dropped:
+        title += f" · {n_dropped:,} at zero"
+    fig.suptitle(title, fontsize=9, x=0.01, ha="left")
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+
+def qc_tissue_scatter_slide(adata, sample):
     """Slide: this sample's cells in tissue, coloured by transcripts and by genes.
 
-    The two panels are the same scatter with a different colour column, so they are a
-    loop rather than two blocks — they cannot drift apart in marker size, aspect, or
-    colour scaling. Layout and figure size come from tissue_figure, which picks 1x2 or
-    2x1 from the tissue's own aspect.
+    Drawn by sq.pl.spatial_scatter from adata.obsm["spatial"], which handles the marker
+    size, the equal aspect, and the Xenium y-orientation itself — all three were
+    hand-rolled here before, and the marker size in particular is the one worth handing
+    over, since it has to scale with the cell count to serve both a 20k ROI and a
+    whole-section run.
 
-    Both columns reach zero on real data and LogNorm rejects a zero vmin, so the colour
-    floor is clipped to 1: those cells stay drawn at the bottom of the ramp instead of
-    dropping out of the panel that exists to locate them.
+    Called once PER PANEL rather than once with two colours. squidpy applies a single
+    `norm` across every colour it is given, which would put genes (max ~2,400 on these
+    ROIs) on the transcripts scale (max ~10,600) and waste most of its ramp. One call per
+    panel gives each its own LogNorm and its own colourbar.
+
+    Zeros are handled through the colormap rather than by clipping the data: LogNorm masks
+    non-positive values, and a masked point is drawn in the colormap's "bad" colour, which
+    defaults to transparent — the cells would silently disappear from the panel that
+    exists to locate them. Painting `bad` with the bottom of the ramp keeps them visible
+    without altering a single value.
+
+    shape=None because these are point coordinates, not Visium spots with a diameter.
+    squidpy drops the axis tick labels, so distance is carried by a scale bar instead —
+    which reads better on tissue than coordinate numbers anyway.
+
+    The figure is still sized and laid out here rather than through squidpy's `ncols`,
+    which cannot choose an orientation from the tissue's shape. A fixed size wastes the
+    slide on anything that is not 2:1, because equal aspect is non-negotiable for tissue
+    and a tall section then renders as a sliver down the middle of a wide figure. These
+    ROIs run both ways — one is a 3:1 strip, the other a 1:2.2 block — and two 3:1 panels
+    side by side make a 6:1 figure that pandoc scales to slide width, leaving both about a
+    centimetre tall in a band of whitespace. So the arrangement is chosen per sample.
     """
     display(Markdown("## QC in tissue coordinates"))
     display(Markdown(
         "Every cell at its position on the slide, coloured by transcript count and by "
-        "genes detected, both on log colour scales. Axes are in µm and share an equal "
-        "aspect, so the panels are at tissue proportions."
+        "genes detected, each on its own log colour scale. Panels are at tissue "
+        "proportions with an equal aspect; the scale bar gives distance in µm."
     ))
 
-    fig, axes = tissue_figure(obs, 2)
     panels = [
         ("transcript_counts", "Transcripts"),
         ("n_genes_by_transcripts", "Genes"),
     ]
-    for ax, (col, label) in zip(axes.ravel(), panels):
-        values = obs[col].to_numpy(dtype=float)
-        im = ax.scatter(
-            obs["spatial_x"], obs["spatial_y"],
-            c=np.clip(values, 1, None),
-            s=point_size(ax, len(obs)),
-            cmap="viridis",
-            norm=LogNorm(vmin=1, vmax=max(values.max(), 2)),
-            linewidths=0,
-        )
-        ax.set_aspect("equal")
-        # Slide y runs downward in Xenium's frame; inverting keeps the tissue the way
-        # round it appears in Xenium Explorer.
-        ax.invert_yaxis()
-        ax.set_title(label, size=8)
-        ax.tick_params(labelsize=6)
-        cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.02)
-        cbar.ax.tick_params(labelsize=6)
 
-    fig.suptitle(f"{sample} · {len(obs):,} cells", fontsize=9, x=0.01, ha="left")
+    spatial = adata.obsm["spatial"]
+    aspect = np.ptp(spatial[:, 0]) / np.ptp(spatial[:, 1])
+    box_w, box_h = FIGSIZE[0] - LEGEND_WIDTH, FIGSIZE[1]
+    target = box_w / box_h
+    # Whichever of the two arrangements lands closest to the slide's aspect wins,
+    # compared in log space so twice-too-wide and half-too-wide count equally.
+    nrows, ncols = min([(1, len(panels)), (len(panels), 1)],
+                       key=lambda rc: abs(np.log(aspect * rc[1] / rc[0] / target)))
+    combined = aspect * ncols / nrows
+    # Fit the combined block inside the slide's plot box, touching whichever edge binds.
+    w, h = (box_w, box_w / combined) if combined >= target else (box_h * combined, box_h)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(w + LEGEND_WIDTH, h), squeeze=False)
+
+    cmap = plt.get_cmap("viridis").copy()
+    cmap.set_bad(cmap(0.0))
+
+    for ax, (col, label) in zip(axes.ravel(), panels):
+        values = adata.obs[col].to_numpy(dtype=float)
+        sq.pl.spatial_scatter(
+            adata,
+            shape=None,
+            color=col,
+            cmap=cmap,
+            norm=LogNorm(vmin=1, vmax=max(values.max(), 2)),
+            # Coordinates are already in µm, so one data unit is one µm.
+            scalebar_dx=1.0,
+            scalebar_units="µm",
+            fig=fig,
+            ax=ax,
+        )
+        ax.set_title(label, size=8)
+        ax.set_xlabel("")
+        ax.set_ylabel("")
+
+    fig.suptitle(f"{sample} · {adata.n_obs:,} cells", fontsize=9, x=0.01, ha="left")
     fig.tight_layout()
     plt.show()
     plt.close(fig)
@@ -243,7 +291,7 @@ def qc_tissue_scatter_slide(obs, sample):
 # block each: the cohort changes, and a hardcoded list silently omits a new sample while
 # raising KeyError on a removed one.
 #
-# Each sample's obs is dropped as soon as its two slides are drawn, so a cohort's worth
+# Each sample's AnnData is dropped as soon as its slides are drawn, so a cohort's worth
 # of obs frames is never co-resident.
 #
 # Every heading here and in the slide functions is emitted with display(Markdown(...))
@@ -254,21 +302,31 @@ def qc_tissue_scatter_slide(obs, sample):
 # emits its own complete block, and each figure ends with plt.show() so it lands
 # between them.
 for path in ZARRS:
-    # Read obs and the spatial coordinates, and nothing else. ad.io.read_elem on the
-    # table's zarr groups leaves the count matrix on disk, which this deck never needs —
-    # every metric it shows was annotated by create_sdata at the one point X was in
-    # memory. spatialdata.read_zarr would instead materialize every image, point, and
-    # shape per sample, the difference between a deck that renders on a laptop and one
-    # that does not.
-    store = zarr.open(f"{path}/tables/table", mode="r")
-    obs = ad.io.read_elem(store["obs"])
+    # Load the table as one AnnData and pass it to every slide, so there is no second
+    # representation of the sample to keep in step and scanpy/squidpy can be handed the
+    # object directly.
+    #
+    # read_lazy leaves X on disk as a Dask array while the object stays honest about its
+    # own shape: n_obs x n_vars is real, var is real, and a slide that ever needs
+    # expression can reach for X without this loader changing. Nothing here reads a value
+    # out of X, so the graph is never computed. spatialdata.read_zarr would instead
+    # materialize every image, point, and shape for a deck that plots none of them.
+    adata = ad.experimental.read_lazy(f"{path}/tables/table")
 
-    # Coordinates live in obsm; copying them into obs is the only change made to the
-    # data anywhere in this deck, and it exists so the tissue slide can plot position
-    # and QC from a single frame.
-    spatial = ad.io.read_elem(store["obsm"]["spatial"])
-    obs["spatial_x"] = spatial[:, 0]
-    obs["spatial_y"] = spatial[:, 1]
+    # obs and var come back as xarray-backed Dataset2D, which anndata's own
+    # strings_to_categoricals cannot handle: it does pd.Categorical(df[key]) over the
+    # string columns and gets a DataArray, raising "unhashable type: 'DataArray'".
+    # scanpy and squidpy both call sanitize before plotting, so every plot below would
+    # hit it — the fault is inside anndata, not the plotting libraries.
+    #
+    # Bringing the annotations into memory is what anndata's own docs prescribe ("obs and
+    # var are lazy objects (Dataset2D) that are not compatible yet with scanpy and need to
+    # be brought into memory"; see scverse/anndata#981). It is a temporary limitation
+    # rather than a permanent constraint — the stated direction is xarray across X and
+    # obsm for a unified API — so expect these two lines to become unnecessary, not to
+    # need defending. They cost only the annotation columns; X stays lazy.
+    adata.obs = adata.obs.to_memory()
+    adata.var = adata.var.to_memory()
 
     # This deck computes no QC metric of its own, and has no fallbacks. A report that
     # derives a metric is a second definition of it, and the two drift without anything
@@ -279,7 +337,7 @@ for path in ZARRS:
     # Outside the per-sample try below, deliberately: a missing column means the whole
     # cohort came from a create_sdata that predates it, so failing the render outright is
     # more useful than a traceback slide repeated once per sample.
-    missing = [c for c in REQUIRED_OBS if c not in obs.columns]
+    missing = [c for c in REQUIRED_OBS if c not in adata.obs.columns]
     if missing:
         raise KeyError(
             f"{Path(path).name}: obs is missing {missing}. These come from create_sdata "
@@ -289,7 +347,7 @@ for path in ZARRS:
     # obs["sample"] is written by create_sdata, so the sample id comes from the object
     # rather than the staged path — which is a meaningless sample1.zarr, since the
     # process stages every zarr under an indexed name.
-    sample = str(obs["sample"].iloc[0])
+    sample = str(adata.obs["sample"].iloc[0])
 
     display(Markdown(f"# {sample}"))
 
@@ -298,8 +356,9 @@ for path in ZARRS:
     # every LATER sample from the deck too — with the render still exiting 0 under
     # `error: true`.
     #
-    # Per slide rather than per sample because these slides share nothing: each reads obs
-    # and derives its own figure, so one failing says nothing about the others. Catching
+    # Per slide rather than per sample because these slides share nothing: each reads the
+    # same adata and draws its own figure, so one failing says nothing about the others.
+    # Catching
     # here also puts the traceback under the failed slide's OWN title, since every slide
     # function emits its heading before it plots — which names the broken slide instead
     # of leaving a traceback loose in the section.
@@ -307,14 +366,14 @@ for path in ZARRS:
     # (A deck whose slides read shared derived state — a correlation matrix feeding three
     # slides, say — wants one try around that computation instead: if it fails, every
     # slide downstream of it is meaningless and should be skipped together.)
-    for slide in (qc_histogram_slide, qc_tissue_scatter_slide):
+    for slide in (qc_histogram_slide, transcripts_vs_genes_slide, qc_tissue_scatter_slide):
         try:
-            slide(obs, sample)
+            slide(adata, sample)
         except Exception:
             # close(), not close(fig): the slide raised before reaching its own close,
             # so the half-built figure is still open and unreachable from here.
             plt.close()
             display(Markdown(f"```\n{traceback.format_exc()}\n```"))
 
-    del obs
+    del adata
 ```
