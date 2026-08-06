@@ -1,0 +1,610 @@
+---
+title: "xenium_nb — QC"
+subtitle: "Per-sample QC before clustering, and the filtering thresholds it implies"
+# Pin the kernel by name, as cluster_report.qmd does. Apptainer bind-mounts $HOME, so
+# kernelspecs from ~/.local/share/jupyter/kernels shadow the container's own — quarto's
+# default "python3" then resolves to a host env missing the pipeline's packages, and
+# every cell fails at import under `error: true` while the render still exits 0.
+jupyter: python_spatial
+format:
+  pptx:
+    reference-doc: ouhsc_ppt_template.pptx
+    # `#` becomes a Section Header slide, `##` a Title-and-Content slide. Without
+    # this pandoc infers the level from the headings present, so adding the first
+    # `#` would silently demote every `##` to a bullet.
+    slide-level: 2
+execute:
+  echo: false
+  warning: false
+  # Keep rendering when a cell raises: one sample's panel erroring leaves an error slide
+  # in its own section instead of taking the whole deck down. The cost is that a
+  # genuinely broken cell yields an error slide and an exit code of 0 — read the slides,
+  # not just the exit status.
+  error: true
+---
+
+```{python}
+# | tags: [setup]
+import traceback
+from pathlib import Path
+
+import anndata as ad
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import zarr
+from IPython.display import display, Markdown
+from matplotlib.colors import LogNorm
+
+# The reference template is 16:9 at 10 x 5.625in; leave room for a slide title.
+FIGSIZE = (9.0, 4.3)
+# Inches reserved beside the in-tissue plots for their colorbar, which sits outside
+# the axes and would otherwise be cropped by tight_layout.
+LEGEND_WIDTH = 1.4
+# Fraction of the in-tissue axes the cell dots should cover, which sets their size.
+SPATIAL_COVERAGE = 0.45
+
+# Every raw zarr is staged into this notebook's working directory by the Nextflow
+# process, so globbing is the whole input contract — no params to pass or drift.
+#
+# These are create_sdata's zarrs, NOT cluster_sdata's: nothing here has been filtered
+# yet, which is the point. Reading this deck off clustered zarrs would show the
+# distributions that survived the very cut the deck exists to choose, with the discarded
+# tail already gone — every threshold would then look harmless.
+ZARRS = sorted(Path(".").glob("*.zarr"))
+if not ZARRS:
+    raise FileNotFoundError("No .zarr directories staged next to the notebook.")
+
+# The thresholds cluster_sdata* apply today, and what the emitted qc_thresholds.csv is
+# pre-filled with. They are drawn on the retention slides as a reference line so each
+# sample's curve is read against the cut currently in force, not against nothing.
+DEFAULT_MIN_COUNTS = 10
+DEFAULT_MIN_CELLS = 5
+
+# Thresholds the retention curves are evaluated at. Dense where the decision actually
+# sits (a Xenium cell with under ~50 transcripts is mostly noise) and sparse above it,
+# since the curve is flat there and only the shape matters.
+COUNT_GRID = np.array([0, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200])
+# The per-gene equivalent. A targeted panel is curated, so the interesting range is
+# small — genes detected in single-digit numbers of cells are the only ones at risk.
+CELL_GRID = np.array([0, 1, 2, 3, 5, 10, 20, 50, 100])
+
+# The count thresholds called out in the retention table on each sample's slide. A
+# subset of COUNT_GRID: the curve shows the shape, the table gives numbers to quote.
+COUNT_CALLOUTS = [5, 10, 20, 30, 50, 100]
+
+# The per-cell QC columns each sample's distribution panel shows, as
+# (obs column, axis label, log scale).
+#
+# All four come straight from the zarr — create_sdata annotates the transcript and gene
+# counts, and the Xenium reader supplies both areas from cells.parquet. This deck derives
+# no QC of its own beyond the negative-control fraction below, which has no home upstream
+# yet.
+QC_COLUMNS = [
+    ("transcript_counts", "Transcripts per cell", True),
+    ("n_genes_by_transcripts", "Genes per cell", True),
+    ("cell_area", "Cell area (µm²)", True),
+    ("nucleus_area", "Nucleus area (µm²)", True),
+]
+
+# obs columns holding the five Xenium control/codeword counters, as the reader writes
+# them. Summed for the negative-control panel — each alone is far too sparse to read.
+CONTROL_COLS = [
+    "control_probe_counts",
+    "genomic_control_counts",
+    "control_codeword_counts",
+    "unassigned_codeword_counts",
+    "deprecated_codeword_counts",
+]
+
+
+def load_sample(path):
+    """Read one zarr's obs, var, and spatial coords without pulling X into memory.
+
+    ad.io.read_elem on the table's zarr groups reads obs/var/obsm only — the count matrix
+    stays on disk, and this deck never needs it. Every metric shown is already annotated:
+    create_sdata computes the per-cell and per-gene QC at the one point X is in memory
+    precisely so a QC report can work from obs and var alone.
+
+    spatialdata.read_zarr would instead materialize every image, point, and shape for
+    each sample, which for a cohort of whole-slide Xenium runs is the difference between
+    a deck that renders on a laptop and one that does not.
+    """
+    store = zarr.open(f"{path}/tables/table", mode="r")
+    obs = ad.io.read_elem(store["obs"])
+    var = ad.io.read_elem(store["var"])
+    spatial = ad.io.read_elem(store["obsm"]["spatial"])
+    obs["spatial_x"] = spatial[:, 0]
+    obs["spatial_y"] = spatial[:, 1]
+
+    # Negative-control fraction: read from obs if a future create_sdata annotates one,
+    # otherwise derived here. The fallback exists because no upstream step emits this
+    # yet and the metric is too central to a pre-clustering QC deck to omit until one
+    # does — a cohort of zarrs written before that change still renders.
+    #
+    # The denominator is rebuilt from transcript_counts rather than read from
+    # total_counts. On these raw zarrs the two are identical by construction
+    # (create_sdata's total_counts IS transcripts + all five counters), but
+    # cluster_sdata's calculate_qc_metrics overwrites total_counts with X.sum(axis=1),
+    # so the column means different things before and after clustering. transcript_counts
+    # always equals the row sum of X, which makes the rebuilt denominator the one that
+    # cannot silently change meaning.
+    if "pct_control" not in obs.columns:
+        present = [c for c in CONTROL_COLS if c in obs.columns]
+        if present:
+            controls = obs[present].sum(axis=1)
+            total = obs["transcript_counts"] + controls
+            # A cell with no transcripts and no controls has no fraction to report;
+            # 0/0 would be a NaN that silently drops out of every mean below.
+            obs["pct_control"] = 100 * controls / total.replace(0, np.nan)
+
+    return obs, var
+
+
+def retained_fraction(values, grid):
+    """Fraction of `values` at or above each threshold in `grid`.
+
+    Matches what scanpy's filters actually do — sc.pp.filter_cells(min_counts=n) and
+    sc.pp.filter_genes(min_cells=n) both KEEP at n, so the cut is >= n, not > n. Getting
+    that off by one would misreport the default cut by a whole threshold step.
+
+    Sorting once and searching is what lets both the per-sample curves and the cohort
+    overlay run over a full grid without rescanning the column per threshold.
+    """
+    ordered = np.sort(np.asarray(values, dtype=float))
+    # searchsorted(..., "left") counts strictly-below, so the complement is the >= side.
+    return 1 - np.searchsorted(ordered, grid, side="left") / len(ordered)
+
+
+def log_hist(ax, values, label, log):
+    """One QC distribution panel, with its median marked.
+
+    Non-positive values are dropped from a log panel rather than silently shifting the
+    whole distribution to make them plottable: transcript_counts reaches 0 on real data,
+    and nucleus_area is 0 for every cell segmented without a nucleus. Both are exactly
+    the cells a QC deck must not hide, so the count that fell off is printed in the panel
+    title instead of being folded into the first bin.
+    """
+    values = np.asarray(values, dtype=float)
+    values = values[np.isfinite(values)]
+    if log:
+        positive = values[values > 0]
+        n_dropped = len(values) - len(positive)
+        bins = np.logspace(np.log10(positive.min()), np.log10(positive.max()), 60)
+        ax.set_xscale("log")
+    else:
+        positive, n_dropped, bins = values, 0, 60
+
+    ax.hist(positive, bins=bins, color="#4C72B0")
+    median = float(np.median(values))
+    ax.axvline(median, color="#C44E52", lw=1.2)
+    ax.set_xlabel(label, size=7)
+    ax.set_ylabel("Cells", size=7)
+    title = f"median {median:,.0f}"
+    if n_dropped:
+        title += f" · {n_dropped:,} at zero"
+    ax.set_title(title, size=7)
+    ax.tick_params(labelsize=6)
+    ax.spines[["top", "right"]].set_visible(False)
+
+
+def point_size(ax, n_cells, coverage=SPATIAL_COVERAGE):
+    """Marker area (pt²) that lets n_cells cover `coverage` of these axes, once.
+
+    A fixed size cannot serve every tissue plot: at s=3 a 21k-cell strip reads well but a
+    32k-cell section is a solid mat of dots, and at s=1 the strip is speckle. Taking the
+    axes' own area covers both — get_position() is the pre-tight_layout fraction of the
+    figure, close enough for a marker size. 72 pt to the inch, squared, converts inches²
+    to the pt² units scatter's `s` is in.
+    """
+    w, h = ax.get_figure().get_size_inches()
+    pos = ax.get_position()
+    area_pt2 = (pos.width * w) * (pos.height * h) * 72 ** 2
+    return float(np.clip(coverage * area_pt2 / n_cells, 0.5, 6.0))
+
+
+def tissue_figure(obs, n):
+    """A figure holding `n` tissue panels, laid out and sized to fill the slide.
+
+    A fixed FIGSIZE wastes the slide on anything that is not 2:1: a tall section renders
+    as a sliver down the middle of a wide figure, because set_aspect("equal") is
+    non-negotiable for tissue. Sizing the figure to the data's aspect instead means the
+    image pandoc embeds is all tissue, and PowerPoint centres it on the slide.
+
+    The ORIENTATION has to follow the tissue too, which is why this does not just take a
+    column count. These ROIs are wide strips (~3:1), and two of those side by side make a
+    6:1 figure that pandoc scales to the slide width — leaving two panels about a
+    centimetre tall in a band of whitespace. Stacking the same two panels gives 1.5:1,
+    close to the slide's own proportions, and each panel keeps real estate. A tall tissue
+    inverts the argument, so the layout is chosen per sample rather than fixed: whichever
+    of the two arrangements lands closest to the slide's aspect wins, compared in log
+    space so being twice too wide and half too wide count equally.
+    """
+    aspect = np.ptp(obs["spatial_x"]) / np.ptp(obs["spatial_y"])
+    box_w, box_h = FIGSIZE[0] - LEGEND_WIDTH, FIGSIZE[1]
+    target = box_w / box_h
+
+    nrows, ncols = min([(1, n), (n, 1)],
+                       key=lambda rc: abs(np.log(aspect * rc[1] / rc[0] / target)))
+    combined = aspect * ncols / nrows
+    # Fit the combined block inside the slide's plot box, touching whichever edge binds.
+    w, h = (box_w, box_w / combined) if combined >= target else (box_h * combined, box_h)
+    return plt.subplots(nrows, ncols, figsize=(w + LEGEND_WIDTH, h), squeeze=False)
+
+
+def sample_colors(n):
+    """n categorical colours for the cohort overlays.
+
+    tab10 below 11 samples and tab20 above, matching cluster_report's rule. Sample
+    identity is unordered, so a categorical palette that maximises adjacent contrast is
+    the right kind — unlike sample_summary's cluster ramp, where adjacency carries
+    meaning.
+    """
+    cmap = plt.get_cmap("tab10" if n <= 10 else "tab20")
+    return [cmap(i % cmap.N) for i in range(n)]
+```
+
+```{python}
+# One `# <sample>` section per sample, driven by the staged zarrs rather than a hardcoded
+# block each: the cohort changes, and a hardcoded list silently omits a new sample while
+# raising KeyError on a removed one.
+#
+# Each sample's obs and var are dropped as soon as its slides are drawn; only the small
+# per-sample summaries the cohort section needs are carried forward, so a cohort's worth
+# of obs frames is never co-resident.
+#
+# The headings are emitted with display(Markdown(...)) from inside an ORDINARY cell, NOT
+# under `output: asis`. Under asis everything a cell displays concatenates into one raw
+# markdown stream: the figure lands between the blocks and leaves the next heading not
+# starting its own line, so pandoc prints a literal "## ..." as text and drops the image
+# entirely. display(Markdown) does not hit it — each call emits its own complete block,
+# and each figure ends with plt.show() so it lands between them.
+
+# Carried out of the loop for the cohort section: one summary row per sample, plus the
+# retention curves and the ECDF inputs the overlay slides redraw.
+summaries = []
+curves = {}
+distributions = {}
+
+for path in ZARRS:
+    obs, var = load_sample(path)
+
+    # obs["sample"] is written by create_sdata, so the sample id comes from the object
+    # rather than the staged path — which is a meaningless sample1.zarr, since the
+    # process stages every zarr under an indexed name.
+    sample = str(obs["sample"].iloc[0])
+
+    display(Markdown(f"# {sample}"))
+
+    # One try around the whole sample. This loop is a single cell, so anything raising
+    # here without being caught aborts the cell and drops every LATER sample from the
+    # deck too — with the render still exiting 0 under `error: true`. Catching per sample
+    # keeps the rest of the cohort. The cost is that the first failure ends this sample:
+    # its section gets a traceback instead of its remaining slides.
+    try:
+        counts = obs["transcript_counts"].to_numpy()
+        gene_cells = var["n_cells_by_transcripts"].to_numpy()
+        cell_curve = retained_fraction(counts, COUNT_GRID)
+        gene_curve = retained_fraction(gene_cells, CELL_GRID)
+
+        # ── Per-cell distributions ────────────────────────────────────────────
+        display(Markdown("## Per-cell QC distributions"))
+        display(Markdown(
+            "Distributions of transcripts, genes detected, cell area, and nucleus area "
+            "across all cells in this sample, before any filtering. All four are on log "
+            "axes; the red line marks each median. Cells at zero cannot be drawn on a "
+            "log axis and are counted in the panel title instead."
+        ))
+        metrics = [(c, label, log) for c, label, log in QC_COLUMNS if c in obs.columns]
+        fig, axes = plt.subplots(2, 2, figsize=FIGSIZE, squeeze=False)
+        for ax, (col, label, log) in zip(axes.ravel(), metrics):
+            log_hist(ax, obs[col], label, log)
+        for ax in axes.ravel()[len(metrics):]:
+            fig.delaxes(ax)
+        fig.suptitle(f"{sample} · {len(obs):,} cells", fontsize=9, x=0.01, ha="left")
+        fig.tight_layout()
+        plt.show()
+        plt.close(fig)
+
+        # ── QC in tissue ─────────────────────────────────────────────────────
+        display(Markdown("## QC in tissue coordinates"))
+        display(Markdown(
+            "Every cell at its position on the slide, coloured by transcript count on "
+            "the left and by genes detected on the right, both on log colour scales. "
+            "Axes are in µm and share an equal aspect, so the panels are at tissue "
+            "proportions."
+        ))
+        fig, axes = tissue_figure(obs, 2)
+        spatial_panels = [
+            ("transcript_counts", "Transcripts"),
+            ("n_genes_by_transcripts", "Genes"),
+        ]
+        for ax, (col, label) in zip(axes.ravel(), spatial_panels):
+            values = obs[col].to_numpy(dtype=float)
+            # LogNorm rejects a zero vmin, and both columns reach zero on real data.
+            # Clipping the floor to 1 keeps those cells drawn at the bottom of the ramp
+            # rather than dropping them from the panel that exists to locate them.
+            im = ax.scatter(
+                obs["spatial_x"], obs["spatial_y"],
+                c=np.clip(values, 1, None),
+                s=point_size(ax, len(obs)),
+                cmap="viridis",
+                norm=LogNorm(vmin=1, vmax=max(values.max(), 2)),
+                linewidths=0,
+            )
+            ax.set_aspect("equal")
+            # Slide y runs downward in Xenium's frame; inverting keeps the tissue the
+            # way round it appears in Xenium Explorer.
+            ax.invert_yaxis()
+            ax.set_title(label, size=8)
+            ax.tick_params(labelsize=6)
+            cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.02)
+            cbar.ax.tick_params(labelsize=6)
+        fig.suptitle(f"{sample} · {len(obs):,} cells", fontsize=9, x=0.01, ha="left")
+        fig.tight_layout()
+        plt.show()
+        plt.close(fig)
+
+        # ── Cell retention ───────────────────────────────────────────────────
+        display(Markdown("## Cells retained by transcript threshold"))
+        display(Markdown(
+            "Share of this sample's cells surviving a minimum-transcript cut, across a "
+            "range of thresholds. The cut keeps cells at or above the threshold. The "
+            f"dashed line marks the pipeline's current cut of {DEFAULT_MIN_COUNTS}. The "
+            "table gives the retained cell count at selected thresholds."
+        ))
+        fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.62, FIGSIZE[1]))
+        ax.plot(COUNT_GRID, 100 * cell_curve, marker="o", ms=3, color="#4C72B0")
+        ax.axvline(DEFAULT_MIN_COUNTS, color="#555555", ls="--", lw=1)
+        ax.set_xlabel("Minimum transcripts per cell", size=7)
+        ax.set_ylabel("Cells retained (%)", size=7)
+        ax.set_ylim(0, 101)
+        ax.tick_params(labelsize=6)
+        ax.spines[["top", "right"]].set_visible(False)
+        fig.suptitle(f"{sample} · {len(obs):,} cells", fontsize=9, x=0.01, ha="left")
+        fig.tight_layout()
+        plt.show()
+        plt.close(fig)
+
+        # Its own slide with its own heading, not a caption under the curve above.
+        # Pandoc's pptx writer puts a table on a slide of its own no matter what, so
+        # without a heading here the table lands on an untitled slide that takes its
+        # title from the first header cell — "Min transcripts" as a slide title.
+        display(Markdown("## Cells retained — selected thresholds"))
+        display(Markdown(
+            "Cell counts surviving a minimum-transcript cut at selected thresholds for "
+            "this sample, as absolute counts and as a share of the unfiltered total."
+        ))
+        callouts = retained_fraction(counts, np.array(COUNT_CALLOUTS))
+        table = ["| Min transcripts | Cells retained | % retained | Cells dropped |",
+                 "|---:|---:|---:|---:|"]
+        for threshold, frac in zip(COUNT_CALLOUTS, callouts):
+            kept = int(round(frac * len(obs)))
+            table.append(f"| {threshold} | {kept:,} | {100 * frac:.1f} | {len(obs) - kept:,} |")
+        display(Markdown("\n".join(table)))
+
+        # ── Controls and segmentation ────────────────────────────────────────
+        display(Markdown("## Negative controls and segmentation"))
+        display(Markdown(
+            "Left: total transcripts assigned to each of the five Xenium control and "
+            "codeword categories across the whole sample, on a log axis. Right: how many "
+            "cells were segmented by each method. The subtitle gives the share of cells "
+            "carrying at least one control transcript and the mean per-cell control "
+            "fraction."
+        ))
+        present = [c for c in CONTROL_COLS if c in obs.columns]
+        fig, axes = plt.subplots(1, 2, figsize=FIGSIZE, squeeze=False)
+        ax = axes[0, 0]
+        totals = obs[present].sum()
+        # Horizontal bars: the category names are long enough that vertical ticks would
+        # overlap or need rotating to fit.
+        ax.barh(range(len(totals)), totals.to_numpy(), color="#C44E52")
+        ax.set_yticks(range(len(totals)),
+                      [c.replace("_counts", "").replace("_", " ") for c in totals.index],
+                      fontsize=6)
+        ax.set_xscale("log")
+        ax.set_xlabel("Total transcripts (log)", size=7)
+        ax.tick_params(labelsize=6)
+        ax.spines[["top", "right"]].set_visible(False)
+
+        ax = axes[0, 1]
+        seg = obs["segmentation_method"].value_counts()
+        ax.barh(range(len(seg)), seg.to_numpy(), color="#4C72B0")
+        # Long stain lists; truncate rather than let them consume the panel.
+        ax.set_yticks(range(len(seg)),
+                      [s if len(s) <= 34 else s[:31] + "…" for s in seg.index],
+                      fontsize=6)
+        # Log axis for the same reason the control panel uses one: nucleus-expansion and
+        # the 0.25x boundary stain account for tens of cells against ~20,000 segmented by
+        # interior stain, and on a linear axis their bars are literally invisible.
+        ax.set_xscale("log")
+        ax.set_xlabel("Cells (log)", size=7)
+        ax.tick_params(labelsize=6)
+        ax.spines[["top", "right"]].set_visible(False)
+
+        control_cells = 100 * (obs[present].sum(axis=1) > 0).mean()
+        mean_pct = obs["pct_control"].mean()
+        fig.suptitle(
+            f"{sample} · {control_cells:.1f}% of cells carry a control · "
+            f"mean control fraction {mean_pct:.3f}%",
+            fontsize=9, x=0.01, ha="left",
+        )
+        fig.tight_layout()
+        plt.show()
+        plt.close(fig)
+
+        # ── Gene detection ───────────────────────────────────────────────────
+        display(Markdown("## Gene detection and the min_cells cut"))
+        display(Markdown(
+            "Left: how many cells each panel gene is detected in, on a log axis. Right: "
+            "share of the panel surviving a minimum-cells cut. The dashed line marks the "
+            f"pipeline's current cut of {DEFAULT_MIN_CELLS}. The subtitle gives the panel "
+            "size and how many genes are detected in no cells at all."
+        ))
+        fig, axes = plt.subplots(1, 2, figsize=FIGSIZE, squeeze=False)
+        log_hist(axes[0, 0], gene_cells, "Cells per gene", True)
+        axes[0, 0].set_ylabel("Genes", size=7)
+        ax = axes[0, 1]
+        ax.plot(CELL_GRID, 100 * gene_curve, marker="o", ms=3, color="#4C72B0")
+        ax.axvline(DEFAULT_MIN_CELLS, color="#555555", ls="--", lw=1)
+        ax.set_xlabel("Minimum cells per gene", size=7)
+        ax.set_ylabel("Panel retained (%)", size=7)
+        ax.set_ylim(0, 101)
+        ax.tick_params(labelsize=6)
+        ax.spines[["top", "right"]].set_visible(False)
+        n_absent = int((gene_cells == 0).sum())
+        fig.suptitle(
+            f"{sample} · {len(var):,} genes · {n_absent:,} detected in no cells",
+            fontsize=9, x=0.01, ha="left",
+        )
+        fig.tight_layout()
+        plt.show()
+        plt.close(fig)
+
+        # Carried to the cohort section. Only the summary scalars and the two curves are
+        # kept; the obs frame itself is dropped with the sample.
+        summaries.append({
+            "sample": sample,
+            "cells": len(obs),
+            "genes": len(var),
+            "median_transcripts": float(np.median(counts)),
+            "median_genes": float(obs["n_genes_by_transcripts"].median()),
+            "median_cell_area": float(obs["cell_area"].median()),
+            "pct_control": float(mean_pct),
+            "genes_absent": n_absent,
+            "pct_cells_at_default": 100 * float(
+                retained_fraction(counts, np.array([DEFAULT_MIN_COUNTS]))[0]),
+            "pct_genes_at_default": 100 * float(
+                retained_fraction(gene_cells, np.array([DEFAULT_MIN_CELLS]))[0]),
+        })
+        curves[sample] = (cell_curve, gene_curve)
+        distributions[sample] = {
+            col: obs[col].to_numpy(dtype=float)
+            for col, _, _ in QC_COLUMNS if col in obs.columns
+        }
+    except Exception:
+        display(Markdown(f"```\n{traceback.format_exc()}\n```"))
+
+    del obs, var
+```
+
+```{python}
+# The cohort section comes last, after every per-sample section, so the overlays are read
+# against samples the reader has already seen individually — and so a sample that failed
+# above is simply absent from them rather than breaking them.
+if summaries:
+    summary = pd.DataFrame(summaries).sort_values("sample").reset_index(drop=True)
+    samples = list(summary["sample"])
+    colors = dict(zip(samples, sample_colors(len(samples))))
+
+    display(Markdown("# Cohort"))
+
+    # ── Summary table ────────────────────────────────────────────────────────
+    display(Markdown("## Cohort summary"))
+    display(Markdown(
+        "One row per sample: cell and panel counts before filtering, median per-cell QC, "
+        "mean per-cell negative-control fraction, and the share of cells and genes that "
+        f"survive the pipeline's current cuts of {DEFAULT_MIN_COUNTS} transcripts per "
+        f"cell and {DEFAULT_MIN_CELLS} cells per gene."
+    ))
+    header = ["| Sample | Cells | Median tx | Median genes | Median area (µm²) "
+              "| Control % | Genes absent | Cells kept % | Genes kept % |",
+              "|:--|---:|---:|---:|---:|---:|---:|---:|---:|"]
+    for row in summary.itertuples():
+        header.append(
+            f"| {row.sample} | {row.cells:,} | {row.median_transcripts:,.0f} "
+            f"| {row.median_genes:,.0f} | {row.median_cell_area:,.0f} "
+            f"| {row.pct_control:.3f} | {row.genes_absent:,} "
+            f"| {row.pct_cells_at_default:.1f} | {row.pct_genes_at_default:.1f} |"
+        )
+    display(Markdown("\n".join(header)))
+
+    # ── Distributions across samples ─────────────────────────────────────────
+    display(Markdown("## Per-cell QC across samples"))
+    display(Markdown(
+        "Cumulative distributions of the per-cell QC metrics, one line per sample, on log "
+        "axes. Each curve gives the share of that sample's cells at or below a given "
+        "value, so a curve lying to the left of the others is a sample with "
+        "systematically lower values."
+    ))
+    ecdf_metrics = [(c, label, log) for c, label, log in QC_COLUMNS
+                    if any(c in d for d in distributions.values())]
+    fig, axes = plt.subplots(2, 2, figsize=FIGSIZE, squeeze=False)
+    for ax, (col, label, log) in zip(axes.ravel(), ecdf_metrics):
+        for sample in samples:
+            values = distributions.get(sample, {}).get(col)
+            if values is None:
+                continue
+            # ECDF rather than overlaid histograms: at eight samples the histograms
+            # occlude each other, while the cumulative curves stay separable — and a
+            # threshold reads off directly as the height of each curve at that x.
+            ordered = np.sort(values[values > 0]) if log else np.sort(values)
+            ax.plot(ordered, 100 * np.arange(1, len(ordered) + 1) / len(ordered),
+                    lw=1.2, color=colors[sample], label=sample)
+        if log:
+            ax.set_xscale("log")
+        ax.set_xlabel(label, size=7)
+        ax.set_ylabel("Cells at or below (%)", size=7)
+        ax.tick_params(labelsize=6)
+        ax.spines[["top", "right"]].set_visible(False)
+    for ax in axes.ravel()[len(ecdf_metrics):]:
+        fig.delaxes(ax)
+    # One shared legend rather than one per panel: the sample colours are the same in
+    # all four, and four legends would cost more panel area than the curves use.
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=min(len(samples), 6), fontsize=6,
+               frameon=False, bbox_to_anchor=(0.5, -0.02))
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+    # ── Retention across samples ─────────────────────────────────────────────
+    display(Markdown("## Retention across samples"))
+    display(Markdown(
+        "Share of cells surviving each minimum-transcript cut (left) and share of the "
+        "panel surviving each minimum-cells cut (right), one line per sample. Dashed "
+        f"lines mark the pipeline's current cuts of {DEFAULT_MIN_COUNTS} and "
+        f"{DEFAULT_MIN_CELLS}. Both cuts keep at or above the threshold."
+    ))
+    fig, axes = plt.subplots(1, 2, figsize=FIGSIZE, squeeze=False)
+    panels = [
+        (axes[0, 0], COUNT_GRID, 0, DEFAULT_MIN_COUNTS,
+         "Minimum transcripts per cell", "Cells retained (%)"),
+        (axes[0, 1], CELL_GRID, 1, DEFAULT_MIN_CELLS,
+         "Minimum cells per gene", "Panel retained (%)"),
+    ]
+    for ax, grid, index, default, xlabel, ylabel in panels:
+        for sample in samples:
+            ax.plot(grid, 100 * curves[sample][index], marker="o", ms=2.5, lw=1.2,
+                    color=colors[sample], label=sample)
+        ax.axvline(default, color="#555555", ls="--", lw=1)
+        ax.set_xlabel(xlabel, size=7)
+        ax.set_ylabel(ylabel, size=7)
+        ax.set_ylim(0, 101)
+        ax.tick_params(labelsize=6)
+        ax.spines[["top", "right"]].set_visible(False)
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=min(len(samples), 6), fontsize=6,
+               frameon=False, bbox_to_anchor=(0.5, -0.02))
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+    # ── Threshold handoff ────────────────────────────────────────────────────
+    # Written pre-filled with the DEFAULTS, not with anything inferred from the curves
+    # above. Picking a threshold is a judgement made by reading these slides, and a deck
+    # that guessed one would put a number nobody chose into a file that looks decided.
+    # What this file saves is the typing and the sample-name spelling; the values are
+    # meant to be edited before it is passed back via --thresholds.
+    thresholds = pd.DataFrame({
+        "sample": samples,
+        "min_counts": DEFAULT_MIN_COUNTS,
+        "min_cells": DEFAULT_MIN_CELLS,
+    })
+    thresholds.to_csv("qc_thresholds.csv", index=False)
+else:
+    # An empty deck still has to produce the file the process declares as an output, or
+    # the task fails on a missing path rather than on whatever actually went wrong.
+    pd.DataFrame(columns=["sample", "min_counts", "min_cells"]).to_csv(
+        "qc_thresholds.csv", index=False)
+```
