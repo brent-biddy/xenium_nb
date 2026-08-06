@@ -93,13 +93,18 @@ def load_sample(path):
     df["spatial_x"] = spatial[:, 0]
     df["spatial_y"] = spatial[:, 1]
 
-    # Negative-control fraction, computed here rather than read from obs. It cannot use
-    # total_counts: create_sdata's total_counts is transcripts + all five counters, but
-    # cluster_sdata's calculate_qc_metrics overwrites it with X.sum(axis=1) — so the
-    # column means different things before and after clustering. transcript_counts is
-    # the one that always equals the row sum of X, so the denominator is rebuilt from it.
+    # Negative-control fraction now comes from create_sdata, which computes it at the
+    # one point X and the reader's own columns are together in memory. This function
+    # used to derive it — as did qc_report — which was two definitions of one number.
+    #
+    # Kept as a fallback for zarrs written before create_sdata emitted the column, since
+    # re-running create_sdata over a cohort is expensive and this deck is cheap. The
+    # denominator is rebuilt from transcript_counts rather than read from total_counts:
+    # transcript_counts always equals the row sum of X, whereas total_counts means
+    # transcripts + all five counters on a raw zarr but a plain row sum after
+    # cluster_sdata_gpu_ooc has run.
     present = [c for c in CONTROL_COLS if c in df.columns]
-    if present:
+    if "pct_control" not in df.columns and present:
         controls = df[present].sum(axis=1)
         df["pct_control"] = 100 * controls / (df["transcript_counts"] + controls)
 

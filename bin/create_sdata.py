@@ -19,6 +19,7 @@ Usage:
 import argparse
 from pathlib import Path
 
+import numpy as np
 import scanpy as sc
 import spatialdata_io
 from spatialdata_io import xenium_aligned_image
@@ -28,6 +29,18 @@ from spatialdata.transformations import Identity
 import session_info
 
 from timer import timer, timing_summary
+
+# The five Xenium control/codeword counters, as spatialdata_io's reader names them in
+# obs. They are per-cell counts taken from cells.parquet, not features in X — which is
+# why the negative-control fraction below is summed by hand rather than passed to
+# calculate_qc_metrics as qc_vars.
+CONTROL_COLS = [
+    "control_probe_counts",
+    "genomic_control_counts",
+    "control_codeword_counts",
+    "unassigned_codeword_counts",
+    "deprecated_codeword_counts",
+]
 
 
 def parse_args():
@@ -115,9 +128,34 @@ def main():
     qc_obs = sdata.tables["table"].obs
     qc_obs.drop(columns="total_transcripts", inplace=True)
 
+    # Negative-control burden, the one per-cell QC metric calculate_qc_metrics cannot
+    # produce here. qc_vars needs its variables to be features in X, and the five
+    # control/codeword counters are not — the reader lands them in obs, from
+    # cells.parquet. So the sum and the fraction are written explicitly.
+    #
+    # Computed here for the same reason as everything above: this is the one point X
+    # and the reader's own columns are together in memory, so every consumer can read
+    # the metric instead of re-deriving it. Both cluster_report and qc_report used to
+    # derive it themselves, which is two definitions of one number.
+    #
+    # The denominator is transcript_counts + controls rather than obs["total_counts"].
+    # On this object the two are identical by construction, but total_counts is the
+    # column cluster_sdata_gpu_ooc's calculate_qc_metrics overwrites with a plain row
+    # sum, whereas transcript_counts always equals X.sum(axis=1). Building the
+    # denominator from the parts is what keeps the metric meaning one thing everywhere.
+    control_counts = qc_obs[CONTROL_COLS].sum(axis=1)
+    total = qc_obs["transcript_counts"] + control_counts
+    qc_obs["control_counts"] = control_counts
+    # A cell with no transcripts and no controls has no fraction to report — 0/0 is a
+    # NaN here rather than a 0 that would read as a clean cell.
+    qc_obs["pct_control"] = 100 * control_counts / total.replace(0, np.nan)
+
     print(f"Cells:              {len(qc_obs):,}")
     print(f"Median transcripts: {qc_obs['transcript_counts'].median():,.0f}")
     print(f"Median genes:       {qc_obs['n_genes_by_transcripts'].median():,.0f}")
+    print(f"Cells w/ control:   {(control_counts > 0).sum():,} "
+          f"({100 * (control_counts > 0).mean():.2f}%)")
+    print(f"Mean control %:     {qc_obs['pct_control'].mean():.4f}")
 
     # spatialdata_io auto-detects an H&E image if one is named with the expected
     # Xenium suffix alongside the data. If not auto-detected, load it explicitly
