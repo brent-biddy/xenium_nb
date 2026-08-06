@@ -150,6 +150,38 @@ def main():
     # NaN here rather than a 0 that would read as a clean cell.
     qc_obs["pct_control"] = 100 * control_counts / total.replace(0, np.nan)
 
+    # Mean transcripts per detected gene — how concentrated a cell's counts are across
+    # the genes it detects. Transcripts and genes rise together, so this is the residual
+    # after that trend: a cell high on it has its counts piled into few genes, which is
+    # either a very specialised cell or a segmentation artifact that swept one bright
+    # neighbour's transcripts into an otherwise empty mask.
+    #
+    # Written the "transcripts per gene" way round rather than its reciprocal because it
+    # is unbounded above, so those concentrated cells separate instead of being squashed
+    # against a ceiling of 1. Not the log10(genes)/log10(transcripts) "novelty score"
+    # from scRNA-seq either: that convention assumes a whole transcriptome, and on a 5K
+    # panel it compresses into ~0.92-0.98 where nothing is legible.
+    #
+    # NaN, not 0, where a cell detects no genes: 0 would place the emptiest cells at the
+    # bottom of the range next to genuinely diffuse ones.
+    qc_obs["transcripts_per_gene"] = (
+        qc_obs["transcript_counts"] / qc_obs["n_genes_by_transcripts"].replace(0, np.nan)
+    )
+
+    # Share of a cell's area taken up by its nucleus. A segmentation check more than an
+    # expression one: the ratio sits around 0.5 on these ROIs, and cells far below it are
+    # mostly cytoplasm — either genuinely large cells or a boundary that swept in
+    # neighbouring space — while cells near 1 are nucleus with almost no cytoplasm around
+    # it, which is what an over-tight boundary or a nucleus-expansion fallback looks like.
+    #
+    # The reader leaves nucleus_area as NaN, NOT 0, for a cell segmented without a
+    # nucleus (70 of 21,724 on one ROI, matching nucleus_count == 0 exactly). That NaN
+    # propagates here on purpose: those cells have no ratio to report, and a 0 would put
+    # them at the bottom of the range beside genuinely cytoplasm-heavy cells.
+    qc_obs["nucleus_ratio"] = (
+        qc_obs["nucleus_area"] / qc_obs["cell_area"].replace(0, np.nan)
+    )
+
     print(f"Cells:              {len(qc_obs):,}")
     print(f"Median transcripts: {qc_obs['transcript_counts'].median():,.0f}")
     print(f"Median genes:       {qc_obs['n_genes_by_transcripts'].median():,.0f}")
