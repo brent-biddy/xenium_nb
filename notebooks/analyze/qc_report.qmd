@@ -185,7 +185,8 @@ HIST_PANELS = 4
 # and draws with matplotlib is nearly free, while everything that rasterises the
 # segmentation or pushes ~7M molecules through datashader is the entire render time.
 #
-#   cell_distributions  4 slides   histograms of every per-cell metric         |
+#   retention           1 slide    what each candidate threshold discards      |
+#   cell_distributions  1 slide    histograms of the metrics a cut is read off |
 #   gene_distributions  4 slides   per-gene histograms, rank, detection        | 31 s total
 #   cell_scatter       13 slides   transcripts vs genes, one per colour        | +7 s
 #   transcript_stats    5 slides   qv, codeword category, per-FOV, placement   |
@@ -195,6 +196,7 @@ HIST_PANELS = 4
 # The bottom three are not separately timed; together they take the deck from ~40 s to
 # ~15 min, and cell_tissue is the largest of them at 14 rasterised panels per sample.
 SECTIONS = {
+    "retention",
     "cell_distributions",
     "gene_distributions",
     "cell_scatter",
@@ -270,6 +272,29 @@ GENE_HIST_METRICS = [
     ("n_cells_by_transcripts", "Cells detecting the gene", "log"),
     ("total_transcripts", "Transcripts per gene", "log"),
 ]
+
+# The cuts cluster_sdata* applies today, drawn on the retention slide as the reference a
+# candidate threshold is judged against. They are DRAWN, never applied — this deck filters
+# nothing, and its whole purpose is deciding whether these two numbers are right.
+#
+# Keep them in step with bin/cluster_sdata.py, where they are hardcoded literals in the
+# sc.pp.filter_cells / filter_genes calls rather than flags. Nothing enforces the match and
+# the deck cannot import them, so a change there and not here leaves this slide quietly
+# marking the wrong line.
+DEFAULT_MIN_COUNTS = 10
+DEFAULT_MIN_CELLS = 5
+
+# The thresholds the retention curves label. They run well ABOVE the pipeline's current
+# cut rather than bracketing it evenly, because that is where the interesting range turned
+# out to be: on a test ROI min_counts=10 discards 5 cells and even 50 discards under 2%,
+# so a slide that stopped near the current value would only show that nothing happens.
+# Round numbers, because a threshold read off this slide should be quotable.
+#
+# DEFAULT_MIN_COUNTS / DEFAULT_MIN_CELLS must appear here — the current setting is drawn
+# as a hollow ring among the candidates, not as its own line, so it is invisible if the
+# lists do not contain it.
+CANDIDATE_MIN_COUNTS = (5, 10, 25, 50, 100, 250, 500)
+CANDIDATE_MIN_CELLS = (3, 5, 10, 25, 50, 100, 250)
 
 # The molecule-table columns pulled per sample, and the quality cut drawn on the qv panel.
 #
@@ -416,6 +441,136 @@ def fit_tissue_panel(fig, ax, aspect):
 # and adding or reordering one is a line there rather than a block edit. Keeping the
 # caption next to the figure it describes is the other half of it — the two are edited
 # together far more often than either is edited alone.
+
+
+def retention_slide(sdata, sample):
+    """Slide: what each candidate filtering threshold would actually discard.
+
+    The one slide that answers the question the deck exists for. Every other panel shows
+    where the distribution sits; none of them says that min_counts=10 costs 812 cells and
+    25 costs 4,000. That number is close to unreadable off a log-axis histogram — it is
+    the integral of the left tail, and the eye does not integrate — so it gets its own
+    curve rather than being left as an exercise.
+
+    Both panels are the survival function of the column the corresponding filter is
+    expressed in: cells against `transcript_counts` for min_counts, genes against
+    `n_cells_by_transcripts` for min_cells. Those are the exact columns
+    sc.pp.filter_cells / filter_genes threshold, not proxies for them, so the curve is
+    what the filter will do rather than an estimate of it.
+
+    Plotted as DISCARDED rather than retained, on a log y. Retained is the intuitive
+    framing but the wrong one to draw: it runs from N down to 0, so the region a threshold
+    is actually chosen in — where losses are a fraction of a percent — is a flat line
+    pinned to the top of the axes. Discarded on a log axis spreads exactly that region out,
+    which is where the decision lives.
+
+    A step, not a line, because the function only changes at observed values and drawing it
+    smooth would imply thresholds between them behave differently. Evaluated at the unique
+    observed values so it is exact — no grid, no interpolation, no binning to argue about.
+
+    Thresholds below the smallest observed value discard nothing, and zero cannot be drawn
+    on a log axis. Those are dropped rather than clamped: a curve that starts at 1 would
+    claim a cut costs one object where it costs none.
+
+    The y axis stays an absolute COUNT while the guide lines carry the percentages, rather
+    than converting the axis to a share. That way the panel answers both questions without
+    a second axis: the count is read off y, and "what threshold costs me 5%" is read off
+    where the curve crosses a labelled guide. Percentage is the decision variable — a cut
+    is chosen by what fraction it is acceptable to lose — but the count is what gets
+    sanity-checked against the sample size in the title, and neither has to be computed
+    from the other.
+    """
+    display(Markdown("## What a filtering threshold would discard"))
+    display(Markdown(
+        "Left, cells that a `min_counts` cut would remove; right, genes that a `min_cells` "
+        "cut would remove. Both axes are log, and the curve steps at each observed value, "
+        "so it is exact rather than binned. Each marked threshold is labelled with what it "
+        "would cost, as a count and a share; the hollow ring is the threshold "
+        "`cluster_sdata` applies today."
+    ))
+
+    table = sdata.tables["table"]
+    panels = [
+        (table.obs["transcript_counts"].to_numpy(dtype=float), DEFAULT_MIN_COUNTS,
+         CANDIDATE_MIN_COUNTS, "min_counts",
+         "Transcripts per cell (threshold)", "Cells discarded", "cells"),
+        (table.var["n_cells_by_transcripts"].to_numpy(dtype=float), DEFAULT_MIN_CELLS,
+         CANDIDATE_MIN_CELLS, "min_cells",
+         "Cells detecting the gene (threshold)", "Genes discarded", "genes"),
+    ]
+
+    fig, axes = plt.subplots(1, 2, figsize=FIGSIZE, squeeze=False)
+    for ax, (values, default, candidates, name, xlabel, ylabel, unit) in zip(
+            axes.ravel(), panels):
+        v = np.sort(values[np.isfinite(values)])
+        # The filters keep value >= threshold, so the number discarded at t is the number
+        # of values strictly below it — which is exactly searchsorted's left insertion
+        # point. Evaluating at the unique observed values makes the step curve exact.
+        thresholds = np.unique(v)
+        discarded = np.searchsorted(v, thresholds, side="left")
+
+        drawable = (thresholds > 0) & (discarded > 0)
+        ax.step(thresholds[drawable], discarded[drawable], where="post",
+                color=BAR_FILL, lw=1.6)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+
+        # Candidate thresholds marked ON the curve, each labelled with what it costs. The
+        # slide is read by scanning thresholds and asking what each one takes, so the
+        # answer is put at the threshold rather than left to be inferred from the axes.
+        # Both the count and the share are given: the share is what a cut is argued about,
+        # the count is what gets sanity-checked against the sample size in the title.
+        #
+        # Labels sit HORIZONTALLY beside their marker, vertically centred on it, and the
+        # side is chosen from where the marker falls on the axis. This exploits the one
+        # thing always true of this curve: it rises monotonically, so at a marker's own
+        # height the space to its right is under the curve and the space to its left is
+        # above it — both empty. A horizontal label therefore never crosses the curve, and
+        # staying on the marker's own line keeps it unambiguously attached to it.
+        #
+        # An earlier version alternated above and below with fixed offsets. It collided at
+        # the low end and, worse, left several labels floating in blank space far from the
+        # marker they described, so the reader had to guess the pairing.
+        #
+        # The flip near the right edge is what stops the high candidates running off the
+        # axis: they sit far along a log x, and these labels are wide.
+        x_lo, x_hi = np.log10(ax.get_xlim())
+
+        # There is no vertical line at the pipeline's current threshold. One was drawn and
+        # removed: it crossed the curve at the crowded end and made both harder to read,
+        # and it duplicated a number the marker already carries. The current setting is
+        # marked as a hollow ring among the candidates instead, which is why DEFAULT_* has
+        # to appear in the CANDIDATE_* list for it to show at all.
+        for candidate in candidates:
+            lost = int(np.searchsorted(v, candidate, side="left"))
+            # Nothing to mark where a threshold costs nothing; 0 cannot be drawn on a log
+            # axis, and a marker at the floor would imply a cost there is none.
+            if lost == 0:
+                continue
+            is_current = candidate == default
+            ax.plot(candidate, lost, "o", ms=5.5 if is_current else 3.5,
+                    markerfacecolor="white" if is_current else ANNOTATION_INK,
+                    markeredgecolor=ANNOTATION_INK, markeredgewidth=1.2, zorder=3)
+            to_right = (np.log10(candidate) - x_lo) / (x_hi - x_lo) < 0.55
+            ax.annotate((f"{name} = " if is_current else "")
+                        + f"{candidate:g} → {lost:,} ({lost / len(v):.1%})",
+                        xy=(candidate, lost), xytext=(8 if to_right else -8, 0),
+                        textcoords="offset points",
+                        ha="left" if to_right else "right", va="center",
+                        color=ANNOTATION_INK, fontsize=6.5, zorder=3)
+
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.grid(color=GRID_INK, lw=0.6)
+        ax.set_axisbelow(True)
+        ax.tick_params(length=0)
+        ax.spines[["top", "right"]].set_visible(False)
+
+    fig.suptitle(f"{sample} · {table.n_obs:,} cells · {table.n_vars:,} genes",
+                 x=0.01, ha="left")
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
 
 
 def qc_histogram_slide(sdata, sample, metrics, level="obs"):
@@ -1419,6 +1574,10 @@ for path in ZARRS:
     # three views, including the two that ARE the scatter's axes — see that slide's
     # docstring for why the degenerate colours are kept rather than filtered out.
     slides = []
+    # Retention first: it is the answer the deck exists to give, and the distributions
+    # below are the context for reading it.
+    if "retention" in SECTIONS:
+        slides += [retention_slide]
     if "cell_distributions" in SECTIONS:
         slides += [partial(qc_histogram_slide,
                            metrics=CELL_HIST_METRICS[i:i + HIST_PANELS])
