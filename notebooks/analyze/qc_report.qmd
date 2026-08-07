@@ -421,6 +421,105 @@ REQUIRED_OBS = [col for col, _, _ in METRICS] + ["sample"]
 REQUIRED_VAR = [col for col, _, _ in GENE_HIST_METRICS]
 
 
+# ── Stale-zarr fallback — TEMPORARY, DELETE WHEN THE COHORT IS RE-RUN ─────────
+#
+# This deck's rule is that it derives nothing: every metric comes from create_sdata, so
+# each has exactly one definition and a stale cohort fails loudly instead of rendering
+# numbers that came from outside the pipeline. This block breaks that rule ON PURPOSE, as
+# a stopgap for zarrs written before create_sdata learned to annotate these columns.
+#
+# The cost is real and is the reason the rule exists: these formulas are a SECOND copy of
+# create_sdata's, and nothing keeps the two in step. If create_sdata's definition changes,
+# a deck rendered off a stale zarr will quietly disagree with one rendered off a fresh one.
+#
+# Three things keep that cost bounded, and all three should survive any edit here:
+#   - the formulas are copied verbatim from bin/create_sdata.py, including its NaN
+#     handling, and are verified against a fresh zarr to reproduce it exactly;
+#   - nothing is derived when the column is already present, so a fresh zarr never takes
+#     this path at all;
+#   - every derived column is NAMED ON THE SLIDE, so a reader can see which numbers did
+#     not come from the pipeline.
+#
+# The fix is to re-run create_sdata over the cohort and delete this whole block, the
+# derive_missing_metrics call in the loop, and the DERIVED banner.
+CONTROL_COLS = [
+    "control_probe_counts",
+    "genomic_control_counts",
+    "control_codeword_counts",
+    "unassigned_codeword_counts",
+    "deprecated_codeword_counts",
+]
+
+
+def derive_missing_metrics(table):
+    """Fill in QC columns a stale zarr predates. Returns the names it had to derive.
+
+    Only touches columns that are actually absent, and only ones derivable from what the
+    Xenium reader always writes plus X. Anything still missing after this is reported by
+    the REQUIRED_OBS / REQUIRED_VAR check as before — this narrows that check's job rather
+    than removing it.
+
+    X is read here, which the deck otherwise never does. That is confined to the two
+    per-gene columns and the per-cell gene count, and only on the stale path.
+    """
+    derived = []
+
+    def missing(frame, column):
+        return column not in frame.columns
+
+    # Per-cell gene count, from X. Needed on its own and by transcripts_per_gene.
+    if missing(table.obs, "n_genes_by_transcripts"):
+        x = table.X
+        table.obs["n_genes_by_transcripts"] = np.asarray(
+            (x > 0).sum(axis=1)).ravel().astype("int32")
+        derived.append("n_genes_by_transcripts")
+
+    # The five control/codeword counters summed, exactly as create_sdata does. Note the
+    # denominator is transcript_counts + control_counts, NOT obs["total_counts"] — the two
+    # agree on a fresh object but total_counts is the column cluster_sdata_gpu_ooc
+    # overwrites with a plain row sum.
+    if missing(table.obs, "control_counts") and all(
+            c in table.obs.columns for c in CONTROL_COLS):
+        table.obs["control_counts"] = table.obs[CONTROL_COLS].sum(axis=1)
+        derived.append("control_counts")
+    if missing(table.obs, "pct_control") and "control_counts" in table.obs.columns:
+        control = table.obs["control_counts"]
+        total = table.obs["transcript_counts"] + control
+        # NaN, not 0, where a cell has neither transcripts nor controls: 0 would read as a
+        # clean cell rather than an empty one.
+        table.obs["pct_control"] = 100 * control / total.replace(0, np.nan)
+        derived.append("pct_control")
+
+    # NaN where a cell detects no genes — 0 would put the emptiest cells at the bottom of
+    # the range beside genuinely diffuse ones.
+    if missing(table.obs, "transcripts_per_gene"):
+        table.obs["transcripts_per_gene"] = (
+            table.obs["transcript_counts"]
+            / table.obs["n_genes_by_transcripts"].replace(0, np.nan))
+        derived.append("transcripts_per_gene")
+
+    # The reader leaves nucleus_area NaN, not 0, for a cell segmented without a nucleus,
+    # and that NaN propagates here on purpose.
+    if missing(table.obs, "nucleus_ratio"):
+        table.obs["nucleus_ratio"] = (
+            table.obs["nucleus_area"] / table.obs["cell_area"].replace(0, np.nan))
+        derived.append("nucleus_ratio")
+
+    # Per-gene, from X. n_cells and total are what the deck plots; the other two var
+    # columns create_sdata writes are exact rescalings of these and are not derived
+    # because nothing reads them.
+    if missing(table.var, "n_cells_by_transcripts"):
+        table.var["n_cells_by_transcripts"] = np.asarray(
+            (table.X > 0).sum(axis=0)).ravel().astype("int64")
+        derived.append("n_cells_by_transcripts")
+    if missing(table.var, "total_transcripts"):
+        table.var["total_transcripts"] = np.asarray(
+            table.X.sum(axis=0)).ravel().astype("float32")
+        derived.append("total_transcripts")
+
+    return derived
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
@@ -1571,6 +1670,11 @@ for path in ZARRS:
     # Outside the per-sample try below, deliberately: a missing column means the whole
     # cohort came from a create_sdata that predates it, so failing the render outright is
     # more useful than a traceback slide repeated once per sample.
+    # TEMPORARY: fill in what a stale zarr predates, before the check below. See
+    # derive_missing_metrics — this is a stopgap and the columns it fills are named on the
+    # slides so nobody mistakes them for pipeline output. Delete with that function.
+    derived = derive_missing_metrics(table)
+
     missing = [c for c in REQUIRED_OBS if c not in table.obs.columns]
     if missing:
         raise KeyError(
@@ -1590,6 +1694,18 @@ for path in ZARRS:
     sample = str(table.obs["sample"].iloc[0])
 
     display(Markdown(f"# {sample}"))
+
+    # TEMPORARY, with derive_missing_metrics: a deck whose numbers did not all come from
+    # create_sdata has to say so on its own face, not only in a comment. Delete together.
+    if derived:
+        display(Markdown(
+            f"**{len(derived)} metric(s) were derived in this notebook for {sample}, not "
+            "read from the zarr**, because it predates the `create_sdata` that writes "
+            f"them: {', '.join(f'`{c}`' for c in sorted(derived))}. The formulas are "
+            "copied from `create_sdata` and reproduce it exactly on a fresh zarr, but they "
+            "are a second copy and nothing keeps the two in step. Re-run `create_sdata` "
+            "over this cohort and these will come from the pipeline again."
+        ))
 
     # The slides, in the order they appear, each caught independently. Built from METRICS
     # rather than written out, so a metric added there appears on all three plot types at
