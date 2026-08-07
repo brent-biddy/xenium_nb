@@ -190,7 +190,7 @@ HIST_PANELS = 4
 #   gene_distributions  4 slides   per-gene histograms, rank, detection        | 31 s total
 #   cell_scatter       13 slides   transcripts vs genes, one per colour        | +7 s
 #   transcript_stats    5 slides   qv, codeword category, per-FOV, placement   |
-#   cell_tissue        14 slides   segmentation painted per metric             | these three
+#   cell_tissue         4 slides   segmentation painted per metric             | these three
 #   molecule_maps       4 slides   datashader over the molecule table          | ~14 min
 #
 # The bottom three are not separately timed; together they take the deck from ~40 s to
@@ -200,8 +200,8 @@ SECTIONS = {
     "cell_distributions",
     "gene_distributions",
     "cell_scatter",
+    "cell_tissue",
     # "transcript_stats",
-    # "cell_tissue",
     # "molecule_maps",
 }
 
@@ -245,6 +245,33 @@ SCATTER_METRICS = [
     ("nucleus_area", "Nucleus area (µm²)", 80),
     ("nucleus_ratio", "Nucleus / cell area", None),
     ("pct_control", "Control transcripts (%)", 1.0),
+]
+
+# The metrics that get a TISSUE panel. Four of the fourteen, on the same standard again:
+# a tissue panel answers "is this spatially structured or spread evenly", so a metric earns
+# one only if that question changes what you would do.
+#
+#   transcript_counts    the column being thresholded. If low-count cells cluster at an
+#                        edge or in one region they are an artefact and a global cut is the
+#                        wrong tool; if they are scattered, a cut is safe.
+#   cell_area            segmentation, and the companion to the above — a low-count cell
+#                        that is also tiny is a fragment, not a poorly-sampled cell.
+#   nucleus_ratio        the most position-independent metric in the deck (R^2 0.20 against
+#                        the scatter axes), so it shows segmentation failure the counts
+#                        cannot.
+#   segmentation_method  categorical, and the one that reads best in tissue rather than as
+#                        a distribution — on a test ROI it separates follicles from stroma
+#                        by which stain segmented them.
+#
+# n_genes_by_transcripts is left off deliberately: it correlates with transcript_counts
+# closely enough that the two panels are near-identical in space, so it costs a rasterised
+# panel to restate one. The pct_top_* family, control counts and nucleus_count are off for
+# the reasons given at SCATTER_METRICS.
+TISSUE_METRICS = [
+    ("transcript_counts", "Transcripts per cell", "log"),
+    ("cell_area", "Cell area (µm²)", "log"),
+    ("nucleus_ratio", "Nucleus / cell area", "linear"),
+    ("segmentation_method", "Segmentation method", "categorical"),
 ]
 
 CELL_HIST_METRICS = [
@@ -1588,7 +1615,7 @@ for path in ZARRS:
                    for col, label, vmax in SCATTER_METRICS]
     if "cell_tissue" in SECTIONS:
         slides += [partial(qc_tissue_labels_slide, color=col, label=label, scale=scale)
-                   for col, label, scale in METRICS]
+                   for col, label, scale in TISSUE_METRICS]
 
     # The molecule table is loaded BEFORE the gene slides are built, even though it is the
     # last section to appear, because the gene→category lookup comes out of it: codeword
