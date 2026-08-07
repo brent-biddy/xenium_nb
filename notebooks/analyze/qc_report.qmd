@@ -30,7 +30,6 @@ import traceback
 from functools import partial
 from pathlib import Path
 
-import matplotlib.patheffects as patheffects
 import matplotlib.pyplot as plt
 import numpy as np
 import scanpy as sc
@@ -173,20 +172,103 @@ METRICS = [
 # not — a 2x2 is still readable at slide size, where a quarter-slide tissue panel is not.
 HIST_PANELS = 4
 
-# The per-GENE columns, same shape and same rule: create_sdata annotates all four onto var
-# at the one point X is in memory, so this deck reads them and derives nothing. They are a
-# separate list because they describe a different population — 5,101 panel genes rather
-# than the cells — and so cannot share a slide with the cell metrics or be indexed the
-# same way, not because they are treated differently.
+# Which sections this deck renders. Comment a line out to drop that section; nothing else
+# needs touching, and no slide function or metric list changes.
 #
-# pct_dropout_by_transcripts is the only one that is linear: it is a bounded percentage,
-# and it runs to 100 for the genes no cell detected, which a log axis would drop entirely.
-# Those are the genes worth finding.
-GENE_METRICS = [
-    ("total_transcripts", "Transcripts per gene", "log"),
+# The deck exists to choose the CELL and GENE filtering thresholds that cluster_sdata* will
+# apply, so the two distribution sections earn their place unconditionally — they are the
+# ones a cut is read off. The rest describe the run and the tissue: worth having, but not
+# what a threshold is chosen from, and they are where the render time goes.
+#
+# Slides per sample and wall-clock cost, timed end-to-end on the two-ROI test cohort. The
+# split is stark and worth knowing before enabling anything: everything that reads obs/var
+# and draws with matplotlib is nearly free, while everything that rasterises the
+# segmentation or pushes ~7M molecules through datashader is the entire render time.
+#
+#   cell_distributions  4 slides   histograms of every per-cell metric         |
+#   gene_distributions  4 slides   per-gene histograms, rank, detection        | 31 s total
+#   cell_scatter       13 slides   transcripts vs genes, one per colour        | +7 s
+#   transcript_stats    5 slides   qv, codeword category, per-FOV, placement   |
+#   cell_tissue        14 slides   segmentation painted per metric             | these three
+#   molecule_maps       4 slides   datashader over the molecule table          | ~14 min
+#
+# The bottom three are not separately timed; together they take the deck from ~40 s to
+# ~15 min, and cell_tissue is the largest of them at 14 rasterised panels per sample.
+SECTIONS = {
+    "cell_distributions",
+    "gene_distributions",
+    "cell_scatter",
+    # "transcript_stats",
+    # "cell_tissue",
+    # "molecule_maps",
+}
+
+# The metrics that get a HISTOGRAM, which is a much shorter list than the ones that get a
+# scatter or a tissue panel. A histogram here is a threshold tool: it exists so a cut can be
+# read off it, so a metric earns one only if it IS a cut, or if it says whether a cut is the
+# right instrument at all. Everything else on METRICS is still drawn — as a scatter colour
+# and in tissue — it just does not also get a distribution.
+#
+# The cell list is the two columns cluster_sdata* actually filters on, plus the two areas.
+# The areas are not thresholds anyone sets; they are here because if segmentation is broken
+# then a count cut is the wrong instrument, and that has to be visible beside the counts
+# rather than three slides away.
+# The metrics that get a SCATTER colour, as (column, label, vmax). Four of the fourteen,
+# on the same standard as the histograms: the geometry is identical on every one of these
+# slides, so a colour earns a slide only if it adds a dimension the two axes do not
+# already carry.
+#
+# Measured on a test ROI as the R^2 of predicting the colour from log(transcripts) and
+# log(genes) — how much of it is just position restated:
+#
+#   nucleus_ratio  0.20   pct_control     0.004   <- independent, kept
+#   nucleus_area   0.53   cell_area       0.60    <- mostly independent, kept
+#   n_genes        0.77   pct_top_5..50   0.75-0.89  <- dropped, and the pct_top family is
+#   transcripts_per_gene  0.957                      also mutually r = 0.72-0.96
+#
+# Dropped outright: the two columns that ARE the axes; transcripts_per_gene, which is
+# exactly transcript_counts / n_genes_by_transcripts and so on log axes is distance from
+# the diagonal; all four pct_transcripts_in_top_* ; nucleus_count, where 99.4% of cells
+# share one value so a continuous ramp is one colour; and control_counts, which carries
+# the same signal as pct_control over 14 discrete values.
+#
+# vmax CLIPS the colour scale, and is None where the metric is already bounded. Two of
+# these have long right tails that otherwise push almost every cell to one end of the ramp
+# — cell_area runs to ~1,180 against a median of 45, and pct_control is 0 for 87% of cells.
+# The values are the 99th percentile rounded, so the clip discards the top ~1% of cells to
+# the end colour and spends the ramp on the rest. Fixed rather than per-sample so the same
+# colour means the same value across a cohort.
+SCATTER_METRICS = [
+    ("cell_area", "Cell area (µm²)", 150),
+    ("nucleus_area", "Nucleus area (µm²)", 80),
+    ("nucleus_ratio", "Nucleus / cell area", None),
+    ("pct_control", "Control transcripts (%)", 1.0),
+]
+
+CELL_HIST_METRICS = [
+    ("transcript_counts", "Transcripts per cell", "log"),
+    ("n_genes_by_transcripts", "Genes per cell", "log"),
+    ("cell_area", "Cell area (µm²)", "log"),
+    ("nucleus_area", "Nucleus area (µm²)", "log"),
+]
+
+# The per-GENE columns, same shape and same rule. A separate list because they describe a
+# different population — 5,101 panel genes rather than the cells — so they cannot share a
+# slide or be indexed the same way.
+#
+# Two, not the four create_sdata writes, because the other two are the SAME VARIABLES
+# rescaled and carry no independent information (verified exactly on a test ROI, not
+# approximately):
+#
+#   pct_dropout_by_transcripts == 100 * (1 - n_cells_by_transcripts / n_obs)
+#   mean_transcripts           == total_transcripts / n_obs
+#
+# Plotting both members of either pair draws one distribution twice. n_cells_by_transcripts
+# is kept over its rescaling because it is the column min_cells is expressed in, and
+# total_transcripts over its because it is a count rather than a per-cell average.
+GENE_HIST_METRICS = [
     ("n_cells_by_transcripts", "Cells detecting the gene", "log"),
-    ("mean_transcripts", "Mean transcripts per cell", "log"),
-    ("pct_dropout_by_transcripts", "Cells not detecting the gene (%)", "linear"),
+    ("total_transcripts", "Transcripts per gene", "log"),
 ]
 
 # The molecule-table columns pulled per sample, and the quality cut drawn on the qv panel.
@@ -194,51 +276,97 @@ GENE_METRICS = [
 # 20 is Xenium's own default threshold — the value the decoder uses to call a transcript
 # trustworthy, equivalent to a 1% error rate. It is drawn rather than applied: nothing here
 # filters, and the fraction below it is the number the slide exists to report.
-TX_COLUMNS = ["x", "y", "qv", "is_gene", "codeword_category", "feature_name", "cell_id",
-              "fov_name", "overlaps_nucleus", "nucleus_distance", "z"]
+# The molecule-table columns materialized per sample, for the slides that aggregate in
+# pandas. The MAPS do not appear here: they are drawn by spatialdata_plot straight off the
+# lazy points element, so their columns never need to come into memory.
+TX_COLUMNS = ["qv", "codeword_category", "feature_name", "fov_name",
+              "overlaps_nucleus", "nucleus_distance", "z"]
 QV_THRESHOLD = 20
 
-# Bin width for the molecule maps, in MICRONS rather than a bin count, so a bin means the
-# same thing on a 2,000 µm ROI and on a whole slide and two samples can be compared.
+# `size` on the datashader path is not a marker size in points — it is the handle on
+# SPREADING. spatialdata_plot dilates every molecule to a disc of
+# round(sqrt(size) * dpi/100) canvas points before shading, so at this deck's 400 dpi
+# size=0.01 gives round(0.1 * 4) = 0 (no dilation, a molecule occupies exactly the canvas
+# point it landed on) and size=1.0 gives 4 (a disc about 2.2 µm across).
 #
-# 5 µm is SUB-CELLULAR — the median cell here is about 7.5 µm across — and is set from how
-# many molecules a bin can afford to lose rather than from anatomy. Xenium's transcript
-# density is high enough that the limit is far finer than it first looks: on these ROIs a
-# 5 µm bin still holds a median of ~110-130 transcripts, and only 1-6% of occupied bins
-# fall under MIN_BIN_TRANSCRIPTS. Below this it degrades fast — at 3 µm the median is ~40
-# and 12-22% of bins blank out, at 2 µm half of them do — so 5 is close to the floor.
-# Coarser wastes the resolution the data actually supports: at 25 µm a bin held ~3,000
-# transcripts, roughly 25x more than it needed to be stable.
-BIN_UM = 5
-# A bin holding two molecules of which one is bad is not 50% bad, it is empty space —
-# and on a fraction map those bins are the loudest thing on the slide. Below this count a
-# bin is left blank instead. At BIN_UM this mostly blanks the sparse tissue edge, which is
-# the intent; if a change to BIN_UM starts blanking tissue, that is the signal it went
-# too fine.
-MIN_BIN_TRANSCRIPTS = 20
+# Dense maps take no dilation: at ~1.5 molecules per canvas point the tissue is already
+# continuous, and spreading would only blur it. A very sparse map needs it to be legible
+# at all — the control subset is 10,087 molecules over ~4.5M canvas points, so almost
+# every occupied point holds exactly one and a single 0.56 µm point is invisible at slide
+# size. Dilating does not move a molecule, it just draws it big enough to see.
+#
+# (This is why spreading was wrong on the fraction maps it replaced: there it inflated one
+# flagged molecule into a cell-sized blob reading 100%. On a count map it is marker size.)
+MAP_POINT_SIZE = 0.01
+MAP_SPARSE_POINT_SIZE = 1.0
 
-# The per-transcript flags mapped as a fraction per bin, as (label, predicate). Fractions
-# rather than counts because a raw count of bad molecules just retraces tissue density.
+# Greyscale, deliberately, and not the viridis the cell-based tissue slides use.
 #
-# All three are questions about the run rather than the tissue, and none of them is
-# visible on the cell-based tissue slides: two of them concern molecules that never
-# reached a cell at all, and the third is a quality the per-cell counts discard.
-TX_FRACTION_MAPS = [
-    (f"Below qv {QV_THRESHOLD}", lambda tx: (tx["qv"] < QV_THRESHOLD).to_numpy()),
+# These maps are read for spatial STRUCTURE — where the molecules are — and fine spatial
+# detail is carried almost entirely by the luminance channel; the chromatic channels have
+# roughly a third of the acuity. So a ramp's usable structural contrast is its lightness
+# range, and white-to-black is the widest available. Extra hues buy discrimination of
+# VALUES, which is the question these slides are not asking, and a many-hue ramp with
+# non-monotonic lightness would invent bands where the data is smooth.
+#
+# White at the bottom is load-bearing too: a count of 0 IS an empty canvas point, so the
+# ramp's first colour is what "no molecules here" looks like. It has to be blank.
+MAP_CMAP = "Greys"
+
+# A constant column. The maps are drawn through the CONTINUOUS colour path — count of
+# non-null values per canvas point — rather than through render_points(density=True),
+# which draws the same picture but routes to the categorical shader and so never builds a
+# colourbar. Colouring by a constant and reducing with "count" reaches the continuous
+# shader, which does. Delete this the day density=True grows a colourbar of its own.
+MAP_COUNT_COLUMN = "one_per_transcript"
+
+# The molecule maps, as (element, label, predicate, vmax, size). Each is the SAME plot over
+# a different subset of the molecule table: one call, one colormap, one reduction, differing
+# only in which molecules go in and how they are scaled. The predicate runs on the lazy
+# points element and its result is registered as a new element; None means the whole table.
+#
+# Counts rather than fractions. A fraction answers "what share of molecules here are bad",
+# which is a magnitude question — and these slides are read for LOCATION. A count map at a
+# low vmax is close to presence/absence, which is the encoding that question wants. It also
+# sidesteps the fraction map's worst artefact, where a canvas point holding one flagged
+# molecule reads as 100%.
+#
+# vmax differs per map because the subsets differ in density by more than an order of
+# magnitude, and it is a CLIP, not a scale: everything at or above it is full black, so a
+# low value turns the map into "occupied or not". The whole-table map is the exception —
+# transcripts are everywhere, so its information IS the density variation that outlines
+# follicles, and it needs headroom rather than clipping.
+#
+# These numbers are tied to this deck's FIGSIZE and 400 dpi: the datashader canvas is
+# figure-inches x dpi, so counts per canvas point — and therefore vmax — change if either
+# does. They were set by rendering the deck and looking, which is the only way; scaling
+# them arithmetically from a different figure size does not work.
+TX_MAPS = [
+    ("transcripts", "All transcripts", None, 4, MAP_POINT_SIZE),
+    ("below_qv", f"Below qv {QV_THRESHOLD}",
+     lambda p: p["qv"] < QV_THRESHOLD, 1, MAP_POINT_SIZE),
     # Decoded, but placed in no cell. The per-cell metrics cannot see these molecules at
     # all, so a segmentation gap is invisible everywhere else in the deck.
-    ("Assigned to no cell", lambda tx: (tx["cell_id"].astype(str) == "UNASSIGNED").to_numpy()),
+    ("unassigned", "Assigned to no cell",
+     lambda p: p["cell_id"].astype(str) == "UNASSIGNED", 2, MAP_POINT_SIZE),
     # is_gene is False for every control and unassigned codeword, so this is the whole
-    # background field in one mask without naming the categories individually.
-    ("Control or unassigned codewords", lambda tx: ~tx["is_gene"].to_numpy()),
+    # background field in one mask without naming the categories individually. Two orders
+    # of magnitude sparser than the others, hence the dilation — see MAP_POINT_SIZE.
+    ("control_codeword", "Control or unassigned codewords",
+     lambda p: ~p["is_gene"], 1, MAP_SPARSE_POINT_SIZE),
 ]
 
 # Every obs and var column this deck reads, checked against each zarr in the loop below.
 # All of them come from create_sdata or the Xenium reader; none is derived here. Listing
 # them in one place means a zarr that predates a column fails on the first sample with the
 # column named, rather than several slides later inside whichever panel happened to want it.
+#
+# Deliberately the union across ALL sections, not just the enabled ones — METRICS is the
+# widest list and covers SCATTER_METRICS and CELL_HIST_METRICS, which are subsets of it.
+# A zarr that cannot support the whole deck should say so when it is first read, not the
+# next time someone uncomments a line in SECTIONS.
 REQUIRED_OBS = [col for col, _, _ in METRICS] + ["sample"]
-REQUIRED_VAR = [col for col, _, _ in GENE_METRICS]
+REQUIRED_VAR = [col for col, _, _ in GENE_HIST_METRICS]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -280,37 +408,6 @@ def fit_tissue_panel(fig, ax, aspect):
     for cax in fig.axes[1:]:
         cax.set_position([(left + panel_w + 0.12) / fig_w, bottom / fig_h,
                           0.16 / fig_w, panel_h / fig_h])
-
-
-def draw_scale_bar(ax, span_um):
-    """Draw a µm scale bar in the lower-left of an axes whose data coords ARE µm.
-
-    Only the molecule maps can carry this. The label-based tissue slides are drawn in
-    spatialdata's `global` frame, which for a Xenium read is in PIXELS, so a bar there
-    would need the pixel size and nothing reachable in the object records it. The points
-    element is in µm natively (it carries a 4.7059 scale TO the pixel frame), so a slide
-    drawn from transcript coordinates already has what the others lack.
-
-    The length is a round number near a fifth of the panel, picked from a 1-2-5 ladder so
-    the label is always something a reader can multiply by eye.
-
-    Drawn white with a dark outline rather than in the deck's annotation ink, because it
-    sits ON the data and the data is a full-range colormap: viridis puts near-black under
-    the bar on a fraction map and near-yellow on a density map, so any single ink is
-    invisible on one of them. An outlined white mark reads on both.
-    """
-    nice = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000]
-    length = min(nice, key=lambda n: abs(n - span_um / 5))
-    outline = [patheffects.withStroke(linewidth=2.4, foreground="#000000")]
-    # Axes fraction for placement, data coords for the length: the bar must measure the
-    # data, but it should sit in the same corner whatever the tissue's extent is.
-    trans = ax.get_xaxis_transform()
-    x0 = ax.get_xlim()[0] + 0.04 * span_um
-    ax.plot([x0, x0 + length], [0.06, 0.06], transform=trans, color="white", lw=2.2,
-            solid_capstyle="butt", clip_on=False, path_effects=outline, zorder=5)
-    ax.annotate(f"{length:,} µm", xy=(x0 + length / 2, 0.085), xycoords=trans,
-                ha="center", va="bottom", color="white", fontsize=7, zorder=5,
-                path_effects=[patheffects.withStroke(linewidth=1.8, foreground="#000000")])
 
 
 # ── Slides ────────────────────────────────────────────────────────────────────
@@ -465,7 +562,7 @@ def qc_histogram_slide(sdata, sample, metrics, level="obs"):
     plt.close(fig)
 
 
-def transcripts_vs_genes_slide(sdata, sample, color, label, scale):
+def transcripts_vs_genes_slide(sdata, sample, color, label, vmax=None):
     """Slide: genes detected against transcript count, coloured by one obs column.
 
     The joint view the histogram slide cannot give: the two metrics are strongly coupled,
@@ -503,15 +600,21 @@ def transcripts_vs_genes_slide(sdata, sample, color, label, scale):
     then drops any cell at zero on either axis, so those are counted from the data and
     reported in the title rather than vanishing silently.
 
-    Colour is left on its full range for now. Both area columns have long right tails
-    (cell_area reaches ~1,180 µm² against a median of 45), so most cells sit at the dark
-    end — clipping or a log norm is the open question, deliberately not decided here.
+    `vmax` clips the colour scale, and is applied by reaching for the drawn collection
+    rather than passed in: sc.pl.scatter has no vmin/vmax (verified against the installed
+    scanpy), so the norm is set afterwards on the PathCollection scanpy left on the axes.
+    The colourbar tracks it because it was built from that same mappable. Without the clip
+    a long-tailed metric puts nearly every cell at one end of the ramp — see
+    SCATTER_METRICS for which need it and why those values.
     """
     display(Markdown(f"## Transcripts vs genes — {label}"))
     display(Markdown(
         "One point per cell: transcript count against the number of genes detected in "
-        f"that cell, both on log axes, coloured by {label.lower()}. Cells at zero on "
-        "either axis cannot be drawn on a log axis and are counted in the title instead."
+        f"that cell, both on log axes, coloured by {label.lower()}."
+        + (f" The colour scale is clipped at {vmax:g}, so cells above that are drawn the "
+           "same." if vmax is not None else "")
+        + " Cells at zero on either axis cannot be drawn on a log axis and are counted in "
+        "the title instead."
     ))
 
     table = sdata.tables["table"]
@@ -529,6 +632,10 @@ def transcripts_vs_genes_slide(sdata, sample, color, label, scale):
     ax = fig.axes[0]
     ax.set_xscale("log")
     ax.set_yscale("log")
+    # See the docstring: scanpy exposes no vmin/vmax, so the clip is set on the collection
+    # it drew. vmin is left alone so the ramp still starts at the metric's own minimum.
+    if vmax is not None and ax.collections:
+        ax.collections[0].set_clim(vmax=vmax)
     # scanpy labels the axes with the raw obs keys; restate them in the deck's wording.
     ax.set_xlabel("Transcripts per cell")
     ax.set_ylabel("Genes detected per cell")
@@ -655,94 +762,69 @@ def qc_tissue_labels_slide(sdata, sample, color, label, scale):
     plt.close(fig)
 
 
-def transcript_map_slide(sdata, sample, tx, mask=None, label="Transcript density"):
-    """Slide: the molecule table binned into a map, in real µm coordinates.
+def transcript_map_slide(sdata, sample, element, label, vmax, size):
+    """Slide: where a subset of the molecule table sits in tissue, by spatialdata_plot.
 
     The only spatial view in this deck drawn from transcripts rather than from cells, and
     that is the point of it: everything on the tissue slides is already conditioned on
     segmentation, so a molecule that was never assigned to a cell is invisible there. Here
     it is not.
 
-    Two modes, because they are one figure asked twice. With no mask it maps DENSITY —
-    molecules per bin, on a log scale, which is coverage independent of any segmentation.
-    With a mask it maps that mask's FRACTION per bin, which is the form that answers
-    "is this problem localised or everywhere". A fraction is the right question for all
-    three masks used here: raw counts of bad molecules just retrace tissue density.
+    Every map is this one call over a different element — same colormap, same reduction,
+    same clip semantics — so the four read against each other and only the molecules
+    change. That is why the subsets are registered as separate points elements rather than
+    passed as a colour column: it keeps the call identical instead of branching on mode.
 
-    Bins are a fixed size in MICRONS, not a fixed count, so a bin means the same thing
-    across samples of different extent and two samples' maps can be read against each
-    other. BIN_UM is sub-cellular — see its comment for why the data supports that.
+    Drawn as a COUNT per canvas point, through the continuous colour path so it carries a
+    colourbar (see MAP_COUNT_COLUMN), and clipped at `vmax` rather than scaled to the
+    data. The clip is the encoding, not a cosmetic: at a low vmax every occupied canvas
+    point saturates, which turns the map into presence-versus-absence — the right form for
+    a slide read for LOCATION rather than magnitude. The whole-table map takes a higher
+    vmax because its information is the density variation itself.
 
-    The counterweight is MIN_BIN_TRANSCRIPTS. A bin holding two molecules of which one is
-    bad is not 50% bad, it is empty space, and on a fraction map those bins are the
-    loudest thing on the slide. Sparse bins are masked to the colormap's "bad" colour
-    rather than plotted or silently zeroed.
+    `method` is named rather than left to the library's >10,000-point rule, since the
+    reduction is meaningless under the matplotlib path. `size` is not a marker size here;
+    see MAP_POINT_SIZE.
 
-    These axes are in µm, unlike every other spatial slide here, because the points element
-    is stored in µm and carries a scale TO spatialdata's pixel `global` frame rather than
-    from it. So this is the one place the deck can show a scale bar.
+    Two consequences of letting the library aggregate, both deliberate and neither hidden:
+
+    The canvas resolution is the FIGURE's — figure inches x dpi — not a length in microns,
+    so the effective bin changes with figure size and dpi, two samples of different extent
+    are not strictly comparable, and `vmax` has to be re-tuned if either changes.
+
+    These axes are spatialdata's `global` frame, which for a Xenium read is in pixels —
+    the points element is stored in µm but carries a scale TO that frame — so the ticks
+    are hidden here exactly as they are on the label slides, and there is no scale bar.
     """
     display(Markdown(f"## In tissue — {label}"))
     display(Markdown(
-        (f"The share of transcripts in each {BIN_UM} µm bin that are {label.lower()}, "
-         f"across the whole imaged area rather than only within cells. Bins holding fewer "
-         f"than {MIN_BIN_TRANSCRIPTS} transcripts are left blank, since a fraction over a "
-         "handful of molecules is noise."
-         if mask is not None else
-         f"The number of transcripts in each {BIN_UM} µm bin, on a log colour scale, "
-         "across the whole imaged area rather than only within cells — so this includes "
-         "molecules assigned to no cell.")
-        + " Coordinates are in microns."
+        f"Every transcript {'in this sample' if element == 'transcripts' else label.lower()}"
+        ", counted over the plotting canvas, across the whole imaged area rather than only "
+        f"within cells. The colour scale is clipped at {vmax}, so anything at or above that "
+        "is drawn the same; white is where no transcript falls."
     ))
 
-    x = tx["x"].to_numpy(dtype=float)
-    y = tx["y"].to_numpy(dtype=float)
-    # Edges built from a fixed bin WIDTH, so the last bin may overhang the data slightly
-    # rather than the width being stretched to fit a bin count.
-    x0, x1, y0, y1 = x.min(), x.max(), y.min(), y.max()
-    edges = [x0 + np.arange(int(np.ceil((x1 - x0) / BIN_UM)) + 1) * BIN_UM,
-             y0 + np.arange(int(np.ceil((y1 - y0) / BIN_UM)) + 1) * BIN_UM]
-    total, _, _ = np.histogram2d(x, y, bins=edges)
-
-    cmap = plt.get_cmap("viridis").copy()
-    cmap.set_bad(GRID_INK)
-    if mask is None:
-        # An empty bin cannot be drawn on a log scale; masked rather than clipped to 1,
-        # which would draw genuinely empty space as if it held a molecule.
-        grid = np.where(total > 0, total, np.nan)
-        norm = SafeLogNorm(vmin=max(total[total > 0].min(), 1), vmax=total.max())
-        cbar_label = f"Transcripts per {BIN_UM} µm bin"
-    else:
-        selected, _, _ = np.histogram2d(x[mask], y[mask], bins=edges)
-        grid = np.where(total >= MIN_BIN_TRANSCRIPTS, selected / np.maximum(total, 1),
-                        np.nan)
-        norm = Normalize(vmin=0, vmax=np.nanmax(grid) if np.isfinite(grid).any() else 1)
-        cbar_label = f"Share of the bin's transcripts"
-
     fig, ax = plt.subplots(figsize=FIGSIZE)
-    # Transposed because histogram2d indexes [x, y] and imshow expects [row, col].
-    image = ax.imshow(grid.T, extent=[x0, x1, y0, y1], origin="lower",
-                      cmap=cmap, norm=norm, interpolation="nearest")
-    # Xenium's y runs downward in the image, and the label-based slides inherit that
-    # orientation; inverting here keeps the tissue the same way up across the deck.
-    ax.invert_yaxis()
-    ax.set_aspect("equal")
-    fig.colorbar(image, ax=ax, label=cbar_label)
+    sdata.pl.render_points(
+        element, color=MAP_COUNT_COLUMN, method="datashader",
+        datashader_reduction="count", size=size, cmap=MAP_CMAP,
+        norm=Normalize(vmax=vmax),
+        # Without this the colourbar is labelled with the raw column name.
+        colorbar_params={"label": "Transcripts per canvas point"},
+    ).pl.show(ax=ax, title="")
 
+    ax.set_title(label)
     ax.set_xlabel("")
     ax.set_ylabel("")
+    # See the docstring: this frame is in pixels, not µm.
     ax.set_xticks([])
     ax.set_yticks([])
-    ax.set_title(label)
-    draw_scale_bar(ax, x1 - x0)
 
-    fit_tissue_panel(fig, ax, (x1 - x0) / (y1 - y0))
+    fit_tissue_panel(fig, ax, abs(np.ptp(ax.get_xlim()) / np.ptp(ax.get_ylim())))
 
-    n = int(mask.sum()) if mask is not None else len(x)
-    subtitle = f"{sample} · {n:,} of {len(x):,} transcripts" if mask is not None \
-        else f"{sample} · {len(x):,} transcripts"
     # No tight_layout: see fit_tissue_panel.
-    fig.suptitle(subtitle, x=0.01, ha="left")
+    n = int(sdata.points[element].shape[0].compute())
+    fig.suptitle(f"{sample} · {n:,} transcripts", x=0.01, ha="left")
     plt.show()
     plt.close(fig)
 
@@ -1336,12 +1418,18 @@ for path in ZARRS:
     # here whose colour handling this deck does not control; every numeric metric gets all
     # three views, including the two that ARE the scatter's axes — see that slide's
     # docstring for why the degenerate colours are kept rather than filtered out.
-    slides = [partial(qc_histogram_slide, metrics=METRICS[i:i + HIST_PANELS])
-              for i in range(0, len(METRICS), HIST_PANELS)]
-    slides += [partial(transcripts_vs_genes_slide, color=col, label=label, scale=scale)
-               for col, label, scale in METRICS if scale != "categorical"]
-    slides += [partial(qc_tissue_labels_slide, color=col, label=label, scale=scale)
-               for col, label, scale in METRICS]
+    slides = []
+    if "cell_distributions" in SECTIONS:
+        slides += [partial(qc_histogram_slide,
+                           metrics=CELL_HIST_METRICS[i:i + HIST_PANELS])
+                   for i in range(0, len(CELL_HIST_METRICS), HIST_PANELS)]
+    if "cell_scatter" in SECTIONS:
+        slides += [partial(transcripts_vs_genes_slide, color=col, label=label,
+                           vmax=vmax)
+                   for col, label, vmax in SCATTER_METRICS]
+    if "cell_tissue" in SECTIONS:
+        slides += [partial(qc_tissue_labels_slide, color=col, label=label, scale=scale)
+                   for col, label, scale in METRICS]
 
     # The molecule table is loaded BEFORE the gene slides are built, even though it is the
     # last section to appear, because the gene→category lookup comes out of it: codeword
@@ -1385,24 +1473,42 @@ for path in ZARRS:
     # Then the gene side, reading var, and finally the molecule side, reading points. The
     # order is cells, genes, transcripts — widest unit to narrowest, so each section is a
     # finer-grained account of the same sample rather than an unrelated appendix.
-    slides += [partial(qc_histogram_slide, metrics=GENE_METRICS, level="var"),
-               partial(gene_rank_slide, gene_category=gene_category),
-               partial(gene_detection_slide, gene_category=gene_category),
-               partial(undetected_genes_slide, gene_category=gene_category)]
+    if "gene_distributions" in SECTIONS:
+        slides += [partial(qc_histogram_slide, metrics=GENE_HIST_METRICS, level="var"),
+                   partial(gene_rank_slide, gene_category=gene_category),
+                   partial(gene_detection_slide, gene_category=gene_category),
+                   partial(undetected_genes_slide, gene_category=gene_category)]
 
-    if tx is not None:
+    if tx is not None and "transcript_stats" in SECTIONS:
         slides += [partial(transcript_qv_slide, tx=tx),
                    partial(qv_by_category_slide, tx=tx),
                    partial(codeword_category_slide, tx=tx),
                    partial(transcript_fov_slide, tx=tx),
                    partial(transcript_geometry_slide, tx=tx)]
-        # The molecule maps last: density first as the reference the fraction maps are
-        # read against, then one map per flag. The predicates are evaluated here rather
-        # than inside the slide so the slide stays a drawing function and the list above
-        # stays the deck's table of contents.
-        slides += [partial(transcript_map_slide, tx=tx)]
-        slides += [partial(transcript_map_slide, tx=tx, mask=predicate(tx), label=label)
-                   for label, predicate in TX_FRACTION_MAPS]
+
+    if tx is not None and "molecule_maps" in SECTIONS:
+        # The molecule maps: the whole table first, as the reference the subsets are
+        # read against, then one map per subset.
+        #
+        # Each subset is registered as its own points ELEMENT rather than being selected
+        # inside the slide, so every map is the same render_points call over a different
+        # element. Filtering a points element preserves its transformations in .attrs, so
+        # they must NOT be passed to PointsModel.parse as well — doing both raises
+        # "Transformations are both specified for the element and also passed as an
+        # argument". Assigning the filtered frame straight back is enough.
+        #
+        # All of this stays lazy: dask holds the filter and the constant column as
+        # unevaluated expressions, so nothing is read until a map is actually drawn.
+        points = sdata.points["transcripts"]
+        points[MAP_COUNT_COLUMN] = 1.0
+        sdata.points["transcripts"] = points
+        for element, _, predicate, _, _ in TX_MAPS:
+            if predicate is not None:
+                sdata.points[element] = points[predicate(points)]
+
+        slides += [partial(transcript_map_slide, element=element, label=label,
+                           vmax=vmax, size=size)
+                   for element, label, _, vmax, size in TX_MAPS]
 
     # This loop is a single cell, so anything raising without being caught aborts the cell
     # and drops every LATER sample from the deck too — with the render still exiting 0
