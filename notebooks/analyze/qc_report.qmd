@@ -94,6 +94,31 @@ BAR_FILL = "#7BA3CC"
 ANNOTATION_INK = "#333333"
 GRID_INK = "#E6E6E6"
 
+# One colour per codeword category, fixed here so a category keeps its colour across every
+# slide that draws it — the gene scatter, the rank curve and the qv distributions are read
+# against each other, and a palette assigned per figure would recolour a category between
+# them.
+#
+# Grouped by meaning rather than spread around the wheel: the two REAL gene categories are
+# the deck's blue and a warm counterpart to it, and every control and unassigned class is a
+# red, purple or amber. So "is this bar a gene or a control" is answered by hue family
+# before any legend is read. Custom genes get the loud colour because they are the 100 in
+# 5,101 that a reader is looking for.
+#
+# None is not a category the reader supplied — it is what the gene→category lookup returns
+# for a gene with no transcript anywhere in the sample, so it cannot be mapped. Grey, and
+# named as such wherever it appears.
+CATEGORY_INK = {
+    "predesigned_gene": BAR_FILL,
+    "custom_gene": "#E08A3C",
+    "deprecated_codeword": "#B07AA1",
+    "negative_control_codeword": "#D1495B",
+    "negative_control_probe": "#8C2F39",
+    "unassigned_codeword": "#E4A11B",
+    "genomic_control_probe": "#58917E",
+}
+UNMAPPED_INK = "#B0B0B0"
+
 # Every raw zarr is staged into this notebook's working directory by the Nextflow
 # process, so globbing is the whole input contract — no params to pass or drift.
 #
@@ -168,7 +193,7 @@ GENE_METRICS = [
 # 20 is Xenium's own default threshold — the value the decoder uses to call a transcript
 # trustworthy, equivalent to a 1% error rate. It is drawn rather than applied: nothing here
 # filters, and the fraction below it is the number the slide exists to report.
-TX_COLUMNS = ["qv", "is_gene", "codeword_category", "fov_name",
+TX_COLUMNS = ["qv", "is_gene", "codeword_category", "feature_name", "fov_name",
               "overlaps_nucleus", "nucleus_distance", "z"]
 QV_THRESHOLD = 20
 
@@ -548,7 +573,7 @@ def qc_tissue_labels_slide(sdata, sample, color, label, scale):
     plt.close(fig)
 
 
-def gene_rank_slide(sdata, sample):
+def gene_rank_slide(sdata, sample, gene_category=None):
     """Slide: the panel's genes ranked by total transcripts.
 
     The dynamic range of the panel in one line, and the only view that shows both ends of
@@ -560,21 +585,46 @@ def gene_rank_slide(sdata, sample):
     list of 5,101 and abundance spans five decades. Genes no cell detected are at zero and
     cannot be drawn on that axis; they are the point of the slide rather than a footnote,
     so they are marked as a span at the foot of the curve and counted in the annotation.
+
+    The curve itself stays one colour — it is a single ordering, and a line cannot carry a
+    per-point category without becoming a scatter and losing the shape that is the reason
+    to draw it. The minority categories are marked ON it instead, as points at their own
+    rank, which answers where in the panel's dynamic range they fall. Predesigned genes
+    are left unmarked because they are the curve: marking 4,995 of 5,101 points would
+    redraw the line in a second colour and say nothing.
     """
     display(Markdown("## Gene abundance, ranked"))
     display(Markdown(
         "Every gene on the panel ranked by its total transcripts across all cells, on a "
-        "log axis. Genes detected in no cell have no abundance to draw and are marked as "
-        "a band at the foot of the curve."
+        "log axis. Genes from a minority codeword category are marked at their rank. "
+        "Genes detected in no cell have no abundance to draw and are marked as a band at "
+        "the foot of the curve."
     ))
 
     var = sdata.tables["table"].var
-    totals = np.sort(var["total_transcripts"].to_numpy(dtype=float))[::-1]
+    totals_raw = var["total_transcripts"].to_numpy(dtype=float)
+    # One ordering used for both the curve and the marks, so a mark sits at the rank the
+    # curve gives it. Sorting the values separately would put them at different positions.
+    order = np.argsort(totals_raw)[::-1]
+    totals = totals_raw[order]
     positive = totals[totals > 0]
 
     fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.72, FIGSIZE[1]))
-    ax.plot(np.arange(1, len(positive) + 1), positive, color=BAR_FILL, lw=1.4)
+    ax.plot(np.arange(1, len(positive) + 1), positive, color=BAR_FILL, lw=1.4, zorder=2)
     ax.set_yscale("log")
+
+    if gene_category is not None:
+        cats = gene_category.to_numpy(dtype=object)[order]
+        drawable = totals > 0
+        # Everything except the dominant category, which IS the curve — see the docstring.
+        minority = [c for c in set(cats[drawable]) if c != "predesigned_gene"]
+        for cat in sorted(minority, key=lambda c: -int((cats[drawable] == c).sum())):
+            mask = drawable & (cats == cat)
+            ax.scatter(np.flatnonzero(mask) + 1, totals[mask], s=7,
+                       color=CATEGORY_INK.get(cat, UNMAPPED_INK), linewidths=0, zorder=3,
+                       label=f"{str(cat).replace('_', ' ')} ({int(mask.sum()):,})")
+        if minority:
+            ax.legend(loc="upper right", frameon=False, fontsize=7, markerscale=1.6)
 
     n_zero = len(totals) - len(positive)
     if n_zero:
@@ -600,7 +650,7 @@ def gene_rank_slide(sdata, sample):
     plt.close(fig)
 
 
-def gene_detection_slide(sdata, sample):
+def gene_detection_slide(sdata, sample, gene_category=None):
     """Slide: abundance against the number of cells detecting each gene.
 
     The gene-side counterpart of the transcripts-vs-genes scatter, and it separates the
@@ -609,6 +659,14 @@ def gene_detection_slide(sdata, sample):
     restricted to a small population, or a probe piling up on something that is not real.
     Neither margin alone tells them apart.
 
+    Coloured by codeword category, which on the gene axis means predesigned against custom
+    panel probes. That is the question this slide can answer and the histograms cannot:
+    custom probes are designed separately from the catalogue ones, so whether they land in
+    the same abundance-detection cloud or off to one side is a statement about the panel
+    build rather than about the tissue. They are 100 of 5,101 here, so they are drawn LAST
+    and larger — plotted in index order they would be buried under the predesigned cloud
+    and the slide would show nothing.
+
     Drawn with matplotlib rather than sc.pl.scatter, which reads obs and var of an AnnData
     by name and is built for the cell axis; there is no var-side equivalent, and a plain
     scatter of two var columns needs nothing scanpy provides.
@@ -616,8 +674,9 @@ def gene_detection_slide(sdata, sample):
     display(Markdown("## Gene abundance vs detection"))
     display(Markdown(
         "One point per gene: total transcripts across all cells against the number of "
-        "cells detecting that gene, both on log axes. Genes at zero on either axis cannot "
-        "be drawn on a log axis and are counted in the title instead."
+        "cells detecting that gene, both on log axes, coloured by the category of codeword "
+        "the gene is decoded from. Genes at zero on either axis cannot be drawn on a log "
+        "axis and are counted in the title instead."
     ))
 
     var = sdata.tables["table"].var
@@ -626,11 +685,32 @@ def gene_detection_slide(sdata, sample):
     drawable = (x > 0) & (y > 0)
 
     fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.72, FIGSIZE[1]))
-    # Small, semi-transparent marks: 5,101 genes on a log-log plane pile up along one arm,
-    # and opaque markers there read as a solid bar rather than a density.
-    ax.scatter(x[drawable], y[drawable], s=4, color=BAR_FILL, alpha=0.45, linewidths=0)
+    if gene_category is None:
+        # The molecule table is where the categories come from, so a sample whose points
+        # failed to load still gets the geometry, just in one colour.
+        groups = [(None, drawable, BAR_FILL, f"{int(drawable.sum()):,} genes")]
+    else:
+        cats = gene_category.to_numpy(dtype=object)
+        # Rarest category last, so the small ones land on top of the big ones. This is the
+        # whole reason the slide is legible with a 50:1 class imbalance.
+        order = sorted(set(cats[drawable]),
+                       key=lambda c: -int((cats[drawable] == c).sum()))
+        groups = [(c, drawable & (cats == c), CATEGORY_INK.get(c, UNMAPPED_INK),
+                   f"{str(c).replace('_', ' ')} ({int((drawable & (cats == c)).sum()):,})")
+                  for c in order]
+
+    for i, (_, mask, colour, label) in enumerate(groups):
+        # Small and semi-transparent for the bulk: 5,101 genes on a log-log plane pile up
+        # along one arm, and opaque markers there read as a solid bar rather than a
+        # density. The minority classes are drawn larger and opaque so they can be seen at
+        # all against it.
+        bulk = i == 0 and len(groups) > 1
+        ax.scatter(x[mask], y[mask], s=4 if bulk else 9, color=colour,
+                   alpha=0.45 if bulk else 0.9, linewidths=0, label=label, zorder=2 + i)
     ax.set_xscale("log")
     ax.set_yscale("log")
+    if len(groups) > 1:
+        ax.legend(loc="upper left", frameon=False, fontsize=7, markerscale=1.6)
 
     ax.set_xlabel("Cells detecting the gene")
     ax.set_ylabel("Transcripts across all cells")
@@ -649,7 +729,7 @@ def gene_detection_slide(sdata, sample):
     plt.close(fig)
 
 
-def undetected_genes_slide(sdata, sample):
+def undetected_genes_slide(sdata, sample, gene_category=None):
     """Slide: the genes no cell detected, named.
 
     The one slide in this deck that is a list rather than a figure, because the useful
@@ -659,6 +739,17 @@ def undetected_genes_slide(sdata, sample):
     A gene appearing here is not necessarily a failure — a panel carries markers for
     populations a given section may not contain. It is a starting point for asking which,
     which is why the slide names them and stops rather than calling them failed.
+
+    Grouped by codeword category, which sorts the list into two different questions. A
+    predesigned gene absent from an ovary section is almost certainly a tissue statement.
+    A custom probe absent is a panel-build statement, since it was designed for this
+    experiment and something was expected to bind. Mixed into one alphabetical list the
+    two are indistinguishable, and the custom ones are the minority that would be lost.
+
+    A gene with no transcript ANYWHERE in the sample has no row in the molecule table and
+    so no category to look up. That is not a failure of the lookup — it is a stronger
+    statement than the rest of the list, since these genes are absent even before cell
+    assignment, so they are grouped under their own heading rather than dropped.
     """
     display(Markdown("## Genes detected in no cell"))
 
@@ -674,13 +765,31 @@ def undetected_genes_slide(sdata, sample):
 
     display(Markdown(
         f"{len(undetected):,} of the {len(var):,} panel genes carry no transcript in any "
-        f"cell in {sample}. A gene may be absent because the section lacks the population "
-        "it marks, so these are named rather than called failures."
+        f"cell in {sample}, grouped by the category of codeword they are decoded from. A "
+        "gene may be absent because the section lacks the population it marks, so these "
+        "are named rather than called failures."
     ))
-    # A plain comma-joined paragraph, not a table: pandoc's pptx writer gives a table its
-    # own layout and a fixed column count, which wastes most of a slide on 30 short names
-    # and overflows silently past whatever count fills the frame.
-    display(Markdown(", ".join(f"`{g}`" for g in undetected)))
+
+    if gene_category is None:
+        groups = [(None, undetected)]
+    else:
+        lookup = gene_category.reindex(undetected)
+        found = lookup.to_numpy(dtype=object)
+        groups = [(cat, sorted(lookup.index[found == cat]))
+                  for cat in sorted({c for c in found if c is not None})]
+        unmapped = sorted(lookup.index[found == None])  # noqa: E711 — elementwise, not `is`
+        if unmapped:
+            groups.append(("no transcript anywhere in the sample", unmapped))
+
+    # A plain comma-joined paragraph per group, not a table: pandoc's pptx writer gives a
+    # table its own layout and a fixed column count, which wastes most of a slide on 30
+    # short names and overflows silently past whatever count fills the frame.
+    for cat, genes in groups:
+        if not genes:
+            continue
+        if cat is not None:
+            display(Markdown(f"**{str(cat).replace('_', ' ')}** ({len(genes):,})"))
+        display(Markdown(", ".join(f"`{g}`" for g in genes)))
 
 
 def transcript_qv_slide(sdata, sample, tx):
@@ -782,6 +891,80 @@ def codeword_category_slide(sdata, sample, tx):
     fig.tight_layout()
     plt.show()
     plt.close(fig)
+
+
+def qv_by_category_slide(sdata, sample, tx):
+    """Slide: the quality distribution of each codeword category separately.
+
+    The control check the deck exists to make, and the one slide that says whether the
+    decoder is working rather than what the tissue contains. Negative controls are
+    codewords with no target to bind: if the run is sound they should decode rarely AND
+    badly, so they belong at the low end of this axis. A negative control sitting at the
+    same quality as the real genes means the decoder cannot tell them apart, which no
+    per-cell metric anywhere else in this deck would reveal — those molecules are simply
+    counted as background at a plausible-looking rate.
+
+    Each category is normalised to its OWN share rather than plotted as raw counts. That
+    is the whole point: the categories span five decades of abundance (5.4M predesigned
+    genes against 162 negative-control probes), and on shared counts every control curve
+    is a flat line on the floor. Normalising asks the only question that compares across
+    them — what does a molecule OF THIS CLASS typically score — and makes 162 molecules
+    as readable as five million.
+
+    Step outlines rather than filled bars, because seven overlapping filled histograms
+    hide each other whatever the alpha, and the shape is what is being compared.
+    """
+    display(Markdown("## Transcript quality by codeword category"))
+    display(Markdown(
+        "The distribution of quality values within each codeword category, each "
+        "normalised to its own share of transcripts so categories of very different size "
+        f"can be compared. The dashed line marks qv {QV_THRESHOLD}. The table gives each "
+        "category's median and the share of it falling below that threshold."
+    ))
+
+    fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.74, FIGSIZE[1]))
+    bins = np.linspace(0, 40, 60)
+    rows = []
+    # Largest first, so the legend order matches the category bar slide and the eye can
+    # carry an ordering between the two.
+    for cat, group in sorted(tx.groupby("codeword_category", observed=True),
+                             key=lambda kv: -len(kv[1])):
+        qv = group["qv"].to_numpy(dtype=float)
+        ax.hist(qv, bins=bins, histtype="step", linewidth=1.3,
+                color=CATEGORY_INK.get(cat, UNMAPPED_INK),
+                weights=np.full(len(qv), 1.0 / len(qv)),
+                label=str(cat).replace("_", " "))
+        rows.append((str(cat).replace("_", " "), len(qv), float(np.median(qv)),
+                     float((qv < QV_THRESHOLD).mean())))
+
+    ax.axvline(QV_THRESHOLD, color=ANNOTATION_INK, lw=1.0, ls="--")
+    ax.set_xlabel("Transcript quality value (qv)")
+    ax.set_ylabel("Share of the category's transcripts")
+    ax.grid(color=GRID_INK, lw=0.6)
+    ax.set_axisbelow(True)
+    ax.tick_params(length=0)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.legend(loc="upper left", frameon=False, fontsize=6.5)
+
+    fig.suptitle(f"{sample} · {len(tx):,} transcripts", x=0.01, ha="left")
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+    # The medians as a table, on their OWN slide with its own heading. Seven overlapping
+    # step curves show the shapes but cannot be read to a number, and the median and the
+    # sub-threshold share are the two numbers that get quoted off this slide.
+    #
+    # The heading is explicit because pandoc puts a table on a fresh slide regardless —
+    # a figure and a table do not share one under this template — so without it the table
+    # arrives untitled and detached from the figure it belongs to.
+    display(Markdown("## Transcript quality by codeword category, in numbers"))
+    display(Markdown(
+        "| Category | Transcripts | Median qv | "
+        f"Below qv {QV_THRESHOLD} |\n|---|---:|---:|---:|\n"
+        + "\n".join(f"| {name} | {n:,} | {median:.1f} | {share:.1%} |"
+                    for name, n, median, share in rows)
+    ))
 
 
 def transcript_fov_slide(sdata, sample, tx):
@@ -986,32 +1169,59 @@ for path in ZARRS:
     slides += [partial(qc_tissue_labels_slide, color=col, label=label, scale=scale)
                for col, label, scale in METRICS]
 
-    # Then the gene side, reading var, and finally the molecule side, reading points. The
-    # order is cells, genes, transcripts — widest unit to narrowest, so each section is a
-    # finer-grained account of the same sample rather than an unrelated appendix.
-    slides += [partial(qc_histogram_slide, metrics=GENE_METRICS, level="var"),
-               gene_rank_slide, gene_detection_slide, undetected_genes_slide]
-
-    # The one materialization in this deck, and the only shared state its slides read, so
-    # it gets its own try: if it fails, every molecule slide below is meaningless and they
-    # are skipped together rather than each repeating the same traceback. That is the case
-    # the per-slide catch below explicitly does not cover.
+    # The molecule table is loaded BEFORE the gene slides are built, even though it is the
+    # last section to appear, because the gene→category lookup comes out of it: codeword
+    # category is a property of the transcript, and the only place a gene's category is
+    # recorded is the rows that decoded to it.
+    #
+    # This is the one materialization in this deck, and the only shared state its slides
+    # read, so it gets its own try: if it fails, every molecule slide is meaningless and
+    # they are skipped together rather than each repeating the same traceback. That is the
+    # case the per-slide catch below explicitly does not cover. The gene slides still
+    # render — they fall back to a single colour, since the geometry is theirs and only the
+    # colouring came from here.
     #
     # Only TX_COLUMNS, never the whole frame — the table carries coordinates and ids this
     # deck does not plot, and they are most of its width. ~7M rows for a 21k-cell ROI takes
     # about a second. A whole-slide sample is where this becomes the binding constraint,
     # and the fix there is to aggregate lazily in Dask (value_counts and groupby both
     # support it) rather than to materialize and subsample.
+    tx = gene_category = None
     try:
         tx = sdata.points["transcripts"][TX_COLUMNS].compute()
+        # feature_name → codeword_category is one-to-one (verified: no feature carries two
+        # categories), so first() is a lookup rather than a summary — which is why this
+        # does not make the deck a second definition of anything.
+        #
+        # Reindexing onto var leaves NaN for a gene with no transcript ANYWHERE in the
+        # sample, which has no row here to read a category from. That is a real state, not
+        # a lookup failure, and the slides name it rather than filling it in.
+        gene_category = (tx.groupby("feature_name", observed=True)["codeword_category"]
+                           .first().reindex(table.var.index))
+        # Normalise the missing value to None once, here, rather than in each slide.
+        # codeword_category is pandas "string" dtype, so reindex fills with pd.NA — and
+        # pd.NA == "predesigned_gene" evaluates to pd.NA, not False, so every downstream
+        # mask built by comparison raises "boolean value of NA is ambiguous" instead of
+        # simply excluding the gene. Object dtype with None compares as plain Python does.
+        gene_category = gene_category.astype(object).where(gene_category.notna(), None)
+    except Exception:
+        display(Markdown("## Transcript-level QC"))
+        display(Markdown(f"```\n{traceback.format_exc()}\n```"))
+
+    # Then the gene side, reading var, and finally the molecule side, reading points. The
+    # order is cells, genes, transcripts — widest unit to narrowest, so each section is a
+    # finer-grained account of the same sample rather than an unrelated appendix.
+    slides += [partial(qc_histogram_slide, metrics=GENE_METRICS, level="var"),
+               partial(gene_rank_slide, gene_category=gene_category),
+               partial(gene_detection_slide, gene_category=gene_category),
+               partial(undetected_genes_slide, gene_category=gene_category)]
+
+    if tx is not None:
         slides += [partial(transcript_qv_slide, tx=tx),
+                   partial(qv_by_category_slide, tx=tx),
                    partial(codeword_category_slide, tx=tx),
                    partial(transcript_fov_slide, tx=tx),
                    partial(transcript_geometry_slide, tx=tx)]
-    except Exception:
-        tx = None
-        display(Markdown("## Transcript-level QC"))
-        display(Markdown(f"```\n{traceback.format_exc()}\n```"))
 
     # This loop is a single cell, so anything raising without being caught aborts the cell
     # and drops every LATER sample from the deck too — with the render still exiting 0
@@ -1036,5 +1246,5 @@ for path in ZARRS:
 
     # tx is the largest thing here by far, so it is dropped with the rest rather than
     # being left to survive into the next sample's load.
-    del sdata, table, tx
+    del sdata, table, tx, gene_category
 ```
