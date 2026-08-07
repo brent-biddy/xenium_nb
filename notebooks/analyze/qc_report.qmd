@@ -1,6 +1,6 @@
 ---
 title: "xenium_nb — QC"
-subtitle: "Per-cell QC distributions and QC in tissue, one section per sample"
+subtitle: "Per-cell, per-gene and per-transcript QC, one section per sample"
 # Pin the kernel by name, as cluster_report.qmd does. Apptainer bind-mounts $HOME, so
 # kernelspecs from ~/.local/share/jupyter/kernels shadow the container's own — quarto's
 # default "python3" then resolves to a host env missing the pipeline's packages, and
@@ -107,8 +107,8 @@ if not ZARRS:
 
 # Every per-cell QC column this deck shows, as (obs column, axis label, scale). All come
 # straight from the zarr — create_sdata annotates the counts and ratios, the Xenium reader
-# supplies the areas, nucleus count and segmentation method from cells.parquet. This deck
-# derives nothing.
+# supplies the areas, nucleus count and segmentation method from cells.parquet. No per-cell
+# or per-gene metric is derived here.
 #
 # This deck is exploratory: every metric appears on every plot type it can, so the whole
 # panel can be looked at once and the uninformative ones dropped afterwards. That is why
@@ -147,11 +147,37 @@ METRICS = [
 # not — a 2x2 is still readable at slide size, where a quarter-slide tissue panel is not.
 HIST_PANELS = 4
 
-# Every obs column this deck reads, checked against each zarr in the loop below. All of
-# them come from create_sdata or the Xenium reader; none is derived here. Listing them in
-# one place means a zarr that predates a column fails on the first sample with the column
-# named, rather than several slides later inside whichever panel happened to want it.
+# The per-GENE columns, same shape and same rule: create_sdata annotates all four onto var
+# at the one point X is in memory, so this deck reads them and derives nothing. They are a
+# separate list because they describe a different population — 5,101 panel genes rather
+# than the cells — and so cannot share a slide with the cell metrics or be indexed the
+# same way, not because they are treated differently.
+#
+# pct_dropout_by_transcripts is the only one that is linear: it is a bounded percentage,
+# and it runs to 100 for the genes no cell detected, which a log axis would drop entirely.
+# Those are the genes worth finding.
+GENE_METRICS = [
+    ("total_transcripts", "Transcripts per gene", "log"),
+    ("n_cells_by_transcripts", "Cells detecting the gene", "log"),
+    ("mean_transcripts", "Mean transcripts per cell", "log"),
+    ("pct_dropout_by_transcripts", "Cells not detecting the gene (%)", "linear"),
+]
+
+# The molecule-table columns pulled per sample, and the quality cut drawn on the qv panel.
+#
+# 20 is Xenium's own default threshold — the value the decoder uses to call a transcript
+# trustworthy, equivalent to a 1% error rate. It is drawn rather than applied: nothing here
+# filters, and the fraction below it is the number the slide exists to report.
+TX_COLUMNS = ["qv", "is_gene", "codeword_category", "fov_name",
+              "overlaps_nucleus", "nucleus_distance", "z"]
+QV_THRESHOLD = 20
+
+# Every obs and var column this deck reads, checked against each zarr in the loop below.
+# All of them come from create_sdata or the Xenium reader; none is derived here. Listing
+# them in one place means a zarr that predates a column fails on the first sample with the
+# column named, rather than several slides later inside whichever panel happened to want it.
 REQUIRED_OBS = [col for col, _, _ in METRICS] + ["sample"]
+REQUIRED_VAR = [col for col, _, _ in GENE_METRICS]
 
 
 # ── Slides ────────────────────────────────────────────────────────────────────
@@ -162,8 +188,13 @@ REQUIRED_OBS = [col for col, _, _ in METRICS] + ["sample"]
 # together far more often than either is edited alone.
 
 
-def qc_histogram_slide(sdata, sample, metrics):
-    """Slide: this sample's per-cell QC, one histogram per metric.
+def qc_histogram_slide(sdata, sample, metrics, level="obs"):
+    """Slide: this sample's QC distributions, one histogram per metric.
+
+    `level` picks the population: "obs" for the cells, "var" for the panel genes. The two
+    are the same figure over a different frame — same binning rules, same median rule,
+    same zero and NaN accounting — so they share this function rather than being written
+    twice and drifting.
 
     Hand-rolled rather than a library call, because scanpy has no histogram function.
     The other slides use sc.pl / spatialdata_plot and let those size their own marks.
@@ -208,24 +239,27 @@ def qc_histogram_slide(sdata, sample, metrics):
     And the median is labelled where it stands rather than in a panel title, so the
     number sits next to the rule it describes.
     """
-    display(Markdown("## Per-cell QC distributions"))
+    table = sdata.tables["table"]
+    frame = table.obs if level == "obs" else table.var
+    unit = "cells" if level == "obs" else "genes"
+
+    display(Markdown(f"## Per-{unit[:-1]} QC distributions"))
     display(Markdown(
         "Distributions of "
         + ", ".join(label.lower() for _, label, _ in metrics)
-        + " across all cells in this sample, before any filtering. The dashed line marks "
-        "each median. Counts and areas are on log axes, where cells at zero cannot be "
-        "drawn; ratios and percentages are on linear axes, where zero is plotted like any "
-        "other value. Cells with no nucleus have no nucleus area or ratio to draw. Cells "
-        "that cannot be drawn are counted beside the median instead."
+        + f" across all {unit} in this sample, before any filtering. The dashed line marks "
+        f"each median. Counts are on log axes, where {unit} at zero cannot be drawn; "
+        "ratios and percentages are on linear axes, where zero is plotted like any other "
+        f"value. {unit.capitalize()} that cannot be drawn are counted beside the median "
+        "instead."
     ))
 
-    table = sdata.tables["table"]
     fig, axes = plt.subplots(2, 2, figsize=FIGSIZE, squeeze=False)
     for ax, (col, label, scale) in zip(axes.ravel(), metrics):
         if scale == "categorical":
             # Sorted so the axis reads as a ranking; the names are long enough that
             # alphabetical order would give the eye nothing to hold onto.
-            counts = table.obs[col].value_counts().sort_values()
+            counts = frame[col].value_counts().sort_values()
             ax.barh(range(len(counts)), counts.to_numpy(),
                     color=BAR_FILL, edgecolor="white", linewidth=0.25)
             ax.set_yticks(range(len(counts)))
@@ -241,7 +275,7 @@ def qc_histogram_slide(sdata, sample, metrics):
             ax.spines[["top", "right", "left"]].set_visible(False)
             continue
 
-        raw = table.obs[col].to_numpy(dtype=float)
+        raw = frame[col].to_numpy(dtype=float)
         finite = raw[np.isfinite(raw)]
 
         if scale == "log":
@@ -283,7 +317,7 @@ def qc_histogram_slide(sdata, sample, metrics):
                     color=ANNOTATION_INK, fontsize=7.5)
 
         ax.set_xlabel(label)
-        ax.set_ylabel("Cells")
+        ax.set_ylabel(unit.capitalize())
         ax.grid(axis="y", color=GRID_INK, lw=0.6)
         ax.set_axisbelow(True)
         ax.tick_params(length=0)
@@ -292,7 +326,7 @@ def qc_histogram_slide(sdata, sample, metrics):
     for ax in axes.ravel()[len(metrics):]:
         fig.delaxes(ax)
 
-    fig.suptitle(f"{sample} · {table.n_obs:,} cells", x=0.01, ha="left")
+    fig.suptitle(f"{sample} · {len(frame):,} {unit}", x=0.01, ha="left")
     fig.tight_layout()
     plt.show()
     plt.close(fig)
@@ -512,6 +546,355 @@ def qc_tissue_labels_slide(sdata, sample, color, label, scale):
     fig.suptitle(f"{sample} · {table.n_obs:,} cells", x=0.01, ha="left")
     plt.show()
     plt.close(fig)
+
+
+def gene_rank_slide(sdata, sample):
+    """Slide: the panel's genes ranked by total transcripts.
+
+    The dynamic range of the panel in one line, and the only view that shows both ends of
+    it at once. The histogram slide gives the same numbers as a distribution, but a rank
+    curve is what makes the shape of the tail legible — where abundance falls off a cliff,
+    and how much of the panel sits in the floor.
+
+    Rank on a linear axis against abundance on a log one, because rank is a position in a
+    list of 5,101 and abundance spans five decades. Genes no cell detected are at zero and
+    cannot be drawn on that axis; they are the point of the slide rather than a footnote,
+    so they are marked as a span at the foot of the curve and counted in the annotation.
+    """
+    display(Markdown("## Gene abundance, ranked"))
+    display(Markdown(
+        "Every gene on the panel ranked by its total transcripts across all cells, on a "
+        "log axis. Genes detected in no cell have no abundance to draw and are marked as "
+        "a band at the foot of the curve."
+    ))
+
+    var = sdata.tables["table"].var
+    totals = np.sort(var["total_transcripts"].to_numpy(dtype=float))[::-1]
+    positive = totals[totals > 0]
+
+    fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.72, FIGSIZE[1]))
+    ax.plot(np.arange(1, len(positive) + 1), positive, color=BAR_FILL, lw=1.4)
+    ax.set_yscale("log")
+
+    n_zero = len(totals) - len(positive)
+    if n_zero:
+        # Spanned rather than plotted: these genes have a rank but no drawable value, and
+        # a band says "the list continues to here with nothing in it" where a dropped tail
+        # would just end the curve early and look like the panel stopped at 5,071.
+        ax.axvspan(len(positive), len(totals), color=ANNOTATION_INK, alpha=0.10)
+        ax.annotate(f"{n_zero:,} genes in no cell",
+                    xy=(len(totals), 0), xycoords=("data", "axes fraction"),
+                    xytext=(-4, 12), textcoords="offset points",
+                    ha="right", color=ANNOTATION_INK, fontsize=7.5)
+
+    ax.set_xlabel("Gene rank")
+    ax.set_ylabel("Transcripts across all cells")
+    ax.grid(color=GRID_INK, lw=0.6)
+    ax.set_axisbelow(True)
+    ax.tick_params(length=0)
+    ax.spines[["top", "right"]].set_visible(False)
+
+    fig.suptitle(f"{sample} · {len(totals):,} genes", x=0.01, ha="left")
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+
+def gene_detection_slide(sdata, sample):
+    """Slide: abundance against the number of cells detecting each gene.
+
+    The gene-side counterpart of the transcripts-vs-genes scatter, and it separates the
+    two ways a gene can be rare. A gene low on both axes is simply not expressed here. A
+    gene with many transcripts in few cells is the shape that matters — either genuinely
+    restricted to a small population, or a probe piling up on something that is not real.
+    Neither margin alone tells them apart.
+
+    Drawn with matplotlib rather than sc.pl.scatter, which reads obs and var of an AnnData
+    by name and is built for the cell axis; there is no var-side equivalent, and a plain
+    scatter of two var columns needs nothing scanpy provides.
+    """
+    display(Markdown("## Gene abundance vs detection"))
+    display(Markdown(
+        "One point per gene: total transcripts across all cells against the number of "
+        "cells detecting that gene, both on log axes. Genes at zero on either axis cannot "
+        "be drawn on a log axis and are counted in the title instead."
+    ))
+
+    var = sdata.tables["table"].var
+    x = var["n_cells_by_transcripts"].to_numpy(dtype=float)
+    y = var["total_transcripts"].to_numpy(dtype=float)
+    drawable = (x > 0) & (y > 0)
+
+    fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.72, FIGSIZE[1]))
+    # Small, semi-transparent marks: 5,101 genes on a log-log plane pile up along one arm,
+    # and opaque markers there read as a solid bar rather than a density.
+    ax.scatter(x[drawable], y[drawable], s=4, color=BAR_FILL, alpha=0.45, linewidths=0)
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+
+    ax.set_xlabel("Cells detecting the gene")
+    ax.set_ylabel("Transcripts across all cells")
+    ax.grid(color=GRID_INK, lw=0.6)
+    ax.set_axisbelow(True)
+    ax.tick_params(length=0)
+    ax.spines[["top", "right"]].set_visible(False)
+
+    title = f"{sample} · {len(x):,} genes"
+    n_dropped = int((~drawable).sum())
+    if n_dropped:
+        title += f" · {n_dropped:,} at zero"
+    fig.suptitle(title, x=0.01, ha="left")
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+
+def undetected_genes_slide(sdata, sample):
+    """Slide: the genes no cell detected, named.
+
+    The one slide in this deck that is a list rather than a figure, because the useful
+    output here is which probes to look at, and a name cannot be read off a distribution.
+    Every other slide says how many; this one says which.
+
+    A gene appearing here is not necessarily a failure — a panel carries markers for
+    populations a given section may not contain. It is a starting point for asking which,
+    which is why the slide names them and stops rather than calling them failed.
+    """
+    display(Markdown("## Genes detected in no cell"))
+
+    var = sdata.tables["table"].var
+    undetected = sorted(var.index[var["n_cells_by_transcripts"].to_numpy() == 0])
+
+    if not undetected:
+        display(Markdown(
+            f"Every one of the {len(var):,} panel genes was detected in at least one cell "
+            f"in {sample}."
+        ))
+        return
+
+    display(Markdown(
+        f"{len(undetected):,} of the {len(var):,} panel genes carry no transcript in any "
+        f"cell in {sample}. A gene may be absent because the section lacks the population "
+        "it marks, so these are named rather than called failures."
+    ))
+    # A plain comma-joined paragraph, not a table: pandoc's pptx writer gives a table its
+    # own layout and a fixed column count, which wastes most of a slide on 30 short names
+    # and overflows silently past whatever count fills the frame.
+    display(Markdown(", ".join(f"`{g}`" for g in undetected)))
+
+
+def transcript_qv_slide(sdata, sample, tx):
+    """Slide: the decoder's quality score over every transcript in the sample.
+
+    The rawest QC number the run has. qv is the Xenium decoder's confidence that a
+    molecule was called correctly, on a Phred-like scale; QV_THRESHOLD (20, a 1% error
+    rate) is the value Xenium's own pipeline treats as the boundary. The fraction below it
+    is the headline, and it is REPORTED rather than applied — this deck filters nothing,
+    and create_sdata's counts include every transcript regardless of qv.
+
+    That last point is what makes the slide worth its place: a cell's transcript_counts is
+    not a count of trustworthy molecules, and this is the only slide that says by how much.
+
+    The distribution is strongly bimodal and saturates — most molecules land at exactly 40,
+    the ceiling — so this is deliberately a linear axis over the full 0-40 range rather
+    than anything adaptive. A log count axis, though, because the trustworthy mode is
+    orders of magnitude taller than the tail that matters.
+    """
+    display(Markdown("## Transcript quality"))
+    display(Markdown(
+        "The decoder's quality value for every transcript in this sample, on a linear "
+        f"axis over the full range. The dashed line marks qv {QV_THRESHOLD}, Xenium's "
+        "default threshold. Counts are on a log axis. Nothing here is filtered — these "
+        "transcripts are all included in the per-cell counts on the earlier slides."
+    ))
+
+    qv = tx["qv"].to_numpy(dtype=float)
+    below = float((qv < QV_THRESHOLD).mean())
+
+    fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.72, FIGSIZE[1]))
+    ax.hist(qv, bins=80, color=BAR_FILL, edgecolor="white", linewidth=0.25)
+    ax.set_yscale("log")
+    ax.axvline(QV_THRESHOLD, color=ANNOTATION_INK, lw=1.0, ls="--")
+    ax.annotate(f"{below:.1%} below qv {QV_THRESHOLD}",
+                xy=(QV_THRESHOLD, 1), xycoords=("data", "axes fraction"),
+                xytext=(4, -11), textcoords="offset points",
+                color=ANNOTATION_INK, fontsize=7.5)
+
+    ax.set_xlabel("Transcript quality value (qv)")
+    ax.set_ylabel("Transcripts")
+    ax.grid(axis="y", color=GRID_INK, lw=0.6)
+    ax.set_axisbelow(True)
+    ax.tick_params(length=0)
+    ax.spines[["top", "right", "left"]].set_visible(False)
+
+    fig.suptitle(f"{sample} · {len(qv):,} transcripts", x=0.01, ha="left")
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+
+def codeword_category_slide(sdata, sample, tx):
+    """Slide: how the run's molecules divide across codeword categories.
+
+    The negative-control picture at the molecule level, which the per-cell pct_control
+    cannot give: that column is a per-cell ratio over the five control counters lumped
+    together, while these are the categories themselves, separated and counted.
+
+    A log count axis, because the categories span five decades — millions of gene calls
+    against a few hundred of each control class — and on a linear axis every control bar
+    is invisible, which is the opposite of what a control is for.
+
+    Horizontal bars for the same reason the segmentation-method panel uses them: the
+    category names are long, and they belong on the axis with room for them.
+    """
+    display(Markdown("## Transcripts by codeword category"))
+    display(Markdown(
+        "Every transcript in this sample counted by the category of codeword it was "
+        "decoded to, on a log axis. Gene categories are the panel's real targets; the "
+        "control and unassigned categories are the run's background."
+    ))
+
+    counts = tx["codeword_category"].value_counts().sort_values()
+    total = int(counts.sum())
+
+    fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.78, FIGSIZE[1]))
+    ax.barh(range(len(counts)), counts.to_numpy(),
+            color=BAR_FILL, edgecolor="white", linewidth=0.25)
+    ax.set_xscale("log")
+    ax.set_yticks(range(len(counts)))
+    ax.set_yticklabels([str(c).replace("_", " ") for c in counts.index], fontsize=7)
+
+    # The share is the number being read here, and it is unreadable off a log axis —
+    # two bars a millimetre apart differ by a factor of three.
+    for i, n in enumerate(counts.to_numpy()):
+        ax.annotate(f"  {n:,} ({n / total:.3%})", xy=(n, i), va="center",
+                    color=ANNOTATION_INK, fontsize=6.5)
+
+    ax.set_xlabel("Transcripts")
+    ax.grid(axis="x", color=GRID_INK, lw=0.6)
+    ax.set_axisbelow(True)
+    ax.tick_params(length=0)
+    ax.spines[["top", "right", "left"]].set_visible(False)
+    # Room for the annotations, which extend past the longest bar.
+    ax.set_xlim(right=counts.max() * 12)
+
+    fig.suptitle(f"{sample} · {total:,} transcripts", x=0.01, ha="left")
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+
+def transcript_fov_slide(sdata, sample, tx):
+    """Slide: transcript yield and quality per field of view.
+
+    The only slide in this deck that can see an INSTRUMENT problem rather than a biological
+    or segmentation one. A field that lost focus, or that decoded badly on one cycle, shows
+    up as a low bar here while being invisible in every per-cell distribution — its cells
+    just look like poor cells, spread through the same histograms as everything else.
+
+    Both panels share the same field order so a field can be read across them. Yield alone
+    is ambiguous: a field covering the edge of the section legitimately holds fewer
+    transcripts, and it is a normal yield with a depressed median qv, or the reverse, that
+    points at the instrument rather than the tissue.
+    """
+    display(Markdown("## Transcripts by field of view"))
+    display(Markdown(
+        "Left, the number of transcripts decoded in each field of view. Right, the median "
+        "quality value in the same field, with the dashed line at Xenium's default "
+        f"threshold of qv {QV_THRESHOLD}. Fields are in the same order in both panels."
+    ))
+
+    by_fov = tx.groupby("fov_name", observed=True)
+    counts = by_fov.size().sort_index()
+    median_qv = by_fov["qv"].median().reindex(counts.index)
+
+    fig, axes = plt.subplots(1, 2, figsize=FIGSIZE, squeeze=False)
+    for ax, values, label in ((axes[0, 0], counts, "Transcripts"),
+                              (axes[0, 1], median_qv, "Median qv")):
+        ax.bar(range(len(values)), values.to_numpy(),
+               color=BAR_FILL, edgecolor="white", linewidth=0.25)
+        ax.set_xticks(range(len(values)))
+        ax.set_xticklabels([str(f) for f in values.index], fontsize=6.5, rotation=90)
+        ax.set_xlabel("Field of view")
+        ax.set_ylabel(label)
+        ax.grid(axis="y", color=GRID_INK, lw=0.6)
+        ax.set_axisbelow(True)
+        ax.tick_params(length=0)
+        ax.spines[["top", "right", "left"]].set_visible(False)
+
+    axes[0, 1].axhline(QV_THRESHOLD, color=ANNOTATION_INK, lw=1.0, ls="--")
+
+    fig.suptitle(f"{sample} · {len(counts):,} fields · {len(tx):,} transcripts",
+                 x=0.01, ha="left")
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+
+def transcript_geometry_slide(sdata, sample, tx):
+    """Slide: where the molecules sit relative to the tissue and the nuclei.
+
+    Three views of assignment rather than of expression, and they answer questions the
+    cell-level slides cannot reach because a molecule assigned to the wrong cell still
+    counts as a transcript in that cell.
+
+    The z panel is a focus check: the section occupies a band of z-planes, and transcripts
+    piling up at one end mean the imaged volume was not centred on the tissue.
+
+    The nucleus-distance panel is a segmentation check at molecule resolution. Cells are
+    called from a nuclear stain outward, so a long tail here is cytoplasmic signal being
+    attached to a nucleus some distance away — which is what nucleus_ratio sees per cell,
+    seen per molecule. It is log-count because the mode at zero (transcripts inside a
+    nucleus) is orders of magnitude taller than the tail that carries the information.
+
+    The nucleus-overlap panel is the same question reduced to a fraction, kept because
+    that single number is what gets compared between samples.
+    """
+    display(Markdown("## Transcript placement"))
+    display(Markdown(
+        "Left, the distribution of transcripts through the imaged z-planes. Middle, each "
+        "transcript's distance to its nucleus, with counts on a log axis. Right, the share "
+        "of transcripts falling inside a nucleus against outside one."
+    ))
+
+    fig, axes = plt.subplots(1, 3, figsize=FIGSIZE, squeeze=False)
+
+    ax = axes[0, 0]
+    ax.hist(tx["z"].to_numpy(dtype=float), bins=60,
+            color=BAR_FILL, edgecolor="white", linewidth=0.25)
+    ax.set_xlabel("z (µm)")
+    ax.set_ylabel("Transcripts")
+
+    ax = axes[0, 1]
+    ax.hist(tx["nucleus_distance"].to_numpy(dtype=float), bins=60,
+            color=BAR_FILL, edgecolor="white", linewidth=0.25)
+    ax.set_yscale("log")
+    ax.set_xlabel("Distance to nucleus (µm)")
+    ax.set_ylabel("Transcripts")
+
+    ax = axes[0, 2]
+    # uint8 0/1 out of the reader, named here so the axis is readable without the schema.
+    overlap = tx["overlaps_nucleus"].to_numpy()
+    shares = [float((overlap == 0).mean()), float((overlap == 1).mean())]
+    ax.bar([0, 1], shares, color=BAR_FILL, edgecolor="white", linewidth=0.25)
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(["Outside\nnucleus", "Inside\nnucleus"], fontsize=7)
+    ax.set_ylabel("Share of transcripts")
+    for i, share in enumerate(shares):
+        ax.annotate(f"{share:.1%}", xy=(i, share), ha="center",
+                    xytext=(0, 3), textcoords="offset points",
+                    color=ANNOTATION_INK, fontsize=7.5)
+
+    for ax in axes.ravel():
+        ax.grid(axis="y", color=GRID_INK, lw=0.6)
+        ax.set_axisbelow(True)
+        ax.tick_params(length=0)
+        ax.spines[["top", "right", "left"]].set_visible(False)
+
+    fig.suptitle(f"{sample} · {len(tx):,} transcripts", x=0.01, ha="left")
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
 ```
 
 ```{python}
@@ -534,8 +917,11 @@ for path in ZARRS:
     # .tables["table"] where a slide wants the annotations. One object, loaded once, in
     # the pipeline's own artifact type — no second representation to keep in step.
     #
-    # Only labels and tables: the deck draws the segmentation and reads obs, and nothing
-    # else. Images stay out because it plots none of them.
+    # Labels, tables and points: the deck draws the segmentation, reads obs and var, and
+    # aggregates the molecule table. Images stay out because it plots none of them.
+    #
+    # Points come back as a lazy Dask frame and cost nothing until asked; the one
+    # materialization is TX_COLUMNS below.
     #
     # This does read X into memory, which the previous read_lazy loader avoided. The
     # trade is worth it — 17 MB for a 21k-cell ROI, and the lazy version needed
@@ -544,14 +930,22 @@ for path in ZARRS:
     # Loading plainly costs some memory and removes a workaround. Revisit if a cohort of
     # whole-slide samples makes X the binding constraint; it is per sample and dropped
     # below, so the ceiling is one sample's matrix, not the cohort's.
-    sdata = spatialdata.read_zarr(path, selection=("labels", "tables"))
+    sdata = spatialdata.read_zarr(path, selection=("labels", "tables", "points"))
     table = sdata.tables["table"]
 
-    # This deck computes no QC metric of its own, and has no fallbacks. A report that
-    # derives a metric is a second definition of it, and the two drift without anything
-    # saying so; a fallback is that second definition wearing a disguise, letting a stale
-    # cohort render a deck whose numbers came from outside the pipeline. Failing here
-    # names the fix, which is to re-run create_sdata.
+    # This deck computes no PER-CELL or PER-GENE metric of its own, and has no fallbacks.
+    # A report that derives such a metric is a second definition of it, and the two drift
+    # without anything saying so; a fallback is that second definition wearing a disguise,
+    # letting a stale cohort render a deck whose numbers came from outside the pipeline.
+    # Failing here names the fix, which is to re-run create_sdata.
+    #
+    # The molecule-level slides ARE the exception, and it is a deliberate one. qv,
+    # codeword category, field of view and nucleus placement are properties of the
+    # transcript table, not summaries of X, so create_sdata never computed them and there
+    # is no pipeline definition for this deck to contradict — the rule exists to stop two
+    # definitions of one metric, and here there is only one. They are aggregated straight
+    # off points below. If any of them later earns a place in create_sdata's uns, this
+    # deck should read it from there and this exception should shrink.
     #
     # Outside the per-sample try below, deliberately: a missing column means the whole
     # cohort came from a create_sdata that predates it, so failing the render outright is
@@ -560,6 +954,12 @@ for path in ZARRS:
     if missing:
         raise KeyError(
             f"{Path(path).name}: obs is missing {missing}. These come from create_sdata "
+            "— re-run it over this sample rather than deriving them here."
+        )
+    missing = [c for c in REQUIRED_VAR if c not in table.var.columns]
+    if missing:
+        raise KeyError(
+            f"{Path(path).name}: var is missing {missing}. These come from create_sdata "
             "— re-run it over this sample rather than deriving them here."
         )
 
@@ -586,6 +986,33 @@ for path in ZARRS:
     slides += [partial(qc_tissue_labels_slide, color=col, label=label, scale=scale)
                for col, label, scale in METRICS]
 
+    # Then the gene side, reading var, and finally the molecule side, reading points. The
+    # order is cells, genes, transcripts — widest unit to narrowest, so each section is a
+    # finer-grained account of the same sample rather than an unrelated appendix.
+    slides += [partial(qc_histogram_slide, metrics=GENE_METRICS, level="var"),
+               gene_rank_slide, gene_detection_slide, undetected_genes_slide]
+
+    # The one materialization in this deck, and the only shared state its slides read, so
+    # it gets its own try: if it fails, every molecule slide below is meaningless and they
+    # are skipped together rather than each repeating the same traceback. That is the case
+    # the per-slide catch below explicitly does not cover.
+    #
+    # Only TX_COLUMNS, never the whole frame — the table carries coordinates and ids this
+    # deck does not plot, and they are most of its width. ~7M rows for a 21k-cell ROI takes
+    # about a second. A whole-slide sample is where this becomes the binding constraint,
+    # and the fix there is to aggregate lazily in Dask (value_counts and groupby both
+    # support it) rather than to materialize and subsample.
+    try:
+        tx = sdata.points["transcripts"][TX_COLUMNS].compute()
+        slides += [partial(transcript_qv_slide, tx=tx),
+                   partial(codeword_category_slide, tx=tx),
+                   partial(transcript_fov_slide, tx=tx),
+                   partial(transcript_geometry_slide, tx=tx)]
+    except Exception:
+        tx = None
+        display(Markdown("## Transcript-level QC"))
+        display(Markdown(f"```\n{traceback.format_exc()}\n```"))
+
     # This loop is a single cell, so anything raising without being caught aborts the cell
     # and drops every LATER sample from the deck too — with the render still exiting 0
     # under `error: true`.
@@ -597,9 +1024,7 @@ for path in ZARRS:
     # function emits its heading before it plots — which names the broken slide instead
     # of leaving a traceback loose in the section.
     #
-    # (A deck whose slides read shared derived state — a correlation matrix feeding three
-    # slides, say — wants one try around that computation instead: if it fails, every
-    # slide downstream of it is meaningless and should be skipped together.)
+    # (The molecule table above is exactly that case, and is guarded on its own.)
     for slide in slides:
         try:
             slide(sdata, sample)
@@ -609,5 +1034,7 @@ for path in ZARRS:
             plt.close()
             display(Markdown(f"```\n{traceback.format_exc()}\n```"))
 
-    del sdata, table
+    # tx is the largest thing here by far, so it is dropped with the rest rather than
+    # being left to survive into the next sample's load.
+    del sdata, table, tx
 ```
