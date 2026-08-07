@@ -199,12 +199,22 @@ TX_COLUMNS = ["x", "y", "qv", "is_gene", "codeword_category", "feature_name", "c
 QV_THRESHOLD = 20
 
 # Bin width for the molecule maps, in MICRONS rather than a bin count, so a bin means the
-# same thing on a 2,000 µm ROI and on a whole slide and two samples can be compared. At
-# 25 µm a bin is a few cell diameters.
-BIN_UM = 25
+# same thing on a 2,000 µm ROI and on a whole slide and two samples can be compared.
+#
+# 5 µm is SUB-CELLULAR — the median cell here is about 7.5 µm across — and is set from how
+# many molecules a bin can afford to lose rather than from anatomy. Xenium's transcript
+# density is high enough that the limit is far finer than it first looks: on these ROIs a
+# 5 µm bin still holds a median of ~110-130 transcripts, and only 1-6% of occupied bins
+# fall under MIN_BIN_TRANSCRIPTS. Below this it degrades fast — at 3 µm the median is ~40
+# and 12-22% of bins blank out, at 2 µm half of them do — so 5 is close to the floor.
+# Coarser wastes the resolution the data actually supports: at 25 µm a bin held ~3,000
+# transcripts, roughly 25x more than it needed to be stable.
+BIN_UM = 5
 # A bin holding two molecules of which one is bad is not 50% bad, it is empty space —
 # and on a fraction map those bins are the loudest thing on the slide. Below this count a
-# bin is left blank instead.
+# bin is left blank instead. At BIN_UM this mostly blanks the sparse tissue edge, which is
+# the intent; if a change to BIN_UM starts blanking tissue, that is the signal it went
+# too fine.
 MIN_BIN_TRANSCRIPTS = 20
 
 # The per-transcript flags mapped as a fraction per bin, as (label, predicate). Fractions
@@ -661,13 +671,12 @@ def transcript_map_slide(sdata, sample, tx, mask=None, label="Transcript density
 
     Bins are a fixed size in MICRONS, not a fixed count, so a bin means the same thing
     across samples of different extent and two samples' maps can be read against each
-    other. At 25 µm a bin is a few cell diameters — fine enough to localise a bad field,
-    coarse enough that the fraction in it is not noise.
+    other. BIN_UM is sub-cellular — see its comment for why the data supports that.
 
-    That last part matters and is what MIN_BIN_TRANSCRIPTS handles. A bin holding two
-    molecules of which one is bad is not 50% bad, it is empty space, and on a fraction map
-    those bins are the loudest thing on the slide. Sparse bins are masked to the colormap's
-    "bad" colour rather than plotted or silently zeroed.
+    The counterweight is MIN_BIN_TRANSCRIPTS. A bin holding two molecules of which one is
+    bad is not 50% bad, it is empty space, and on a fraction map those bins are the
+    loudest thing on the slide. Sparse bins are masked to the colormap's "bad" colour
+    rather than plotted or silently zeroed.
 
     These axes are in µm, unlike every other spatial slide here, because the points element
     is stored in µm and carries a scale TO spatialdata's pixel `global` frame rather than
