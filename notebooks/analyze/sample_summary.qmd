@@ -44,6 +44,14 @@ from scipy.spatial.distance import squareform
 # The reference template is 16:9 at 10 x 5.625in; leave room for a slide title.
 FIGSIZE = (9.0, 4.3)
 
+# Inches reserved beside the in-tissue plot for its cluster legend, which sits outside
+# the axes and would otherwise be cropped by tight_layout.
+SPATIAL_LEGEND_WIDTH = 1.2
+# Fraction of the in-tissue axes the cell dots should cover, which sets their size. A
+# fixed size cannot serve every section: at s=3 a 21k-cell strip reads well but a
+# 32k-cell section is a solid mat, and at s=1 the strip is speckle.
+SPATIAL_COVERAGE = 0.45
+
 # Every clustered zarr is staged into this notebook's working directory by the Nextflow
 # process, so globbing is the whole input contract — no params to pass or drift. These
 # are cluster_sdata's zarrs, not create_sdata's: they carry the leiden_res_* columns,
@@ -455,6 +463,90 @@ def umap_clusters(adata, sample, name):
     plt.close(fig)
 
 
+def spatial_clusters(adata, sample, name):
+    """One slide's figure: this sample's cells in tissue coordinates, coloured by cluster.
+
+    The UMAP says which cells group together; only this says whether that group is a
+    STRUCTURE. A cluster scattered evenly through the section and a cluster forming
+    discrete round bodies are the same picture on a UMAP and different biology here.
+
+    Drawn as bare centroids over white rather than over the morphology or H&E image.
+    spatialdata_plot renders those happily — but the tissue's own texture competes with
+    the cluster colours at section scale and the result reads as mud, which is the
+    opposite of what this slide is for. The image belongs on a slide whose question is
+    "what tissue is this", not "where is this cluster".
+
+    Centroids from obsm["spatial"], not the cell_boundaries polygons: at section scale a
+    15 µm cell is well under a pixel, so the polygons cost a great deal of render time to
+    draw the same dots.
+
+    Three things are specific to tissue coordinates and all three would be wrong on
+    defaults. The FIGURE is shaped to the tissue's own aspect, because equal aspect is
+    non-negotiable here and a fixed box would render a wide strip as a band across an
+    empty slide. The MARKER is sized from the axes area and the cell count, since one
+    constant cannot serve a 21k-cell strip and a 700k-cell section. And y is INVERTED,
+    because Xenium global coordinates run downward from the top-left of the scan.
+    cluster_report does all three the same way.
+    """
+    x, y = adata.obsm["spatial"][:, 0], adata.obsm["spatial"][:, 1]
+
+    # Shape the figure to the data, leaving room for the legend beside it.
+    aspect = (x.max() - x.min()) / (y.max() - y.min())
+    plot_w = FIGSIZE[0] - SPATIAL_LEGEND_WIDTH
+    if aspect >= plot_w / FIGSIZE[1]:
+        w, h = plot_w, plot_w / aspect
+    else:
+        w, h = FIGSIZE[1] * aspect, FIGSIZE[1]
+    fig, ax = plt.subplots(figsize=(w + SPATIAL_LEGEND_WIDTH, h))
+
+    # Marker area (pt²) letting the cells cover SPATIAL_COVERAGE of the axes once.
+    # get_position() is the pre-tight_layout fraction of the figure, close enough to
+    # size a dot; 72 pt to the inch, squared, converts inches² to scatter's `s` units.
+    pos = ax.get_position()
+    area_pt2 = (pos.width * w) * (pos.height * h) * 72 ** 2
+    size = float(np.clip(SPATIAL_COVERAGE * area_pt2 / adata.n_obs, 0.5, 6.0))
+
+    # Largest cluster first, so small ones are drawn last and land on top. The reverse
+    # buries a 500-cell cluster under a 10,000-cell one wherever they overlap — which in
+    # tissue is everywhere, since a follicle sits inside stroma rather than beside it.
+    labels = adata.obs[name]
+    colors = adata.uns[f"{name}_colors"]
+    counts = labels.value_counts()
+    for level in sorted(labels.cat.categories, key=lambda l: -counts[l]):
+        m = (labels == level).to_numpy()
+        ax.scatter(x[m], y[m], color=colors[int(level) - 1], label=level,
+                   s=size, alpha=1.0, edgecolors="none", rasterized=True)
+
+    ax.set_aspect("equal")
+    ax.invert_yaxis()
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    # Legend rather than on-data labels: a cluster spread across a whole section has its
+    # median in the middle of everything else, so the label lands on cells it does not
+    # belong to. markerscale lifts the key dots off the plotted size, which is a speck.
+    #
+    # Handles are reordered numerically before being handed over. Draw order and legend
+    # order are separate concerns that matplotlib ties together: the scatters run
+    # largest-cluster-first so the small ones land on top, which would otherwise leave
+    # the legend reading 1, 4, 2, 7... The reorder keeps both — z-stacking by size, key
+    # by number.
+    handles, keys = ax.get_legend_handles_labels()
+    by_number = sorted(range(len(keys)), key=lambda i: int(keys[i]))
+    ax.legend([handles[i] for i in by_number], [keys[i] for i in by_number],
+              loc="center left", bbox_to_anchor=(1.0, 0.5), frameon=False,
+              fontsize=7, markerscale=6, handletextpad=0.2, title=name,
+              title_fontsize=7)
+
+    fig.suptitle(f"{sample} · {adata.n_obs:,} cells · {labels.nunique()} clusters · tissue",
+                 fontsize=9, x=0.01, ha="left")
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+
 def qc_violins(adata, sample, name, resolution):
     """One slide's figure: this sample's per-cell QC, one violin per cluster per metric.
 
@@ -679,6 +771,16 @@ for path in ZARRS:
             "identifies it, not the colour."
         ))
         umap_clusters(adata, sample, "cluster_v2")
+
+        display(Markdown("## Clusters in tissue — v2 ids"))
+        display(Markdown(
+            "The same cells and clusters in tissue coordinates, carrying the v2 ids and "
+            "colours from the UMAP above. y is inverted and the aspect is equal, so the "
+            "section reads the way the scan does and its proportions are true. A cluster "
+            "that forms a discrete structure here is a different claim from one scattered "
+            "through the section, and the two are indistinguishable on a UMAP."
+        ))
+        spatial_clusters(adata, sample, "cluster_v2")
 
     except Exception:
         display(Markdown(f"```\n{traceback.format_exc()}\n```"))
