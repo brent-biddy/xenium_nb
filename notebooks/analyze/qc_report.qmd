@@ -1235,12 +1235,18 @@ def transcript_qv_slide(sdata, sample, tx):
 
     The rawest QC number the run has. qv is the Xenium decoder's confidence that a
     molecule was called correctly, on a Phred-like scale; QV_THRESHOLD (20, a 1% error
-    rate) is the value Xenium's own pipeline treats as the boundary. The fraction below it
-    is the headline, and it is REPORTED rather than applied — this deck filters nothing,
-    and create_sdata's counts include every transcript regardless of qv.
+    rate) is the value Xenium's own pipeline treats as the boundary.
 
-    That last point is what makes the slide worth its place: a cell's transcript_counts is
-    not a count of trustworthy molecules, and this is the only slide that says by how much.
+    That boundary has ALREADY been applied by the time this deck sees a count. 10x builds
+    the cell-feature matrix only from molecules at qv >= 20, so transcript_counts is
+    exactly the count of transcripts that are is_gene, assigned to a cell, and above the
+    cut — verified on an uncropped test bundle, where it matches for 100.000% of cells
+    while counting every molecule regardless of qv matches 0.27%.
+
+    So the fraction below threshold is NOT a marginal tail inside the counts; it is the
+    data discarded before counting, and it is what makes the slide worth its place. A
+    sample that lost 30% of its molecules here will look sparse on every per-cell
+    distribution for a reason that is not biological, and no other slide reports it.
 
     The distribution is strongly bimodal and saturates — most molecules land at exactly 40,
     the ceiling — so this is deliberately a linear axis over the full 0-40 range rather
@@ -1250,9 +1256,9 @@ def transcript_qv_slide(sdata, sample, tx):
     display(Markdown("## Transcript quality"))
     display(Markdown(
         "The decoder's quality value for every transcript in this sample, on a linear "
-        f"axis over the full range. The dashed line marks qv {QV_THRESHOLD}, Xenium's "
-        "default threshold. Counts are on a log axis. Nothing here is filtered — these "
-        "transcripts are all included in the per-cell counts on the earlier slides."
+        f"axis over the full range. The dashed line marks qv {QV_THRESHOLD}, the cut "
+        "Xenium applies when building the cell-feature matrix: molecules below it are "
+        "excluded from the per-cell counts on the earlier slides. Counts are on a log axis."
     ))
 
     qv = tx["qv"].to_numpy(dtype=float)
