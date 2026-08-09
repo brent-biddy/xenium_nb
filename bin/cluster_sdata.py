@@ -24,6 +24,13 @@ from timer import timer, timing_summary
 
 DEFAULT_RESOLUTIONS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
+# The filtering cut. These live here rather than in nextflow.config for the same reason
+# DEFAULT_RESOLUTIONS does: the modules omit the flag when the param is unset, so the
+# default is defined in exactly one place and the three cluster_sdata* steps cannot
+# drift apart on what "unfiltered" means.
+DEFAULT_MIN_COUNTS = 10
+DEFAULT_MIN_CELLS = 5
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -40,6 +47,20 @@ def parse_args():
         help="Leiden resolutions to sweep; one obs column is written per value "
         f"(default: {' '.join(str(r) for r in DEFAULT_RESOLUTIONS)}).",
     )
+    parser.add_argument(
+        "--min_counts",
+        type=int,
+        default=DEFAULT_MIN_COUNTS,
+        help="Drop cells with fewer than this many transcripts. Read the cut off the "
+        f"retention curves in the qc_report deck (default: {DEFAULT_MIN_COUNTS}).",
+    )
+    parser.add_argument(
+        "--min_cells",
+        type=int,
+        default=DEFAULT_MIN_CELLS,
+        help="Drop genes detected in fewer than this many cells "
+        f"(default: {DEFAULT_MIN_CELLS}).",
+    )
     return parser.parse_args()
 
 
@@ -54,6 +75,7 @@ def main():
     print(f"Input:   {args.path}")
     print(f"Output:  {output_path}")
     print(f"Res:     {', '.join(f'{r:g}' for r in resolutions)}")
+    print(f"Filter:  min_counts={args.min_counts}, min_cells={args.min_cells}")
 
     with timer("Read zarr"):
         sdata = spatialdata.read_zarr(args.path)
@@ -84,8 +106,8 @@ def main():
         # Dropping it is safe: filter_cells and filter_genes derive their thresholds
         # from X directly and never read obs, so the cut is unchanged.
         n_before = adata.n_obs
-        sc.pp.filter_cells(adata, min_counts=10)
-        sc.pp.filter_genes(adata, min_cells=5)
+        sc.pp.filter_cells(adata, min_counts=args.min_counts)
+        sc.pp.filter_genes(adata, min_cells=args.min_cells)
 
     print(f"Filtered {n_before - adata.n_obs:,} low-quality cells.")
     print(f"Retained {adata.n_obs:,} cells × {adata.n_vars:,} genes.")
