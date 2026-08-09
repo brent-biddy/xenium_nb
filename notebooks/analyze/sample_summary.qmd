@@ -138,16 +138,16 @@ REFERENCE_GENES = sorted({gene for cell_type in REFERENCE.columns
 # call is gone, so the column is gone with it, and create_sdata's own — computed once,
 # before any filtering — is what clustered zarrs carry.
 #
-# pct_control is the Xenium-specific one and the reason this list is worth revisiting: a
-# cluster reading control probes is debris, not a cell type, and no amount of staring at
-# transcripts and area will say so. It is on a LINEAR scale, unlike the three counts and
-# areas, because it is a percentage that is legitimately 0 for most cells on a clean
-# sample — a log axis cannot show that at all.
+# pct_control is deliberately NOT here, despite being the Xenium-specific debris signal
+# and now available from create_sdata. A violin is the wrong instrument for it: the
+# metric is exactly 0 for most cells on a clean sample, so every cluster collapses to a
+# spike at the baseline with a thin tail, and the one cluster that differs reads as a
+# slightly fatter spike. The comparison it supports — which cluster is reading control
+# probes — wants a per-cluster summary rather than a distribution.
 QC_COLUMNS = [
     ("transcript_counts", "Transcripts", True),
     ("n_genes_by_transcripts", "Genes", True),
     ("cell_area", "Cell area (µm²)", True),
-    ("pct_control", "Control %", False),
 ]
 
 # sample -> overriding resolution, as the float the CSV records. Read once here so a
@@ -805,11 +805,11 @@ for path in ZARRS:
             "Per-cell QC distributions, one violin per cluster, at this sample's Leiden "
             "resolution. Clusters carry the v2 ids and colours from the slides above, so "
             "adjacent violins are transcriptionally adjacent and a cluster reads straight "
-            "down the slide across all four metrics. Transcripts, genes and cell area are "
-            "on log axes; control percentage is linear, since it is legitimately zero for "
-            "most cells. The box inside each violin is its interquartile range and median. "
-            "A cluster low on transcripts and genes together, or high on control "
-            "percentage, is debris rather than a cell type."
+            "down the slide across all three metrics. All are on log axes, being strictly "
+            "positive and heavily right-skewed. The box inside each violin is its "
+            "interquartile range and median. A cluster low on transcripts and genes "
+            "together, or with cells whose area sits well off the rest, is debris rather "
+            "than a cell type."
         ))
         qc_violins(adata, sample, "cluster_v2", resolution)
 
