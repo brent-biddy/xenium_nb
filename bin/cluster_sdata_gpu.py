@@ -25,9 +25,19 @@ from timer import timer, timing_summary
 DEFAULT_RESOLUTIONS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
 # Must stay in step with cluster_sdata.py — the CPU and GPU steps are meant to be
-# interchangeable, so a different default cut here would make them silently disagree.
-DEFAULT_MIN_COUNTS = 10
-DEFAULT_MIN_CELLS = 5
+# interchangeable, so a different default cut or recipe constant here would make them
+# silently disagree. See that file for why these values were chosen.
+DEFAULT_MIN_COUNTS = 20
+DEFAULT_MIN_CELLS = 100
+DEFAULT_MAX_COUNTS_QUANTILE = 0.98
+
+HVG_N_TOP_GENES = 2000
+SCALE_MAX_VALUE = 10
+N_PCS = 30
+NEIGHBORS_METRIC = "cosine"
+# 100, not the vignette's -1: rapids forwards it to cuGraph as a size_t and overflows
+# on a negative. See cluster_sdata.py.
+LEIDEN_N_ITERATIONS = 100
 
 
 def parse_args():
@@ -59,6 +69,13 @@ def parse_args():
         help="Drop genes detected in fewer than this many cells "
         f"(default: {DEFAULT_MIN_CELLS}).",
     )
+    parser.add_argument(
+        "--max_counts_quantile",
+        type=float,
+        default=DEFAULT_MAX_COUNTS_QUANTILE,
+        help="Drop cells above this quantile of transcript_counts, to remove doublets "
+        f"and segmentation merges. 0 disables (default: {DEFAULT_MAX_COUNTS_QUANTILE}).",
+    )
     return parser.parse_args()
 
 
@@ -73,7 +90,8 @@ def main():
     print(f"Input:   {args.path}")
     print(f"Output:  {output_path}")
     print(f"Res:     {', '.join(f'{r:g}' for r in resolutions)}")
-    print(f"Filter:  min_counts={args.min_counts}, min_cells={args.min_cells}")
+    print(f"Filter:  min_counts={args.min_counts}, min_cells={args.min_cells}, "
+          f"max_counts_quantile={args.max_counts_quantile:g}")
 
     with timer("Read zarr"):
         sdata = spatialdata.read_zarr(args.path)
@@ -96,22 +114,41 @@ def main():
         # Dropping it is safe: rsc.pp.filter_cells and filter_genes both derive their
         # thresholds from X via _basic_qc and never read obs, so the cut is unchanged.
         n_before = adata.n_obs
+        # Quantile on the UNFILTERED table, before min_counts removes the low tail —
+        # see cluster_sdata.py's Filter block.
+        max_counts = (
+            float(adata.obs["transcript_counts"].quantile(args.max_counts_quantile))
+            if args.max_counts_quantile else None
+        )
         rsc.pp.filter_cells(adata, min_counts=args.min_counts)
+        if max_counts is not None:
+            rsc.pp.filter_cells(adata, max_counts=max_counts)
+            print(f"Upper cut at q{args.max_counts_quantile:g} = {max_counts:,.0f} transcripts.")
         rsc.pp.filter_genes(adata, min_cells=args.min_cells)
 
     print(f"Filtered {n_before - adata.n_obs:,} low-quality cells.")
     print(f"Retained {adata.n_obs:,} cells × {adata.n_vars:,} genes.")
 
+    with timer("HVG"):
+        # seurat_v3 on raw counts, before normalization — see cluster_sdata.py.
+        rsc.pp.highly_variable_genes(
+            adata, flavor="seurat_v3", n_top_genes=HVG_N_TOP_GENES)
+
     with timer("Normalize"):
         adata.layers["counts"] = adata.X.copy()
         rsc.pp.normalize_total(adata, inplace=True)
         rsc.pp.log1p(adata)
+        # Preserved before scaling overwrites X; downstream annotation reads this.
+        adata.layers["lognorm"] = adata.X.copy()
+
+    with timer("Scale"):
+        rsc.pp.scale(adata, zero_center=False, max_value=SCALE_MAX_VALUE)
 
     with timer("PCA"):
-        rsc.pp.pca(adata, random_state=0)
+        rsc.pp.pca(adata, n_comps=N_PCS, random_state=0)
 
     with timer("Neighbors"):
-        rsc.pp.neighbors(adata, random_state=0)
+        rsc.pp.neighbors(adata, metric=NEIGHBORS_METRIC, random_state=0)
 
     with timer("UMAP"):
         rsc.tl.umap(adata, random_state=0)
@@ -125,6 +162,7 @@ def main():
                 adata,
                 resolution=res,
                 key_added=f"leiden_res_{res:.2f}",
+                n_iterations=LEIDEN_N_ITERATIONS,
                 random_state=0,
             )
 

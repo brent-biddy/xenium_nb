@@ -22,7 +22,7 @@ process CLUSTER_SDATA_GPU {
     input:
     // See cluster_sdata.nf: the cut is per-sample so it rides in the tuple, while the
     // cohort-wide resolution sweep stays a plain val.
-    tuple val(sample), path(input_path), val(min_counts), val(min_cells)
+    tuple val(sample), path(input_path), val(min_counts), val(min_cells), val(max_counts_quantile)
     val resolutions
 
     output:
@@ -43,6 +43,7 @@ process CLUSTER_SDATA_GPU {
     // single definition in the Python script rather than being restated in the config.
     if (min_counts != '') clusterArgs << "--min_counts ${min_counts}"
     if (min_cells != '') clusterArgs << "--min_cells ${min_cells}"
+    if (max_counts_quantile != '') clusterArgs << "--max_counts_quantile ${max_counts_quantile}"
     """
     export XDG_CACHE_HOME="\$PWD/.cache"
     export TMPDIR="\$PWD/tmp"
