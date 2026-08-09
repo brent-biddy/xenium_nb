@@ -1,6 +1,6 @@
 ---
 title: "xenium_nb — sample summary"
-subtitle: "Per-cell QC by cluster, one sample per section"
+subtitle: "Clusters and centroid correlation, one sample per section"
 # Pin the kernel by name, as cluster_report.qmd does. Apptainer bind-mounts $HOME, so
 # kernelspecs from ~/.local/share/jupyter/kernels shadow the container's own — quarto's
 # default "python3" then resolves to a host env missing the pipeline's packages, and
@@ -147,7 +147,7 @@ if RESOLUTIONS_CSV.exists():
     OVERRIDES = dict(zip(chosen["sample"].astype(str), chosen["resolution"].astype(float)))
 
 
-# Cluster-id colours here encode ORDER, not identity: the dendrogram ids are 1..n in
+# Cluster-id colours here encode ORDER, not identity: the v2 ids are 1..n in
 # dendrogram order, so adjacent ids are transcriptionally adjacent. Sampling a multi-hue
 # ordered colormap ALONG that order makes proximity read as colour similarity — the
 # opposite of a categorical palette like tab20, which maximises adjacent contrast and so
@@ -238,10 +238,10 @@ def centroid_correlation(sample, corr, order):
     TICKS differ between the two panels — the matrix is identical, drawn in dendrogram
     order both times.
 
-    Left is keyed by the size-ranked ids, which therefore read out of numeric sequence;
-    right by the dendrogram ids, which read 1..n because that numbering IS this ordering.
+    Left is keyed by the v1 ids, which therefore read out of numeric sequence;
+    right by the v2 ids, which read 1..n because that numbering IS this ordering.
     Side by side rather than on consecutive slides so the rename is visible in place — a
-    reader sees which size-ranked cluster each new id renames without chasing a mapping
+    reader sees which v1 cluster each v2 id renames without chasing a mapping
     line in the caption.
 
     The diagonal is kept rather than blanked. It is 1 by construction, but on this data the
@@ -259,10 +259,10 @@ def centroid_correlation(sample, corr, order):
     # construction rather than by each panel happening to compute it from the same matrix.
     vmin, vmax = float(values.min()), float(values.max())
 
-    # order[p] is a 0-based size-rank position; +1 makes it the printed size id.
+    # order[p] is a 0-based v1 rank position; +1 makes it the printed v1 id.
     panels = (
-        ([int(p) + 1 for p in order], "Cluster (size-ranked)", "size-ranked ids"),
-        (list(range(1, len(order) + 1)), "Cluster (dendrogram)", "dendrogram-ordered ids"),
+        ([int(p) + 1 for p in order], "Cluster (v1)", "v1 ids"),
+        (list(range(1, len(order) + 1)), "Cluster (v2)", "v2 ids"),
     )
 
     fig, axes = plt.subplots(1, 2, figsize=(12.5, 5.2), constrained_layout=True)
@@ -376,7 +376,7 @@ def marker_scores(adata, sample, name):
         )
         ax.title.set_fontsize(8)
 
-    # Per-cluster means, clusters down the rows in the same size-ranked order the UMAP
+    # Per-cluster means, clusters down the rows in the same v1 order the UMAP
     # slide uses, so a row here refers to the cluster carrying that number there.
     #
     # Order by the label read as an integer, taken from the labels that exist. Not
@@ -578,10 +578,10 @@ for path in ZARRS:
         # of the same data. int() because the labels are strings, where "10" < "2".
         counts = adata.obs[key].value_counts()
         levels = sorted(counts.index, key=lambda level: (-counts[level], int(level)))
-        add_cluster_ids(adata, key, levels, "cluster_size")
+        add_cluster_ids(adata, key, levels, "cluster_v1")
 
         # Centroids, their correlation, and the dendrogram order, computed once here rather
-        # than inside a slide function: both the heatmap and the dendrogram-ordered
+        # than inside a slide function: both the heatmap and the v2
         # numbering need the ordering, and the counts layer is by far the most expensive
         # thing this deck touches.
         #
@@ -606,48 +606,19 @@ for path in ZARRS:
         adata.layers["cp10k"] = adata.layers["counts"].copy()
         sc.pp.normalize_total(adata, layer="cp10k", target_sum=1e4)
         # sc.get.aggregate returns its result in .layers["mean"], not .X.
-        agg = sc.get.aggregate(adata, by="cluster_size", func="mean", layer="cp10k")
+        agg = sc.get.aggregate(adata, by="cluster_v1", func="mean", layer="cp10k")
         centroids = pd.DataFrame(np.log1p(agg.layers["mean"]),
                                  index=list(agg.obs_names), columns=agg.var_names)
 
-        # Score the follicle marker sets off the SAME layer, log1p'd in place now that
-        # the centroids have taken their mean from the linear values. In place rather
-        # than a second layer because this deck already holds one extra copy of the
-        # count matrix and a whole-slide sample makes that the dominant cost.
-        #
-        # Scoring reads this layer rather than X on purpose. Under the current recipe X
-        # is log-normalized and would give the same answer, but cluster_sdata scales X
-        # before writing, and a scaled X would silently score z-like values instead of
-        # expression. Deriving from layers["counts"] is true either way.
-        adata.layers["cp10k"] = np.log1p(adata.layers["cp10k"])
-        adata.uns["marker_n_genes"] = {}
-        for marker_set, genes in MARKER_SETS.items():
-            present = [gene for gene in genes if gene in adata.var_names]
-            adata.uns["marker_n_genes"][marker_set] = len(present)
-            # ctrl_size defaults to 50 and is capped at the set size by scanpy; left
-            # alone so every set uses the same background definition the method assumes.
-            sc.tl.score_genes(adata, present, score_name=f"score_{marker_set}",
-                              layer="cp10k")
+        # NOTE: the follicle marker scoring that used to run here is removed for now,
+        # along with the reference correlation below — marker_scores() and
+        # reference_correlation() are still defined and their assets still staged, and
+        # both go back into the per-sample sequence once their place in the deck is
+        # settled. Nothing is paid for a figure that is not drawn.
 
         # Drop the second copy of the matrix now: the figures below do not need it.
         del adata.layers["cp10k"]
         gc.collect()
-
-        # Correlate those same centroids against the reference. Spearman ranks genes
-        # within a centroid, so the log1p and the CP10K target above are both
-        # irrelevant here — but the centroids are the comparable form, and reusing them
-        # keeps one definition of a cluster's expression profile in this deck.
-        #
-        # Intersecting with var_names rather than assuming: cluster_sdata marks genes
-        # below min_cells ineligible for the embedding but keeps them, so the panel is
-        # whole — though an older zarr, or one narrowed by --n_top_genes, will be
-        # missing some.
-        reference_genes = [g for g in REFERENCE_GENES if g in centroids.columns]
-        reference_corr = pd.DataFrame(index=centroids.index,
-                                      columns=REFERENCE.columns, dtype=float)
-        for cell_type in REFERENCE.columns:
-            reference_corr[cell_type] = centroids[reference_genes].T.corrwith(
-                REFERENCE.loc[reference_genes, cell_type], method="spearman")
 
         # Spearman rather than Pearson on the values: a targeted panel's centroids are
         # dominated by a few very high-expressing genes, which set a Pearson r almost on
@@ -667,11 +638,11 @@ for path in ZARRS:
         np.fill_diagonal(distance, 0.0)
         order = leaves_list(linkage(squareform(distance, checks=False), method="average"))
 
-        add_cluster_ids(adata, key, [levels[i] for i in order], "cluster_dendro")
+        add_cluster_ids(adata, key, [levels[i] for i in order], "cluster_v2")
 
-        # The UMAP comes first: it establishes what each cluster number and colour refers
-        # to, which the violin slide then reads against.
-        display(Markdown("## Clusters on the UMAP — size-ranked ids"))
+        # The v1 UMAP comes first: it establishes what each cluster number and colour
+        # refers to, which the correlation heatmap then reads against.
+        display(Markdown("## Clusters on the UMAP — v1 ids"))
         display(Markdown(
             "Cells in UMAP coordinates, coloured by cluster at this sample's Leiden "
             "resolution. Clusters are renumbered 1-n by descending cell count, so cluster "
@@ -679,33 +650,7 @@ for path in ZARRS:
             "Leiden labels cluster_report uses. Each number sits at its cluster's median "
             "position."
         ))
-        umap_clusters(adata, sample, "cluster_size")
-
-        display(Markdown("## Follicle marker scores"))
-        display(Markdown(
-            "Granulosa, oocyte and theca marker sets from Sci Adv adm7506 Data S5, "
-            "scored per cell against a background of similarly-expressed genes and shown "
-            "in UMAP coordinates, with each set's mean per cluster on the right. Panel "
-            "titles give how many of each set's genes are on this panel. Scores are "
-            "relative: zero means no different from background, and values are comparable "
-            "across cells within a sample rather than against a fixed threshold. Clusters "
-            "are the size-ranked ids from the previous slide."
-        ))
-        marker_scores(adata, sample, "cluster_size")
-
-        display(Markdown("## Cluster centroids vs major cell types"))
-        display(Markdown(
-            "Spearman correlation between each cluster's centroid and the four major "
-            "cell types of the Sci Adv adm7506 ovary reference, over the genes most "
-            "specific to one of those types. Each row is labelled with its best match "
-            "and the margin over the runner-up. The reference holds no follicle or "
-            "epithelial types, so a granulosa or oocyte cluster is assigned to whichever "
-            "of the four it least badly resembles — a low correlation with a small "
-            "margin reads as 'not in the reference', and the previous slide is what "
-            "names those clusters. No threshold is applied and no call is written "
-            "anywhere; the numbers are reported and the judgement is the reader's."
-        ))
-        reference_correlation(sample, reference_corr)
+        umap_clusters(adata, sample, "cluster_v1")
 
         display(Markdown("## Cluster centroid correlation"))
         display(Markdown(
@@ -714,36 +659,27 @@ for path in ZARRS:
             "over each cluster's cells and then log1p'd. Both panels are the same matrix, "
             "cell for cell — only the tick labels differ. Rows and columns are ordered by "
             "hierarchical clustering, so similar clusters sit adjacent as blocks: the "
-            "size-ranked ids on the left therefore read out of numeric sequence, while "
-            "the dendrogram ids on the right read 1-n. Reading across the two shows which "
-            "size-ranked cluster each dendrogram id renames. High off-diagonal pairs are "
+            "v1 ids on the left therefore read out of numeric sequence, while "
+            "the v2 ids on the right read 1-n. Reading across the two shows which "
+            "v1 cluster each v2 id renames. High off-diagonal pairs are "
             "clusters the chosen resolution split that are transcriptionally "
             "near-identical."
         ))
         centroid_correlation(sample, corr, order)
 
-        # The dendrogram-ordered UMAP follows the heatmaps, since they are what define
+        # The v2 UMAP follows the heatmaps, since they are what define
         # this numbering — reading it before the matrix that produced it would be
         # backwards.
-        display(Markdown("## Clusters on the UMAP — dendrogram-ordered ids"))
+        display(Markdown("## Clusters on the UMAP — v2 ids"))
         display(Markdown(
             "The same cells and the same clusters as the first UMAP, carrying the "
-            "dendrogram-ordered ids from the heatmap above, so adjacent numbers are "
+            "v2 ids from the heatmap above, so adjacent numbers are "
             "transcriptionally adjacent. Colours follow the new numbering, so a given "
-            "cluster is not the same colour here as on the size-ranked UMAP — the number "
+            "cluster is not the same colour here as on the v1 UMAP — the number "
             "identifies it, not the colour."
         ))
-        umap_clusters(adata, sample, "cluster_dendro")
+        umap_clusters(adata, sample, "cluster_v2")
 
-        display(Markdown("## Per-cell QC by cluster — dendrogram-ordered ids"))
-        display(Markdown(
-            "Per-cell QC distributions, one violin per cluster, at this sample's Leiden "
-            "resolution. Clusters carry the dendrogram-ordered ids and colours, matching "
-            "the heatmap and UMAP above, so adjacent violins are transcriptionally "
-            "adjacent. Transcripts, genes, and cell area are on log axes; the box inside "
-            "each violin is its interquartile range and median."
-        ))
-        qc_violins(adata, sample, "cluster_dendro", resolution)
     except Exception:
         display(Markdown(f"```\n{traceback.format_exc()}\n```"))
 
