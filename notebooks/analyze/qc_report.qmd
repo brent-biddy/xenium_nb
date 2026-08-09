@@ -30,6 +30,7 @@ import traceback
 from functools import partial
 from pathlib import Path
 
+import dask
 import matplotlib.pyplot as plt
 import numpy as np
 import scanpy as sc
@@ -326,12 +327,18 @@ CANDIDATE_MIN_CELLS = (3, 5, 10, 25, 50, 100, 250)
 # The molecule-table columns pulled per sample, and the quality cut drawn on the qv panel.
 #
 # 20 is Xenium's own default threshold — the value the decoder uses to call a transcript
-# trustworthy, equivalent to a 1% error rate. It is drawn rather than applied: nothing here
-# filters, and the fraction below it is the number the slide exists to report.
+# trustworthy, equivalent to a 1% error rate. This deck draws it rather than applying it,
+# because Xenium already applied it: transcript_counts is built only from molecules at or
+# above the cut, so the fraction below is data discarded before counting rather than a tail
+# inside the counts. That fraction is the number the slide exists to report.
 # The molecule-table columns materialized per sample, for the slides that aggregate in
 # pandas. The MAPS do not appear here: they are drawn by spatialdata_plot straight off the
 # lazy points element, so their columns never need to come into memory.
-TX_COLUMNS = ["qv", "codeword_category", "feature_name", "fov_name",
+#
+# feature_name is deliberately NOT here. It was only ever pulled to build the gene→category
+# lookup, which create_sdata now annotates onto var — and it is the widest column in the
+# table after the coordinates.
+TX_COLUMNS = ["qv", "codeword_category", "fov_name",
               "overlaps_nucleus", "nucleus_distance", "z"]
 QV_THRESHOLD = 20
 
@@ -418,7 +425,7 @@ TX_MAPS = [
 # A zarr that cannot support the whole deck should say so when it is first read, not the
 # next time someone uncomments a line in SECTIONS.
 REQUIRED_OBS = [col for col, _, _ in METRICS] + ["sample"]
-REQUIRED_VAR = [col for col, _, _ in GENE_HIST_METRICS]
+REQUIRED_VAR = [col for col, _, _ in GENE_HIST_METRICS] + ["codeword_category"]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -944,7 +951,7 @@ def qc_tissue_labels_slide(sdata, sample, color, label, scale):
     plt.close(fig)
 
 
-def transcript_map_slide(sdata, sample, element, label, vmax, size):
+def transcript_map_slide(sdata, sample, element, label, vmax, size, n_molecules, share):
     """Slide: where a subset of the molecule table sits in tissue, by spatialdata_plot.
 
     The only spatial view in this deck drawn from transcripts rather than from cells, and
@@ -968,6 +975,12 @@ def transcript_map_slide(sdata, sample, element, label, vmax, size):
     reduction is meaningless under the matplotlib path. `size` is not a marker size here;
     see MAP_POINT_SIZE.
 
+    n_molecules and share are passed in rather than counted here, so all four subsets come
+    from one dask pass at assembly. They are stated because the map answers WHERE and not
+    HOW MUCH — a clipped count map is deliberately close to presence/absence, so its
+    magnitude cannot be read off the colour, and the share of transcripts assigned to no
+    cell is the one segmentation figure nothing else in the pipeline reports.
+
     Two consequences of letting the library aggregate, both deliberate and neither hidden:
 
     The canvas resolution is the FIGURE's — figure inches x dpi — not a length in microns,
@@ -983,7 +996,10 @@ def transcript_map_slide(sdata, sample, element, label, vmax, size):
         f"Every transcript {'in this sample' if element == 'transcripts' else label.lower()}"
         ", counted over the plotting canvas, across the whole imaged area rather than only "
         f"within cells. The colour scale is clipped at {vmax}, so anything at or above that "
-        "is drawn the same; white is where no transcript falls."
+        "is drawn the same; white is where no transcript falls. "
+        + (f"{n_molecules:,} transcripts in total."
+           if element == "transcripts"
+           else f"{n_molecules:,} transcripts, {share:.1%} of the sample.")
     ))
 
     fig, ax = plt.subplots(figsize=FIGSIZE)
@@ -1623,44 +1639,41 @@ for path in ZARRS:
         slides += [partial(qc_tissue_labels_slide, color=col, label=label, scale=scale)
                    for col, label, scale in TISSUE_METRICS]
 
-    # The molecule table is loaded BEFORE the gene slides are built, even though it is the
-    # last section to appear, because the gene→category lookup comes out of it: codeword
-    # category is a property of the transcript, and the only place a gene's category is
-    # recorded is the rows that decoded to it.
+    # The gene→category lookup is READ from var, where create_sdata annotated it, rather
+    # than rebuilt from the molecule table. The deck used to derive it here, and that was
+    # its last remaining reason to materialize 7M rows on a default render.
     #
-    # This is the one materialization in this deck, and the only shared state its slides
-    # read, so it gets its own try: if it fails, every molecule slide is meaningless and
-    # they are skipped together rather than each repeating the same traceback. That is the
-    # case the per-slide catch below explicitly does not cover. The gene slides still
-    # render — they fall back to a single colour, since the geometry is theirs and only the
-    # colouring came from here.
+    # Normalised to object/None on the way in rather than trusted. create_sdata writes it
+    # that way, but a zarr round-trip can return the column as a categorical or a nullable
+    # string, and pd.NA == "predesigned_gene" evaluates to pd.NA rather than False — which
+    # makes every comparison-built mask downstream raise "boolean value of NA is ambiguous"
+    # instead of simply excluding the gene. This is a dtype normalisation, not a second
+    # definition of the value: an unmapped gene stays unmapped and the slides name it.
+    gene_category = table.var["codeword_category"]
+    gene_category = gene_category.astype(object).where(gene_category.notna(), None)
+
+    # The molecule table is materialized ONLY for the sections that plot it. Nothing above
+    # this point needs it any more, so a default render — where both molecule sections are
+    # off — never touches points at all.
+    #
+    # It is the one materialization in this deck and the only shared state its slides read,
+    # so it gets its own try: if it fails, every molecule slide is meaningless and they are
+    # skipped together rather than each repeating the same traceback. That is the case the
+    # per-slide catch below explicitly does not cover. The gene slides are unaffected now
+    # that their colouring comes from var.
     #
     # Only TX_COLUMNS, never the whole frame — the table carries coordinates and ids this
     # deck does not plot, and they are most of its width. ~7M rows for a 21k-cell ROI takes
     # about a second. A whole-slide sample is where this becomes the binding constraint,
     # and the fix there is to aggregate lazily in Dask (value_counts and groupby both
     # support it) rather than to materialize and subsample.
-    tx = gene_category = None
-    try:
-        tx = sdata.points["transcripts"][TX_COLUMNS].compute()
-        # feature_name → codeword_category is one-to-one (verified: no feature carries two
-        # categories), so first() is a lookup rather than a summary — which is why this
-        # does not make the deck a second definition of anything.
-        #
-        # Reindexing onto var leaves NaN for a gene with no transcript ANYWHERE in the
-        # sample, which has no row here to read a category from. That is a real state, not
-        # a lookup failure, and the slides name it rather than filling it in.
-        gene_category = (tx.groupby("feature_name", observed=True)["codeword_category"]
-                           .first().reindex(table.var.index))
-        # Normalise the missing value to None once, here, rather than in each slide.
-        # codeword_category is pandas "string" dtype, so reindex fills with pd.NA — and
-        # pd.NA == "predesigned_gene" evaluates to pd.NA, not False, so every downstream
-        # mask built by comparison raises "boolean value of NA is ambiguous" instead of
-        # simply excluding the gene. Object dtype with None compares as plain Python does.
-        gene_category = gene_category.astype(object).where(gene_category.notna(), None)
-    except Exception:
-        display(Markdown("## Transcript-level QC"))
-        display(Markdown(f"```\n{traceback.format_exc()}\n```"))
+    tx = None
+    if SECTIONS & {"transcript_stats", "molecule_maps"}:
+        try:
+            tx = sdata.points["transcripts"][TX_COLUMNS].compute()
+        except Exception:
+            display(Markdown("## Transcript-level QC"))
+            display(Markdown(f"```\n{traceback.format_exc()}\n```"))
 
     # Then the gene side, reading var, and finally the molecule side, reading points. The
     # order is cells, genes, transcripts — widest unit to narrowest, so each section is a
@@ -1698,9 +1711,21 @@ for path in ZARRS:
             if predicate is not None:
                 sdata.points[element] = points[predicate(points)]
 
+        # How big each subset actually is, as a NUMBER rather than a density to be eyeballed
+        # off the map. The share of transcripts assigned to no cell is the one segmentation
+        # figure nothing else in the pipeline reports, and reading it off a map is guesswork.
+        #
+        # One dask.compute over all four, so the subsets share a single pass rather than
+        # scanning the table once per map. Counting is far cheaper than the renders that
+        # follow, all of which read the same points.
+        map_counts = dask.compute(*[sdata.points[element].shape[0]
+                                    for element, *_ in TX_MAPS])
+        n_all = map_counts[0]
+
         slides += [partial(transcript_map_slide, element=element, label=label,
-                           vmax=vmax, size=size)
-                   for element, label, _, vmax, size in TX_MAPS]
+                           vmax=vmax, size=size, n_molecules=n,
+                           share=(n / n_all if n_all else float("nan")))
+                   for (element, label, _, vmax, size), n in zip(TX_MAPS, map_counts)]
 
     # This loop is a single cell, so anything raising without being caught aborts the cell
     # and drops every LATER sample from the deck too — with the render still exiting 0
