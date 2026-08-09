@@ -124,7 +124,10 @@ def main():
         if max_counts is not None:
             rsc.pp.filter_cells(adata, max_counts=max_counts)
             print(f"Upper cut at q{args.max_counts_quantile:g} = {max_counts:,.0f} transcripts.")
-        rsc.pp.filter_genes(adata, min_cells=args.min_cells)
+        # Masks rather than removes — see cluster_sdata.py for why a detection cut on a
+        # targeted panel deletes exactly the rare-cell-type markers annotation needs.
+        passing, _ = rsc.pp.filter_genes(adata, min_cells=args.min_cells, inplace=False)
+        adata.var["passes_min_cells"] = passing
 
     print(f"Filtered {n_before - adata.n_obs:,} low-quality cells.")
     print(f"Retained {adata.n_obs:,} cells × {adata.n_vars:,} genes.")
@@ -133,9 +136,26 @@ def main():
         # seurat_v3 on raw counts, before normalization — see cluster_sdata.py.
         rsc.pp.highly_variable_genes(
             adata, flavor="seurat_v3", n_top_genes=HVG_N_TOP_GENES)
+        # Re-select among the genes passing min_cells — see cluster_sdata.py.
+        ranked = adata.var.loc[passing, "variances_norm"].nlargest(HVG_N_TOP_GENES).index
+        adata.var["highly_variable"] = adata.var_names.isin(ranked)
 
     with timer("Normalize"):
         adata.layers["counts"] = adata.X.copy()
+        # Normalization deliberately takes NO target_sum, so scanpy's default applies: the
+        # median pre-normalization cell total. That default is principled here, not arbitrary.
+        # A fixed target far from the data's own scale — CP10K, say, against a ~200 transcript
+        # median — multiplies every cell by a factor inversely proportional to its depth, and
+        # because log1p follows, that factor leaks straight back into the values. Measured on
+        # both test ROIs, CP10K drove PC1's correlation with depth to 0.97 (from 0.31-0.53),
+        # lost one sample's immune cluster entirely, and cut every reference-correlation margin
+        # by half or more (endothelial 0.457 -> 0.168). The median target keeps the multiplier
+        # near 1 and log1p behaving consistently across cells.
+        #
+        # The cost is that "normalized" is a per-sample scale (226 and 198 on the two test
+        # ROIs), so layers["lognorm"] is not comparable across samples or against an external
+        # atlas. Anything needing that comparability normalizes to CP10K itself from
+        # layers["counts"] — sample_summary's centroids already do.
         rsc.pp.normalize_total(adata, inplace=True)
         rsc.pp.log1p(adata)
         # Preserved before scaling overwrites X; downstream annotation reads this.

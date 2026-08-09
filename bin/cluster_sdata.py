@@ -175,10 +175,24 @@ def main():
         if max_counts is not None:
             sc.pp.filter_cells(adata, max_counts=max_counts)
             print(f"Upper cut at q{args.max_counts_quantile:g} = {max_counts:,.0f} transcripts.")
-        sc.pp.filter_genes(adata, min_cells=args.min_cells)
+        # min_cells MASKS rather than removes: the gene stays in the object, it is just
+        # not eligible to be selected as a highly variable gene below, so the embedding
+        # is built from the same genes a hard filter would have left.
+        #
+        # Removing them was actively harmful on a targeted panel. A gene specific to a
+        # rare population is by definition detected in few cells, so a detection cut
+        # selects against exactly the most informative markers: at min_cells=100 on one
+        # 32k-cell test ROI it deleted 14 of 32 oocyte markers (FIGLA, ZP4, LHX8,
+        # NLRP5...), 7 of 37 granulosa (AMH, FST, GREM1, IHH) and 4 of 19 theca
+        # (CYP17A1, INSL3) — the canonical markers for the very cell types the deck
+        # exists to identify. Masking keeps them available to annotation while leaving
+        # the clustering unchanged.
+        passing, _ = sc.pp.filter_genes(adata, min_cells=args.min_cells, inplace=False)
+        adata.var["passes_min_cells"] = passing
 
     print(f"Filtered {n_before - adata.n_obs:,} low-quality cells.")
-    print(f"Retained {adata.n_obs:,} cells × {adata.n_vars:,} genes.")
+    print(f"Retained {adata.n_obs:,} cells × {adata.n_vars:,} genes "
+          f"({int(passing.sum()):,} eligible for the embedding).")
 
     with timer("HVG"):
         # seurat_v3 runs on RAW counts, before normalization — that is what the flavor
@@ -188,9 +202,29 @@ def main():
         # marker and annotation work.
         sc.pp.highly_variable_genes(
             adata, flavor="seurat_v3", n_top_genes=HVG_N_TOP_GENES)
+        # Re-select among the genes passing min_cells, using the normalized variance
+        # seurat_v3 has already written to var. Ranking a second time rather than
+        # running HVG on a subset avoids copying the count matrix, and gives exactly the
+        # gene set a hard filter followed by HVG would have produced.
+        ranked = adata.var.loc[passing, "variances_norm"].nlargest(HVG_N_TOP_GENES).index
+        adata.var["highly_variable"] = adata.var_names.isin(ranked)
 
     with timer("Normalize"):
         adata.layers["counts"] = adata.X.copy()
+        # Normalization deliberately takes NO target_sum, so scanpy's default applies: the
+        # median pre-normalization cell total. That default is principled here, not arbitrary.
+        # A fixed target far from the data's own scale — CP10K, say, against a ~200 transcript
+        # median — multiplies every cell by a factor inversely proportional to its depth, and
+        # because log1p follows, that factor leaks straight back into the values. Measured on
+        # both test ROIs, CP10K drove PC1's correlation with depth to 0.97 (from 0.31-0.53),
+        # lost one sample's immune cluster entirely, and cut every reference-correlation margin
+        # by half or more (endothelial 0.457 -> 0.168). The median target keeps the multiplier
+        # near 1 and log1p behaving consistently across cells.
+        #
+        # The cost is that "normalized" is a per-sample scale (226 and 198 on the two test
+        # ROIs), so layers["lognorm"] is not comparable across samples or against an external
+        # atlas. Anything needing that comparability normalizes to CP10K itself from
+        # layers["counts"] — sample_summary's centroids already do.
         sc.pp.normalize_total(adata, inplace=True)
         sc.pp.log1p(adata)
         # Keep the log-normalized values before scaling overwrites X. Everything

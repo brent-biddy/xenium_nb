@@ -204,11 +204,16 @@ def main():
         # filter_genes after filter_cells and so count only survivors. Left stale, this
         # step retained 3,328 genes where the other two retained 3,187 on one test ROI.
         rsc.pp.calculate_qc_metrics(adata)
-        gene_mask = adata.var["n_cells_by_counts"].to_numpy() >= args.min_cells
-        adata = adata[:, gene_mask].copy()
+        # Masks rather than removes, matching the other two steps — see cluster_sdata.py
+        # for why a detection cut on a targeted panel deletes exactly the rare-cell-type
+        # markers annotation needs. Kept as a var column rather than a hard subset, so
+        # only HVG candidacy is restricted.
+        passing = adata.var["n_cells_by_counts"].to_numpy() >= args.min_cells
+        adata.var["passes_min_cells"] = passing
 
     print(f"Filtered {n_before - adata.n_obs:,} low-quality cells.")
-    print(f"Retained {adata.n_obs:,} cells x {adata.n_vars:,} genes.")
+    print(f"Retained {adata.n_obs:,} cells x {adata.n_vars:,} genes "
+          f"({int(passing.sum()):,} eligible for the embedding).")
 
     with timer("HVG"):
         # Now mandatory and no longer an escape hatch: all three cluster_sdata* steps
@@ -221,11 +226,28 @@ def main():
         # only called when --n_top_genes forces a hard narrowing for memory.
         n_top = args.n_top_genes or HVG_N_TOP_GENES
         rsc.pp.highly_variable_genes(adata, flavor="seurat_v3", n_top_genes=n_top)
+        # Re-select among the genes passing min_cells — see cluster_sdata.py.
+        ranked = adata.var.loc[passing, "variances_norm"].nlargest(n_top).index
+        adata.var["highly_variable"] = adata.var_names.isin(ranked)
         if args.n_top_genes:
             rsc.pp.filter_highly_variable(adata)
             print(f"HVG subset: {adata.n_vars:,} genes retained.")
 
     with timer("Normalize"):
+        # Normalization deliberately takes NO target_sum, so scanpy's default applies: the
+        # median pre-normalization cell total. That default is principled here, not arbitrary.
+        # A fixed target far from the data's own scale — CP10K, say, against a ~200 transcript
+        # median — multiplies every cell by a factor inversely proportional to its depth, and
+        # because log1p follows, that factor leaks straight back into the values. Measured on
+        # both test ROIs, CP10K drove PC1's correlation with depth to 0.97 (from 0.31-0.53),
+        # lost one sample's immune cluster entirely, and cut every reference-correlation margin
+        # by half or more (endothelial 0.457 -> 0.168). The median target keeps the multiplier
+        # near 1 and log1p behaving consistently across cells.
+        #
+        # The cost is that "normalized" is a per-sample scale (226 and 198 on the two test
+        # ROIs), so layers["lognorm"] is not comparable across samples or against an external
+        # atlas. Anything needing that comparability normalizes to CP10K itself from
+        # layers["counts"] — sample_summary's centroids already do.
         rsc.pp.normalize_total(adata, inplace=True)
         rsc.pp.log1p(adata)
         # Preserved before scaling overwrites X; downstream annotation reads this.
