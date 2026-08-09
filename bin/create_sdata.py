@@ -20,6 +20,7 @@ import argparse
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import scanpy as sc
 import spatialdata_io
 from spatialdata_io import xenium_aligned_image
@@ -213,13 +214,23 @@ def main():
     # the probe is on the panel and detected nothing — not a lookup failure, and it is
     # kept rather than filled.
     #
-    # Normalised to object dtype with None HERE, once, rather than left as pandas
-    # "string" dtype: pd.NA == "predesigned_gene" evaluates to pd.NA rather than False,
-    # so every comparison-built mask downstream raises "boolean value of NA is ambiguous"
-    # instead of selecting rows. Do not reintroduce the string dtype on this column.
-    category = category.astype(object).where(category.notna(), None)
-    sdata.tables["table"].var["codeword_category"] = category
+    # Written as a CATEGORICAL, which is what makes the unmapped state survive the write.
+    # An object column of strings-plus-None goes through spatialdata's writer as a plain
+    # vlen-utf8 string array, and None is coerced to the literal string "None" — verified
+    # on a real ROI, where the three unmapped genes came back as a third category and
+    # isna() returned 0, silently turning "no transcript anywhere" into a label. A
+    # categorical is stored as codes plus categories with -1 for missing, so the gap
+    # round-trips as a genuine NA.
+    #
+    # Categorical also keeps comparisons safe: `col == "custom_gene"` yields a plain bool
+    # mask with False at the missing entries, rather than the pd.NA that a nullable string
+    # dtype produces and that raises "boolean value of NA is ambiguous" downstream.
+    sdata.tables["table"].var["codeword_category"] = pd.Categorical(
+        category.astype(object).where(category.notna(), None)
+    )
 
+    # Read back as a Series so the summary below uses the column as stored.
+    category = sdata.tables["table"].var["codeword_category"]
     n_unmapped = int(category.isna().sum())
 
     print(f"Cells:              {len(qc_obs):,}")
