@@ -16,8 +16,23 @@ jobs:
         with:
           version: '>=25.10.0'
 
+      # The two region steps take real input paths, and create_sdata now declares its
+      # H&E inputs `path` with checkIfExists, so their samplesheet must point at files
+      # that exist on the runner. assets/samplesheet.csv holds developer-local absolute
+      # paths, so build an equivalent sheet over empty fixtures instead — a stub run
+      # never opens them, it only checks that the channels and processes wire up.
+      - name: Materialize stub input fixtures
+        run: |
+          mkdir -p ci_fixtures/roi_1
+          touch ci_fixtures/he.ome.tif ci_fixtures/matrix.csv
+          cat > ci_fixtures/samplesheet.csv <<'CSV'
+          sample,path,xmin,ymin,xmax,ymax,region_name,he_image,he_alignment
+          ROI1_A,ci_fixtures/roi_1,3500,1000,5500,1700,ROI1_A,ci_fixtures/he.ome.tif,ci_fixtures/matrix.csv
+          ROI1_B,ci_fixtures/roi_1,400,3000,1400,5200,ROI1_B,ci_fixtures/he.ome.tif,ci_fixtures/matrix.csv
+          CSV
+
       - name: Stub create_sdata
-        run: nextflow run main.nf --step create_sdata -stub --samplesheet assets/samplesheet.csv
+        run: nextflow run main.nf --step create_sdata -stub --samplesheet ci_fixtures/samplesheet.csv
 
       - name: Stub create_adata
         run: nextflow run main.nf --step create_adata -stub --samplesheet assets/ci_analyze_samplesheet.csv
@@ -44,7 +59,7 @@ jobs:
         run: nextflow run main.nf --step downsample_sdata -stub --samplesheet assets/ci_analyze_samplesheet.csv --fraction 0.1
 
       - name: Stub downsample_xenium_region
-        run: nextflow run main.nf --step downsample_xenium_region -stub --samplesheet assets/samplesheet.csv
+        run: nextflow run main.nf --step downsample_xenium_region -stub --samplesheet ci_fixtures/samplesheet.csv
 
       - name: Stub plot_follicle
         run: nextflow run main.nf --step plot_follicle -stub --samplesheet assets/ci_analyze_samplesheet.csv
