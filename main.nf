@@ -59,8 +59,11 @@ workflow downsample_xenium_region {
         .map { row ->
             if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
-            def heImage    = row.he_image     ? new File(row.he_image     as String).absolutePath : ""
-            def heAlign    = row.he_alignment ? new File(row.he_alignment as String).absolutePath : ""
+            // `file()`, not a bare path string: these are staged `path` inputs, so the
+            // container can read them wherever they live. `[]` is the optional-input
+            // sentinel — it stages nothing and renders falsy in the process script.
+            def heImage    = row.he_image     ? file(row.he_image     as String, checkIfExists: true) : []
+            def heAlign    = row.he_alignment ? file(row.he_alignment as String, checkIfExists: true) : []
             def regionName = row.region_name ?: row.sample
             tuple(row.sample, file(row.path), row.xmin, row.ymin, row.xmax, row.ymax, regionName, heImage, heAlign)
         }                              // tuple(sample, path, xmin, ymin, xmax, ymax, region_name, he_image, he_alignment)
