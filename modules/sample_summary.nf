@@ -39,6 +39,9 @@ process SAMPLE_SUMMARY {
     // Required rather than optional: absent, the marker section would vanish silently,
     // and it covers exactly the cell types the major-type reference cannot name.
     path markers, stageAs: 'ovary_follicle_markers.yaml'
+    // The major cell-type reference the cluster centroids are correlated against,
+    // likewise under the fixed name the notebook reads.
+    path reference, stageAs: 'ovary_reference_major.csv.gz'
 
     output:
     path "sample_summary.pptx", emit: report

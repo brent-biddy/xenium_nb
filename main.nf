@@ -341,6 +341,7 @@ workflow sample_summary {
     // scripts/convert_ovary_reference.py. Tissue-specific, so it is a path rather than
     // anything derived — a different tissue needs a different marker file.
     if (!params.follicle_markers)   error "Please provide --follicle_markers"
+    if (!params.reference_major)    error "Please provide --reference_major"
 
     // Point --samplesheet at a cluster_sdata* handoff sheet — this report reads the
     // clustered zarrs (obs, var, and the leiden_res_* columns), not create_sdata's raw ones.
@@ -362,6 +363,7 @@ workflow sample_summary {
         file("${projectDir}/resources/ouhsc_ppt_template.pptx"),
         file(params.chosen_resolutions),
         file(params.follicle_markers),
+        file(params.reference_major),
     )
 }
 

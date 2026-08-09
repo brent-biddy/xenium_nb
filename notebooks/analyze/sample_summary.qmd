@@ -86,6 +86,40 @@ MARKER_SETS = yaml.safe_load(MARKERS_YAML.read_text()) if MARKERS_YAML.exists() 
 if not MARKER_SETS:
     raise FileNotFoundError(f"{MARKERS_YAML} not staged beside the notebook.")
 
+# The major cell-type reference: genes x cell type mean expression, built by
+# scripts/convert_ovary_reference.py from Sci Adv adm7506 Data S6 and staged flat under
+# this name. Cluster centroids are correlated against its columns to name them.
+REFERENCE_CSV = Path("ovary_reference_major.csv.gz")
+if not REFERENCE_CSV.exists():
+    raise FileNotFoundError(f"{REFERENCE_CSV} not staged beside the notebook.")
+REFERENCE = pd.read_csv(REFERENCE_CSV, index_col=0)
+
+# How many genes per reference column define the gene set the correlation runs over.
+#
+# Correlating across every shared gene does not work: most genes do not discriminate
+# between these four types, so every centroid correlates with every column at ~0.8 and
+# the argmax is decided by noise. Measured on one test ROI, the mean margin was 0.100
+# and a cluster of oocytes — a type absent from this reference — was confidently called
+# Stromal at r=0.689.
+#
+# Selecting our own highly variable genes does not help either (margin 0.099): they are
+# largely the same abundant genes. Selecting by variance ACROSS the reference columns is
+# worse than it looks — variance tracks the mean, so it reselects abundant genes and
+# inflates confidence, including for types the reference does not contain.
+#
+# A z-score across the columns picks genes raised in ONE type relative to the others,
+# which is what the argmax is actually asking. It lifted the mean margin to 0.133, and
+# dropped that oocyte cluster to r=0.345 — correctly reading as "no match" rather than a
+# confident wrong call.
+TYPE_SPECIFIC_TOP_N = 100
+
+# Genes specific to each reference type, computed once: the reference does not change
+# between samples, and this is a per-gene z-score over a 20k-row table.
+_z = REFERENCE.sub(REFERENCE.mean(axis=1), axis=0).div(
+    REFERENCE.std(axis=1).replace(0, np.nan), axis=0)
+REFERENCE_GENES = sorted({gene for cell_type in REFERENCE.columns
+                          for gene in _z[cell_type].nlargest(TYPE_SPECIFIC_TOP_N).index})
+
 # The per-cell QC columns each sample's panel shows, as (obs column, axis label, log).
 # All are strictly positive and heavily right-skewed, so all are shown on a log scale.
 #
@@ -258,6 +292,53 @@ def centroid_correlation(sample, corr, order):
     plt.close(fig)
 
 
+def reference_correlation(sample, corr):
+    """One slide's figure: each cluster's centroid against the major cell types.
+
+    Spearman, over genes specific to a reference type rather than every shared gene —
+    see TYPE_SPECIFIC_TOP_N for why that choice is load-bearing rather than a detail.
+
+    The call is NOT thresholded, and no cell type is written into obs here. What the
+    slide reports is the best match, its correlation, and its MARGIN over the runner-up;
+    reading those is the judgement, and it belongs to whoever reads the deck. A cluster
+    can top a column simply because the reference has nowhere better to put it: this
+    reference holds four stromal-compartment types and no follicle or epithelium, so an
+    oocyte or granulosa cluster is assigned to whichever of the four it least badly
+    resembles. Those clusters are identifiable on the marker-score slide instead, which
+    is why it sits immediately before this one.
+
+    A low r with a small margin is the honest reading of "this cluster is not in the
+    reference" — treat it that way rather than accepting the argmax.
+    """
+    fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.62, FIGSIZE[1]))
+
+    image = ax.imshow(corr.to_numpy(), cmap="viridis", aspect="auto")
+    ax.set_xticks(range(corr.shape[1]))
+    ax.set_xticklabels(corr.columns, rotation=45, ha="right", fontsize=8)
+    ax.set_yticks(range(corr.shape[0]))
+
+    # Each row is labelled with its own call and margin, so the table and the heatmap
+    # are one object rather than a figure the reader has to join to a caption.
+    ordered = np.sort(corr.to_numpy(), axis=1)
+    margins = ordered[:, -1] - ordered[:, -2]
+    best = corr.idxmax(axis=1)
+    ax.set_yticklabels(
+        [f"{cluster}  {best.iloc[i]}  Δ{margins[i]:.2f}" for i, cluster in enumerate(corr.index)],
+        fontsize=7)
+
+    for row in range(corr.shape[0]):
+        for col in range(corr.shape[1]):
+            ax.text(col, row, f"{corr.iat[row, col]:.2f}", ha="center", va="center",
+                    fontsize=7, color="white")
+    fig.colorbar(image, ax=ax, fraction=0.04)
+
+    ax.set_title(f"{sample} — cluster centroids vs major cell types\n"
+                 f"{len(REFERENCE_GENES)} type-specific genes", fontsize=10)
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+
 def marker_scores(adata, sample, name):
     """One slide's figure: each follicle marker set on the UMAP, then per cluster.
 
@@ -297,8 +378,13 @@ def marker_scores(adata, sample, name):
 
     # Per-cluster means, clusters down the rows in the same size-ranked order the UMAP
     # slide uses, so a row here refers to the cluster carrying that number there.
-    means = (adata.obs.groupby(name, observed=True)[columns].mean()
-             .reindex([str(i) for i in range(adata.obs[name].nunique())]))
+    #
+    # Order by the label read as an integer, taken from the labels that exist. Not
+    # range(n): add_cluster_ids numbers clusters 1-n, so a 0-based range invents an
+    # empty first row and silently drops the last cluster. Not a plain sort either,
+    # since these are strings and "10" sorts before "2".
+    levels = sorted(adata.obs[name].unique().tolist(), key=int)
+    means = adata.obs.groupby(name, observed=True)[columns].mean().reindex(levels)
     ax = axes[-1]
     image = ax.imshow(means.to_numpy(), cmap="magma", aspect="auto")
     ax.set_xticks(range(len(columns)))
@@ -547,6 +633,22 @@ for path in ZARRS:
         del adata.layers["cp10k"]
         gc.collect()
 
+        # Correlate those same centroids against the reference. Spearman ranks genes
+        # within a centroid, so the log1p and the CP10K target above are both
+        # irrelevant here — but the centroids are the comparable form, and reusing them
+        # keeps one definition of a cluster's expression profile in this deck.
+        #
+        # Intersecting with var_names rather than assuming: cluster_sdata marks genes
+        # below min_cells ineligible for the embedding but keeps them, so the panel is
+        # whole — though an older zarr, or one narrowed by --n_top_genes, will be
+        # missing some.
+        reference_genes = [g for g in REFERENCE_GENES if g in centroids.columns]
+        reference_corr = pd.DataFrame(index=centroids.index,
+                                      columns=REFERENCE.columns, dtype=float)
+        for cell_type in REFERENCE.columns:
+            reference_corr[cell_type] = centroids[reference_genes].T.corrwith(
+                REFERENCE.loc[reference_genes, cell_type], method="spearman")
+
         # Spearman rather than Pearson on the values: a targeted panel's centroids are
         # dominated by a few very high-expressing genes, which set a Pearson r almost on
         # their own, while ranks weight the whole panel. Via pandas rather than
@@ -590,6 +692,20 @@ for path in ZARRS:
             "are the size-ranked ids from the previous slide."
         ))
         marker_scores(adata, sample, "cluster_size")
+
+        display(Markdown("## Cluster centroids vs major cell types"))
+        display(Markdown(
+            "Spearman correlation between each cluster's centroid and the four major "
+            "cell types of the Sci Adv adm7506 ovary reference, over the genes most "
+            "specific to one of those types. Each row is labelled with its best match "
+            "and the margin over the runner-up. The reference holds no follicle or "
+            "epithelial types, so a granulosa or oocyte cluster is assigned to whichever "
+            "of the four it least badly resembles — a low correlation with a small "
+            "margin reads as 'not in the reference', and the previous slide is what "
+            "names those clusters. No threshold is applied and no call is written "
+            "anywhere; the numbers are reported and the judgement is the reader's."
+        ))
+        reference_correlation(sample, reference_corr)
 
         display(Markdown("## Cluster centroid correlation"))
         display(Markdown(
