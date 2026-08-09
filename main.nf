@@ -8,9 +8,9 @@
 //   create_sdata              samplesheet: sample, path[, he_image, he_alignment]
 //   create_adata              samplesheet: sample, path
 //   create_follicle_sdata     samplesheet: sample, path  (+ --cell_ids_file)
-//   cluster_sdata             samplesheet: sample, path[, min_counts, min_cells]  (+ --resolutions)
-//   cluster_sdata_gpu         samplesheet: sample, path[, min_counts, min_cells]  (+ --resolutions)
-//   cluster_sdata_gpu_ooc     samplesheet: sample, path[, min_counts, min_cells]  (+ --chunk_size, --n_top_genes, --resolutions)
+//   cluster_sdata             samplesheet: sample, path[, min_counts, min_cells, max_counts_quantile]  (+ --resolutions)
+//   cluster_sdata_gpu         samplesheet: sample, path[, min_counts, min_cells, max_counts_quantile]  (+ --resolutions)
+//   cluster_sdata_gpu_ooc     samplesheet: sample, path[, min_counts, min_cells, max_counts_quantile]  (+ --chunk_size, --n_top_genes, --resolutions)
 //   cluster_report            samplesheet: sample, path  (clustered zarrs; one deck for the cohort)
 //   qc_report                 samplesheet: sample, path  (raw create_sdata zarrs; one deck for the cohort)
 //   concat_sdata              samplesheet: path
@@ -177,7 +177,7 @@ workflow cluster_sdata {
 
     def inputs = channel
         .fromPath(params.samplesheet)
-        .splitCsv(header: true)      // Map(sample, path[, min_counts, min_cells])
+        .splitCsv(header: true)      // Map(sample, path[, min_counts, min_cells, max_counts_quantile])
         .map { row ->
             if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
@@ -186,8 +186,9 @@ workflow cluster_sdata {
             // alongside the sample itself rather than in a run's flags.
             tuple(row.sample, file(row.path),
                   resolveThreshold(row.min_counts, params.min_counts),
-                  resolveThreshold(row.min_cells,  params.min_cells))
-        }                            // tuple(sample, path, min_counts, min_cells)
+                  resolveThreshold(row.min_cells,  params.min_cells),
+                  resolveThreshold(row.max_counts_quantile, params.max_counts_quantile))
+        }                            // tuple(sample, path, min_counts, min_cells, max_counts_quantile)
 
     // Leiden resolution sweep. Null by default (see nextflow.config) so the list
     // lives only in the clustering script; a `val` process input cannot be null,
@@ -212,15 +213,16 @@ workflow cluster_sdata_gpu {
 
     def inputs = channel
         .fromPath(params.samplesheet)
-        .splitCsv(header: true)      // Map(sample, path[, min_counts, min_cells])
+        .splitCsv(header: true)      // Map(sample, path[, min_counts, min_cells, max_counts_quantile])
         .map { row ->
             if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
             // See cluster_sdata above for why the cut is per-sample.
             tuple(row.sample, file(row.path),
                   resolveThreshold(row.min_counts, params.min_counts),
-                  resolveThreshold(row.min_cells,  params.min_cells))
-        }                            // tuple(sample, path, min_counts, min_cells)
+                  resolveThreshold(row.min_cells,  params.min_cells),
+                  resolveThreshold(row.max_counts_quantile, params.max_counts_quantile))
+        }                            // tuple(sample, path, min_counts, min_cells, max_counts_quantile)
 
     // See cluster_sdata above for why an empty string stands in for "unset".
     def resolutions = params.resolutions ?: ''
@@ -241,15 +243,16 @@ workflow cluster_sdata_gpu_ooc {
 
     def inputs = channel
         .fromPath(params.samplesheet)
-        .splitCsv(header: true)      // Map(sample, path[, min_counts, min_cells])
+        .splitCsv(header: true)      // Map(sample, path[, min_counts, min_cells, max_counts_quantile])
         .map { row ->
             if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
             // See cluster_sdata above for why the cut is per-sample.
             tuple(row.sample, file(row.path),
                   resolveThreshold(row.min_counts, params.min_counts),
-                  resolveThreshold(row.min_cells,  params.min_cells))
-        }                            // tuple(sample, path, min_counts, min_cells)
+                  resolveThreshold(row.min_cells,  params.min_cells),
+                  resolveThreshold(row.max_counts_quantile, params.max_counts_quantile))
+        }                            // tuple(sample, path, min_counts, min_cells, max_counts_quantile)
 
     // HVG selection is off by default (params.n_top_genes = null) so this step
     // matches cluster_sdata/cluster_sdata_gpu. A `val` process input cannot be

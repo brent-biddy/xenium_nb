@@ -21,7 +21,7 @@ process CLUSTER_SDATA {
     // sample in main.nf (samplesheet column, else param, else the script's default), so
     // it varies across the channel. `resolutions` stays a plain val because the sweep is
     // cohort-wide — cluster_report compares the same resolutions across every sample.
-    tuple val(sample), path(input_path), val(min_counts), val(min_cells)
+    tuple val(sample), path(input_path), val(min_counts), val(min_cells), val(max_counts_quantile)
     val resolutions
 
     output:
@@ -42,6 +42,7 @@ process CLUSTER_SDATA {
     // single definition in the Python script rather than being restated in the config.
     if (min_counts != '') clusterArgs << "--min_counts ${min_counts}"
     if (min_cells != '') clusterArgs << "--min_cells ${min_cells}"
+    if (max_counts_quantile != '') clusterArgs << "--max_counts_quantile ${max_counts_quantile}"
     """
     export XDG_CACHE_HOME="\$PWD/.cache"
     export TMPDIR="\$PWD/tmp"
