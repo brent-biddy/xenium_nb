@@ -16,8 +16,14 @@ process CREATE_SDATA {
         mode: 'link',
         saveAs: { fn -> fn.endsWith('.samplesheet_row.csv') ? null : fn }
 
+    // he_image/he_alignment are `path`, not `val`, and are optional — main.nf passes
+    // `[]` when the samplesheet omits them, which stages nothing and leaves the
+    // variable falsy. They must be staged: an unstaged absolute path is a host path
+    // the container cannot see. Apptainer's default binds ($HOME, /tmp, cwd) hide
+    // this locally, but an H&E anywhere else — e.g. OSCER /scratch, which is bound
+    // only at the work dir Nextflow mounts — is simply missing inside the container.
     input:
-    tuple val(sample), path(input_path), val(he_image), val(he_alignment)
+    tuple val(sample), path(input_path), path(he_image), path(he_alignment)
 
     output:
     tuple val(sample), path("${sample}.zarr"), emit: artifacts
