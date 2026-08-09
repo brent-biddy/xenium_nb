@@ -129,18 +129,25 @@ REFERENCE_GENES = sorted({gene for cell_type in REFERENCE.columns
                           for gene in _z[cell_type].nlargest(TYPE_SPECIFIC_TOP_N).index})
 
 # The per-cell QC columns each sample's panel shows, as (obs column, axis label, log).
-# All are strictly positive and heavily right-skewed, so all are shown on a log scale.
 #
-# Every entry must already exist in obs — this deck derives no QC of its own. A
-# negative-control fraction belongs here too, but the Xenium reader leaves the five
-# control/codeword counters as raw per-cell counts and scanpy's qc_vars cannot turn them
-# into a percentage (they are obs columns, not features in X), so nothing upstream emits
-# one yet. Computing it here would hide a cohort-wide QC metric inside one deck; it
-# belongs in create_sdata alongside the other per-cell metrics.
+# Every entry must already exist in obs — this deck derives no QC of its own, and a
+# metric computed here would be a second definition of one create_sdata already emits.
+#
+# n_genes_by_transcripts, NOT n_genes_by_counts: the latter existed only because
+# cluster_sdata* used to re-run calculate_qc_metrics with the default expr_type. That
+# call is gone, so the column is gone with it, and create_sdata's own — computed once,
+# before any filtering — is what clustered zarrs carry.
+#
+# pct_control is the Xenium-specific one and the reason this list is worth revisiting: a
+# cluster reading control probes is debris, not a cell type, and no amount of staring at
+# transcripts and area will say so. It is on a LINEAR scale, unlike the three counts and
+# areas, because it is a percentage that is legitimately 0 for most cells on a clean
+# sample — a log axis cannot show that at all.
 QC_COLUMNS = [
     ("transcript_counts", "Transcripts", True),
-    ("n_genes_by_counts", "Genes", True),
+    ("n_genes_by_transcripts", "Genes", True),
     ("cell_area", "Cell area (µm²)", True),
+    ("pct_control", "Control %", False),
 ]
 
 # sample -> overriding resolution, as the float the CSV records. Read once here so a
@@ -570,7 +577,18 @@ def qc_violins(adata, sample, name, resolution):
     passed through to seaborn so each violin carries its own median and interquartile
     range.
     """
-    metrics = [(c, label, log) for c, label, log in QC_COLUMNS if c in adata.obs.columns]
+    # Fail on a missing column rather than dropping it. Filtering to what happens to be
+    # present is how a renamed upstream metric turns into a slide that quietly shows
+    # three panels where it used to show four — which is exactly what happened when
+    # cluster_sdata stopped emitting n_genes_by_counts. Naming the column and the fix
+    # costs one render; not noticing costs a wrong reading of the deck.
+    missing = [c for c, _, _ in QC_COLUMNS if c not in adata.obs.columns]
+    if missing:
+        raise KeyError(
+            f"{sample}: obs is missing {missing}. These come from create_sdata — re-run "
+            "it over this sample rather than deriving them here."
+        )
+    metrics = QC_COLUMNS
     fig, axes = plt.subplots(len(metrics), 1, figsize=FIGSIZE, sharex=True, squeeze=False)
 
     for ax, (col, label, log) in zip(axes.ravel(), metrics):
@@ -781,6 +799,19 @@ for path in ZARRS:
             "through the section, and the two are indistinguishable on a UMAP."
         ))
         spatial_clusters(adata, sample, "cluster_v2")
+
+        display(Markdown("## Per-cell QC by cluster — v2 ids"))
+        display(Markdown(
+            "Per-cell QC distributions, one violin per cluster, at this sample's Leiden "
+            "resolution. Clusters carry the v2 ids and colours from the slides above, so "
+            "adjacent violins are transcriptionally adjacent and a cluster reads straight "
+            "down the slide across all four metrics. Transcripts, genes and cell area are "
+            "on log axes; control percentage is linear, since it is legitimately zero for "
+            "most cells. The box inside each violin is its interquartile range and median. "
+            "A cluster low on transcripts and genes together, or high on control "
+            "percentage, is debris rather than a cell type."
+        ))
+        qc_violins(adata, sample, "cluster_v2", resolution)
 
     except Exception:
         display(Markdown(f"```\n{traceback.format_exc()}\n```"))
