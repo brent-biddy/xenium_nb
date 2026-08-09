@@ -407,9 +407,10 @@ def marker_dotplot(adata, sample, name):
     if not present:
         raise ValueError(f"{sample}: no marker genes from any set are on this panel.")
 
-    # scanpy's own `title`, not a suptitle: dotplot lays out its own axes and puts the
-    # gene-group brackets above the main panel, where a figure-level title lands on top
-    # of them.
+    # No figure title. dotplot lays out its own axes and puts the gene-group brackets
+    # directly above the main panel, and BOTH a suptitle and scanpy's own `title` land on
+    # top of them — tried in that order. The slide heading and caption carry the sample
+    # and the score threshold instead, which is where this deck puts context anyway.
     axes = sc.pl.dotplot(
         adata,
         var_names=present,          # dict -> genes grouped and bracketed by set
@@ -418,8 +419,6 @@ def marker_dotplot(adata, sample, name):
         standard_scale="var",
         cmap="viridis",
         figsize=(FIGSIZE[0] * 0.92, FIGSIZE[1] * 0.82),
-        title=f"{sample} — marker genes by cluster "
-              f"(quality score <= {MARKER_MAX_SCORE})",
         show=False,
     )
     fig = axes["mainplot_ax"].get_figure() if isinstance(axes, dict) else plt.gcf()
@@ -428,21 +427,26 @@ def marker_dotplot(adata, sample, name):
 
 
 def marker_set_scores(centroids):
-    """Cluster x marker-set scores, built from the centroids rather than from cells.
+    """Cluster x marker-set scores: the mean of the set's markers in each centroid.
 
-    Each marker gene is standardized ACROSS clusters and the set's genes are then
-    averaged, so a score answers "does this cluster express this set more than the other
-    clusters do" on one scale for every set. Standardizing per gene first is what makes
-    the sets comparable: without it an abundant marker sets its set's score almost alone,
-    and a 5-gene set with one loud member outranks a 10-gene set that is uniformly up.
+    Deliberately just a mean. Standardizing each gene across clusters before averaging
+    was tried and dropped: on both test ROIs it picked the same cluster for granulosa and
+    for oocyte as the plain mean did, and differed only on theca, where the dotplot shows
+    no signal at all — so it changed the answer only where there was no answer. A step
+    that cannot be shown to change a conclusion should not be in the middle of one.
 
     Built from centroids, not per cell. sc.tl.score_genes on this data scores a 7-gene
     set against ~200 transcripts drawn from 5,101 genes, so most cells hold zero of the
     set even in the cluster that owns it, and the per-cell score is mostly sampling
-    noise; averaging within a cluster afterwards is doing the same aggregation this does
-    up front, but through a noisier path. It also sidesteps score_genes' control set,
-    which is capped at the size of the gene list — a 5-gene theca set would be judged
-    against a 5-gene background.
+    noise; averaging within a cluster afterwards is the same aggregation by a worse path.
+    It also sidesteps score_genes' control set, which is capped at the size of the gene
+    list — a 5-gene theca set would be judged against a 5-gene background.
+
+    The values are therefore log1p CP10K expression, in the same units as the centroids,
+    and are NOT comparable between sets: granulosa markers sit near 0.75 in every cluster
+    of these samples while oocyte markers sit near 0.06, so the same number means very
+    different things in two columns. The heatmap colours each column on its own range for
+    exactly this reason.
 
     A gene absent from the panel is dropped, and a set with none left scores NaN rather
     than 0: no evidence is not evidence of absence.
@@ -450,112 +454,153 @@ def marker_set_scores(centroids):
     scores = {}
     for set_name, genes in MARKER_SETS.items():
         present = [g for g in genes if g in centroids.columns]
-        if not present:
-            scores[set_name] = pd.Series(np.nan, index=centroids.index)
-            continue
-        block = centroids[present]
-        # A gene constant across clusters carries no information and would divide by 0.
-        spread = block.std(axis=0).replace(0, np.nan)
-        scores[set_name] = ((block - block.mean(axis=0)) / spread).mean(axis=1)
+        scores[set_name] = (centroids[present].mean(axis=1) if present
+                            else pd.Series(np.nan, index=centroids.index))
     return pd.DataFrame(scores)
 
 
 def marker_score_heatmap(sample, scores):
-    """One slide's figure: the cluster x marker-set scores as a heatmap.
+    """One slide's figure: the cluster x marker-set means under three normalizations.
 
-    Diverging colormap centred at zero, because the score is standardized across
-    clusters and its sign is the reading: above zero means this cluster expresses the
-    set more than the sample's clusters do on average, below means less. A sequential
-    ramp would make "slightly below average" look like a small amount of something.
+    The same matrix three times, because the three answer different questions and no one
+    of them answers all three:
+
+      raw       absolute magnitude. Granulosa markers really are more abundant than
+                oocyte markers here — near 0.75 against near 0.06 in every cluster —
+                and that is worth seeing rather than normalizing away.
+      column    within a set, which cluster is highest: "which cluster is the granulosa
+                one". The set's own baseline drops out.
+      row       within a cluster, which set is highest: "what is this cluster most
+                like". This is the one that points at an annotation.
+
+    Each panel PRINTS the values it colours by, so a number always matches its own
+    shade. Reading across panels is then reading three different quantities, which is
+    the point — the raw panel keeps the magnitudes the normalized ones discard.
+
+    Beware the normalized panels where a set has no signal. Scaled to its own range,
+    theca's 0.11-0.53 spread paints its best cluster as brightly as granulosa's genuine
+    2.13, and nothing in the colour says which is which. That is what the raw panel is
+    for, and why nothing here is boxed.
+
+    KNOWN LIMITATION of the row panel, left as-is deliberately. Because the sets sit at
+    very different levels, the row maximum is granulosa in almost every cluster on these
+    samples — six of seven on ROI1_A — purely because granulosa markers are ~10x more
+    abundant than oocyte markers, not because those clusters are granulosa. Cluster 3
+    reads 1.00 there on a raw value of 0.88, beside cluster 7's genuine 2.13. Read the
+    row panel only against the raw one. Making it mean what it looks like it means would
+    require standardizing each set across clusters BEFORE normalizing along the row, so
+    the sets are commensurate first — the same z-score dropped from the column question,
+    where it changed no argmax, but which the row question actually needs.
     """
-    values = scores.to_numpy(dtype=float)
-    limit = float(np.nanmax(np.abs(values))) if np.isfinite(values).any() else 1.0
+    raw = scores.to_numpy(dtype=float)
 
-    fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.5, FIGSIZE[1]))
-    image = ax.imshow(values, cmap="RdBu_r", aspect="auto", vmin=-limit, vmax=limit)
-    ax.set_xticks(range(scores.shape[1]))
-    ax.set_xticklabels(scores.columns, rotation=45, ha="right", fontsize=8)
-    ax.set_yticks(range(scores.shape[0]))
-    ax.set_yticklabels(scores.index, fontsize=7)
-    ax.set_ylabel("cluster (v1)", fontsize=8)
-    for row in range(scores.shape[0]):
-        for col in range(scores.shape[1]):
-            value = values[row, col]
-            if np.isfinite(value):
-                ax.text(col, row, f"{value:.2f}", ha="center", va="center", fontsize=7,
-                        color="white" if abs(value) > limit * 0.55 else "black")
-    fig.colorbar(image, ax=ax, fraction=0.05)
-    ax.set_title(f"{sample} — marker set scores\n"
-                 f"per-gene z across clusters, averaged per set", fontsize=9)
-    fig.tight_layout()
+    def normalize(values, axis):
+        lo = np.nanmin(values, axis=axis, keepdims=True)
+        span = np.nanmax(values, axis=axis, keepdims=True) - lo
+        return (values - lo) / np.where(span > 0, span, np.nan)
+
+    panels = [
+        (raw, "raw", "log1p CP10K"),
+        (normalize(raw, 0), "column-normalized", "within each set"),
+        (normalize(raw, 1), "row-normalized", "within each cluster"),
+    ]
+
+    fig, axes = plt.subplots(1, 3, figsize=(FIGSIZE[0], FIGSIZE[1]), constrained_layout=True)
+    for ax, (values, title, bar_label) in zip(axes, panels):
+        finite = values[np.isfinite(values)]
+        vmin, vmax = (float(finite.min()), float(finite.max())) if finite.size else (0.0, 1.0)
+        image = ax.imshow(values, cmap="viridis", aspect="auto", vmin=vmin, vmax=vmax)
+        ax.set_xticks(range(scores.shape[1]))
+        ax.set_xticklabels(scores.columns, rotation=45, ha="right", fontsize=7)
+        ax.set_yticks(range(scores.shape[0]))
+        ax.set_yticklabels(scores.index, fontsize=7)
+        ax.set_title(title, fontsize=8)
+        for row in range(values.shape[0]):
+            for col in range(values.shape[1]):
+                value = values[row, col]
+                if not np.isfinite(value):
+                    continue
+                # Text colour off this panel's own scale, so it stays legible under
+                # whichever normalization is driving the shade.
+                shade = (value - vmin) / (vmax - vmin) if vmax > vmin else 0.0
+                ax.text(col, row, f"{value:.2f}", ha="center", va="center", fontsize=6,
+                        color="black" if shade > 0.55 else "white")
+        bar = fig.colorbar(image, ax=ax, fraction=0.045)
+        bar.set_label(bar_label, fontsize=6)
+        bar.ax.tick_params(labelsize=5)
+
+    axes[0].set_ylabel("cluster (v2)", fontsize=8)
+    fig.suptitle(f"{sample} — mean marker expression per cluster "
+                 f"(quality score <= {MARKER_MAX_SCORE})", fontsize=9, x=0.01, ha="left")
     plt.show()
     plt.close(fig)
 
 
-def marker_scores(adata, sample, name):
-    """One slide's figure: each follicle marker set on the UMAP, then per cluster.
 
-    The follicle cell types are the ones the major-type reference cannot name — it holds
-    Endothelial, Immune, Pericyte and Stromal only, so a granulosa or oocyte cluster is
-    assigned to whichever of those four it least badly resembles. Scoring the marker sets
-    separately is what makes those clusters identifiable at all, which is why this slide
-    sits before the reference correlation rather than after it.
+def marker_umaps(adata, sample):
+    """One slide's figure: each marker set's mean expression on the UMAP.
 
-    Two views of the same numbers, because they answer different questions. The UMAP
-    panels show WHERE the signal is — a set that concentrates in one region is a cell
-    type, one that smears across the embedding is not. The final panel averages each set
-    within each cluster, which is what says whether the clustering actually isolated it:
-    a set can be clearly localised on the UMAP and still be split across three clusters.
+    The heatmap says WHICH cluster owns a set; this says whether the signal is tight.
+    A set concentrated in one region is a cell type; one smeared thinly across the
+    embedding is a set of genes that happen to be broadly expressed, and both give the
+    same cluster mean.
 
-    Scores are read from obs, computed once in the per-sample block below where the
-    log-normalized layer already exists.
+    The value is the plain mean of the set's markers in each cell, from the same
+    log-normalized layer the dotplot reads and the same mean the cluster heatmap takes —
+    the cluster values are these aggregated, so the two slides cannot tell different
+    stories. Not sc.tl.score_genes: its background correction is what made the earlier
+    version of this slide hard to read, and its control set is capped at the size of the
+    gene list, which for a 5-gene set is no background at all.
+
+    Expect most cells to read zero. At ~200 transcripts against a 5,101-gene panel a
+    genuine oocyte often carries none of the 7 oocyte markers, so the panel is mostly
+    dark with a bright island. That is the honest picture of the evidence rather than a
+    fault in the plot, and it is why the cluster-level heatmap is the slide that carries
+    the call.
     """
-    columns = [f"score_{marker_set}" for marker_set in MARKER_SETS]
-    fig, axes = plt.subplots(1, len(columns) + 1,
-                             figsize=(FIGSIZE[0], FIGSIZE[1] * 0.95))
+    if "lognorm" not in adata.layers:
+        raise KeyError(
+            f"{sample}: layers['lognorm'] is missing. cluster_sdata writes it alongside "
+            "counts; re-run it over this sample rather than reading the scaled X."
+        )
+    present = {name: [g for g in genes if g in adata.var_names]
+               for name, genes in MARKER_SETS.items()}
+    present = {k: v for k, v in present.items() if v}
 
-    for ax, marker_set, column in zip(axes, MARKER_SETS, columns):
-        sc.pl.umap(
-            adata,
+    columns = []
+    for set_name, genes in present.items():
+        column = f"mean_{set_name}"
+        block = adata[:, genes].layers["lognorm"]
+        # .A1 on a sparse row-mean gives a flat array; np.asarray covers the dense case.
+        mean = block.mean(axis=1)
+        adata.obs[column] = np.asarray(mean).ravel()
+        columns.append((column, f"{set_name} ({len(genes)} genes)"))
+
+    fig, axes = plt.subplots(1, len(columns),
+                             figsize=(FIGSIZE[0], FIGSIZE[1] * 0.95), squeeze=False)
+    for ax, (column, title) in zip(axes.ravel(), columns):
+        # Cells sorted low-to-high so the expressing ones are drawn last: at this
+        # sparsity the bright cells are a small minority and would otherwise be buried
+        # under the zeros they sit among.
+        order = np.argsort(adata.obs[column].to_numpy(), kind="stable")
+        sc.pl.embedding(
+            adata[order],
+            basis="umap",
             color=column,
-            # magma over the default: these are signed, near-zero-centred values, and a
-            # sequential dark-to-bright ramp reads "more" without implying a midpoint the
-            # score does not have.
             cmap="magma",
             frameon=False,
-            title=f"{marker_set} ({adata.uns['marker_n_genes'][marker_set]} genes)",
+            title=title,
             ax=ax,
             show=False,
         )
         ax.title.set_fontsize(8)
 
-    # Per-cluster means, clusters down the rows in the same v1 order the UMAP
-    # slide uses, so a row here refers to the cluster carrying that number there.
-    #
-    # Order by the label read as an integer, taken from the labels that exist. Not
-    # range(n): add_cluster_ids numbers clusters 1-n, so a 0-based range invents an
-    # empty first row and silently drops the last cluster. Not a plain sort either,
-    # since these are strings and "10" sorts before "2".
-    levels = sorted(adata.obs[name].unique().tolist(), key=int)
-    means = adata.obs.groupby(name, observed=True)[columns].mean().reindex(levels)
-    ax = axes[-1]
-    image = ax.imshow(means.to_numpy(), cmap="magma", aspect="auto")
-    ax.set_xticks(range(len(columns)))
-    ax.set_xticklabels(list(MARKER_SETS), rotation=45, ha="right", fontsize=7)
-    ax.set_yticks(range(means.shape[0]))
-    ax.set_yticklabels(means.index, fontsize=7)
-    ax.set_ylabel("cluster", fontsize=7)
-    ax.set_title("mean score per cluster", fontsize=8)
-    for row in range(means.shape[0]):
-        for col in range(means.shape[1]):
-            ax.text(col, row, f"{means.iat[row, col]:.2f}", ha="center", va="center",
-                    fontsize=6, color="white")
-    fig.colorbar(image, ax=ax, fraction=0.05)
-
-    fig.suptitle(f"{sample} — follicle marker scores", fontsize=10)
+    fig.suptitle(f"{sample} — mean marker expression per cell "
+                 f"(quality score <= {MARKER_MAX_SCORE})", fontsize=9, x=0.01, ha="left")
     fig.tight_layout()
     plt.show()
     plt.close(fig)
+
 
 
 def umap_clusters(adata, sample, name):
@@ -858,9 +903,6 @@ for path in ZARRS:
         centroids = pd.DataFrame(np.log1p(agg.layers["mean"]),
                                  index=list(agg.obs_names), columns=agg.var_names)
 
-        # Marker-set scores off the same centroids, so the heatmap and the within-sample
-        # correlation describe one definition of a cluster's expression profile.
-        marker_set_score_table = marker_set_scores(centroids)
 
         # Drop the second copy of the matrix now: the figures below do not need it.
         del adata.layers["cp10k"]
@@ -885,6 +927,18 @@ for path in ZARRS:
         order = leaves_list(linkage(squareform(distance, checks=False), method="average"))
 
         add_cluster_ids(adata, key, [levels[i] for i in order], "cluster_v2")
+
+        # Everything downstream of this point speaks v2. The centroids had to be built
+        # on v1 — the dendrogram that DEFINES v2 is computed from them — but v2 is only
+        # a permutation of the same rows, so they are relabelled rather than aggregated
+        # a second time over the count matrix. order[j] is the 0-based v1 rank that
+        # becomes v2 id j + 1.
+        centroids = centroids.iloc[order]
+        centroids.index = [str(j + 1) for j in range(len(order))]
+
+        # Marker-set scores off the same centroids, so the heatmap and the within-sample
+        # correlation describe one definition of a cluster's expression profile.
+        marker_set_score_table = marker_set_scores(centroids)
 
         # The v1 UMAP comes first: it establishes what each cluster number and colour
         # refers to, which the correlation heatmap then reads against.
@@ -956,19 +1010,34 @@ for path in ZARRS:
             "these are its established markers rather than its whole published list. Dot "
             "area is the fraction of a cluster's cells with any count for that gene, "
             "colour is mean expression scaled to each gene's own range so a quiet marker "
-            "is visible beside an abundant one. Clusters carry the v1 ids."
+            "is visible beside an abundant one. Clusters carry the v2 ids."
         ))
-        marker_dotplot(adata, sample, "cluster_v1")
+        marker_dotplot(adata, sample, "cluster_v2")
+
+        display(Markdown("## Marker set expression on the UMAP"))
+        display(Markdown(
+            "Mean expression of each marker set's genes per cell, in UMAP coordinates — "
+            "the same values the cluster heatmap aggregates, so the two agree by "
+            "construction. A set concentrated in one region is a cell type; one spread "
+            "thinly across the embedding is a set of broadly expressed genes, and both "
+            "give the same cluster mean. Most cells read zero: at ~200 transcripts "
+            "against a 5,101-gene panel a genuine oocyte often carries none of the seven "
+            "oocyte markers, so a mostly dark panel with a bright island is the expected "
+            "picture rather than a fault."
+        ))
+        marker_umaps(adata, sample)
 
         display(Markdown("## Marker set scores by cluster"))
         display(Markdown(
-            "Each marker gene standardized across this sample's clusters and averaged "
-            "within its set, so a score says whether a cluster expresses that set more "
-            "than the sample's clusters do on average — above zero more, below zero "
-            "less. Built from the cluster centroids rather than per cell: at ~200 "
-            "transcripts against a 5,101-gene panel, most cells hold none of a 7-gene "
-            "set even in the cluster that owns it. Scores are comparable between sets "
-            "but not between samples, and name no cell type on their own."
+            "Mean expression of each marker set's genes in each cluster's centroid, in "
+            "log1p CP10K units, under three normalizations. Raw keeps the magnitudes: "
+            "granulosa markers sit near 0.75 in every cluster of this sample while "
+            "oocyte markers sit near 0.06. Column-normalized asks which cluster is "
+            "highest within a set; row-normalized asks which set is highest within a "
+            "cluster. Each panel prints the values it colours by. In the normalized "
+            "panels a set with no signal still has a brightest cell — theca's range here "
+            "is 0.11 to 0.53 — so read those against the raw panel before believing "
+            "them. Nothing here names a cell type on its own."
         ))
         marker_score_heatmap(sample, marker_set_score_table)
 
