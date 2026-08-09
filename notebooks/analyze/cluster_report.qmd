@@ -34,7 +34,7 @@ import numpy as np
 import pandas as pd
 import zarr
 from IPython.display import display, Markdown
-from matplotlib.colors import LogNorm
+from matplotlib.colors import LogNorm, Normalize
 
 # The reference template is 16:9 at 10 x 5.625in; leave room for a slide title.
 FIGSIZE = (9.0, 4.3)
@@ -64,7 +64,20 @@ CLUSTER_SLIDES = 2
 # panels on tissue would be unreadable and the point of those slides is whether a
 # cluster is a coherent structure, not where to cut the sweep. Nearest available
 # resolution wins, so a run with a custom --resolutions still renders.
-SPATIAL_RESOLUTION = 1.0
+#
+# 0.5 rather than the 1.0 this was set to before the clustering recipe changed. That
+# value was chosen when the old recipe needed high resolution to resolve anything: it
+# gave 8 clusters at r=1.0 on a 21k-cell test ROI. The current recipe resolves far more
+# per unit resolution, and cluster count also grows with cell count, so on a whole slide
+# r=1.0 produces a count this slide cannot show legibly — it is a single dense
+# full-tissue plot, and past ~10 clusters the palette falls back to tab20's dark/light
+# pairs, where adjacent structures stop being distinguishable at plot scale.
+#
+# It is a legibility choice, not a claim about the right resolution. That judgement is
+# made by reading the sweep slides, and recorded per sample in sample_summary's
+# chosen_resolutions.csv — which this deck deliberately does not read, since it is the
+# deck the judgement is made FROM.
+SPATIAL_RESOLUTION = 0.5
 
 def load_sample(path):
     """Read one zarr's obs, UMAP, and spatial coords without pulling X into memory.
@@ -235,6 +248,22 @@ def cluster_colors(labels):
 # ramp puts almost every cell in the bottom colour; the rest are bounded. No mito or
 # doublet panel: the Xenium panel carries no MT- genes at all, so pct_counts_mt would
 # read 0.0 for every cell, and no doublet caller runs in this pipeline.
+# Upper quantile the QC-on-UMAP colour ramps are clipped at.
+#
+# Without it these panels are unreadable. Left unclipped, matplotlib scales to the
+# observed maximum, which on every one of these metrics is a far outlier: cell area ran
+# to 1,600 µm² against a median of 45, so the whole ramp compressed into its bottom
+# thirtieth and the panel rendered as a uniform dark square. Genes-detected and
+# negative-control were the same. Only the log-scaled panel survived, because log
+# compresses the tail on its own.
+#
+# The point of these panels is finding a REGION of the manifold that runs high, so the
+# cells beyond the clip are exactly the ones whose value does not need resolving — they
+# saturate, and the ramp spends its range where the reading is made. qc_report clips its
+# equivalent scatters the same way, at fixed 150/80; a quantile is used here instead so
+# it holds across samples of different depth without per-sample constants.
+QC_CLIP_QUANTILE = 0.99
+
 QC_METRICS = [
     ("transcript_counts", "Transcripts", True),
     # n_genes_by_transcripts, not n_genes_by_counts: the latter existed only because
@@ -264,9 +293,19 @@ def qc_umap(sample):
 
     for ax, (metric, title, log_c) in zip(axes, metrics):
         values = d[metric]
-        # Guard the log norm: a zero or negative would raise, and transcript_counts can
-        # be small on debris. vmin at the smallest positive value keeps the ramp honest.
-        norm = LogNorm(vmin=max(values[values > 0].min(), 1e-9), vmax=values.max()) if log_c else None
+        # Clip the top of the ramp so the panel resolves the range the reading is made
+        # in — see QC_CLIP_QUANTILE. Fall back to the maximum if the quantile is not
+        # above the floor, which happens when a metric is near-constant (pct_control is
+        # 0 for most cells on a clean sample) and would otherwise give an invalid norm.
+        vmax = float(values.quantile(QC_CLIP_QUANTILE))
+        if log_c:
+            vmin = max(values[values > 0].min(), 1e-9)
+            # Guard the log norm: a zero or negative would raise, and transcript_counts
+            # can be small on debris.
+            norm = LogNorm(vmin=vmin, vmax=max(vmax, vmin * 1.000001))
+        else:
+            vmin = float(values.min())
+            norm = Normalize(vmin=vmin, vmax=vmax if vmax > vmin else float(values.max()))
         scatter = ax.scatter(
             d["umap_1"], d["umap_2"], c=values,
             cmap="viridis", norm=norm,
@@ -274,7 +313,10 @@ def qc_umap(sample):
             # blended toward white.
             s=2, alpha=1.0, edgecolors="none", rasterized=True,
         )
-        style_umap(ax, title)
+        # Say the panel is clipped, so a saturated region is not read as a plateau.
+        clipped = (values > vmax).sum()
+        style_umap(ax, f"{title} · {clipped:,} above p{QC_CLIP_QUANTILE * 100:g}"
+                   if clipped else title)
         cbar = fig.colorbar(scatter, ax=ax, fraction=0.045, pad=0.02)
         cbar.ax.tick_params(labelsize=6)
 
