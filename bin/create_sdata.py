@@ -182,9 +182,51 @@ def main():
         qc_obs["nucleus_area"] / qc_obs["cell_area"].replace(0, np.nan)
     )
 
+    # Which class of codebook entry each gene's probe belongs to — predesigned catalogue
+    # panel vs. separately-designed custom probes, on the gene axis. That distinction is
+    # the one question the per-gene abundance and detection metrics cannot answer: whether
+    # custom probes land in the same abundance-detection cloud as the catalogue ones, or
+    # off in a corner, which would be a probe-design problem rather than biology.
+    #
+    # This is a LOOKUP, not a summary, which is what makes it safe to compute here.
+    # feature_name -> codeword_category is strictly one-to-one (verified: 0 of 7,415
+    # features on a test ROI carry two categories), so collapsing the molecule table to
+    # one row per feature loses nothing and cannot disagree with a downstream derivation.
+    #
+    # drop_duplicates rather than groupby().first(): both give one row per feature, but
+    # drop_duplicates is a single pass and stays cheap under Dask, which matters when a
+    # whole-slide sample has hundreds of millions of molecules. Only the two columns are
+    # read — the coordinates and ids are most of the table's width.
+    #
+    # Only the gene categories survive onto var, since controls are not features in X:
+    # the reader lands them in obs as the five counter columns summed above. So this
+    # column takes two values plus the unmapped state below.
+    with timer("Codeword category"):
+        tx = sdata.points["transcripts"][["feature_name", "codeword_category"]]
+        lookup = tx.drop_duplicates().compute()
+        lookup = lookup.astype({"feature_name": str, "codeword_category": str})
+        category = (lookup.set_index("feature_name")["codeword_category"]
+                          .reindex(sdata.tables["table"].var.index))
+
+    # A gene with no transcript ANYWHERE in the sample has no row in the molecule table
+    # to read a category from, so reindex leaves a missing value. That is a real state —
+    # the probe is on the panel and detected nothing — not a lookup failure, and it is
+    # kept rather than filled.
+    #
+    # Normalised to object dtype with None HERE, once, rather than left as pandas
+    # "string" dtype: pd.NA == "predesigned_gene" evaluates to pd.NA rather than False,
+    # so every comparison-built mask downstream raises "boolean value of NA is ambiguous"
+    # instead of selecting rows. Do not reintroduce the string dtype on this column.
+    category = category.astype(object).where(category.notna(), None)
+    sdata.tables["table"].var["codeword_category"] = category
+
+    n_unmapped = int(category.isna().sum())
+
     print(f"Cells:              {len(qc_obs):,}")
     print(f"Median transcripts: {qc_obs['transcript_counts'].median():,.0f}")
     print(f"Median genes:       {qc_obs['n_genes_by_transcripts'].median():,.0f}")
+    print(f"Gene categories:    "
+          f"{dict(category.dropna().value_counts())}, unmapped {n_unmapped:,}")
     print(f"Cells w/ control:   {(control_counts > 0).sum():,} "
           f"({100 * (control_counts > 0).mean():.2f}%)")
     print(f"Mean control %:     {qc_obs['pct_control'].mean():.4f}")
