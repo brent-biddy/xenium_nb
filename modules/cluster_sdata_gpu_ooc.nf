@@ -20,12 +20,12 @@ process CLUSTER_SDATA_GPU_OOC {
         saveAs: { fn -> fn.endsWith('.samplesheet_row.csv') ? null : fn }
 
     input:
-    tuple val(sample), path(input_path)
+    // See cluster_sdata.nf: the cut is per-sample so it rides in the tuple, while the
+    // cohort-wide knobs (chunk size, HVG count, resolution sweep) stay plain vals.
+    tuple val(sample), path(input_path), val(min_counts), val(min_cells)
     val chunk_size
     val n_top_genes
     val resolutions
-    val min_counts
-    val min_cells
 
     output:
     tuple val(sample), path("clustered.zarr"), emit: zarr

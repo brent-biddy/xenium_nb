@@ -20,10 +20,10 @@ process CLUSTER_SDATA_GPU {
         saveAs: { fn -> fn.endsWith('.samplesheet_row.csv') ? null : fn }
 
     input:
-    tuple val(sample), path(input_path)
+    // See cluster_sdata.nf: the cut is per-sample so it rides in the tuple, while the
+    // cohort-wide resolution sweep stays a plain val.
+    tuple val(sample), path(input_path), val(min_counts), val(min_cells)
     val resolutions
-    val min_counts
-    val min_cells
 
     output:
     tuple val(sample), path("clustered.zarr"), emit: zarr

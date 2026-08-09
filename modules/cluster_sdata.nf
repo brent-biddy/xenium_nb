@@ -17,10 +17,12 @@ process CLUSTER_SDATA {
         saveAs: { fn -> fn.endsWith('.samplesheet_row.csv') ? null : fn }
 
     input:
-    tuple val(sample), path(input_path)
+    // The filtering cut rides in the tuple, not as a separate val: it is resolved per
+    // sample in main.nf (samplesheet column, else param, else the script's default), so
+    // it varies across the channel. `resolutions` stays a plain val because the sweep is
+    // cohort-wide — cluster_report compares the same resolutions across every sample.
+    tuple val(sample), path(input_path), val(min_counts), val(min_cells)
     val resolutions
-    val min_counts
-    val min_cells
 
     output:
     tuple val(sample), path("clustered.zarr"), emit: zarr

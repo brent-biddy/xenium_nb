@@ -8,9 +8,9 @@
 //   create_sdata              samplesheet: sample, path[, he_image, he_alignment]
 //   create_adata              samplesheet: sample, path
 //   create_follicle_sdata     samplesheet: sample, path  (+ --cell_ids_file)
-//   cluster_sdata             samplesheet: sample, path  (+ --resolutions)
-//   cluster_sdata_gpu         samplesheet: sample, path  (+ --resolutions)
-//   cluster_sdata_gpu_ooc     samplesheet: sample, path  (+ --chunk_size, --n_top_genes, --resolutions)
+//   cluster_sdata             samplesheet: sample, path[, min_counts, min_cells]  (+ --resolutions)
+//   cluster_sdata_gpu         samplesheet: sample, path[, min_counts, min_cells]  (+ --resolutions)
+//   cluster_sdata_gpu_ooc     samplesheet: sample, path[, min_counts, min_cells]  (+ --chunk_size, --n_top_genes, --resolutions)
 //   cluster_report            samplesheet: sample, path  (clustered zarrs; one deck for the cohort)
 //   qc_report                 samplesheet: sample, path  (raw create_sdata zarrs; one deck for the cohort)
 //   concat_sdata              samplesheet: path
@@ -30,6 +30,21 @@ include { CONCAT_SDATA }             from './modules/concat_sdata'
 include { DOWNSAMPLE_SDATA }         from './modules/downsample_sdata'
 include { PLOT_FOLLICLE }            from './modules/plot_follicle'
 include { paramsFile }               from './modules/quarto_params'
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+// Resolve one filtering threshold for one sample, most specific source winning:
+// the samplesheet column, else the cohort-wide param, else '' meaning "pass no flag
+// and let the script's own default stand".
+//
+// An empty or whitespace-only cell counts as absent, so a column filled in for only
+// some samples falls back per row instead of passing an empty flag. "0" does NOT count
+// as absent — zero is a meaningful threshold (keep every cell), which is also why the
+// param arm tests != null rather than using ?:.
+def resolveThreshold(rowValue, paramValue) {
+    if (rowValue?.toString()?.trim()) return rowValue.toString().trim()
+    return paramValue != null ? paramValue : ''
+}
 
 // ── Entry workflow ────────────────────────────────────────────────────────────
 
@@ -162,25 +177,26 @@ workflow cluster_sdata {
 
     def inputs = channel
         .fromPath(params.samplesheet)
-        .splitCsv(header: true)      // Map(sample, path)
+        .splitCsv(header: true)      // Map(sample, path[, min_counts, min_cells])
         .map { row ->
             if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
-            tuple(row.sample, file(row.path))
-        }                            // tuple(sample, path)
+            // Per-sample cut: the six samples of a cohort rarely share one threshold,
+            // and putting it in the samplesheet records which sample got which value
+            // alongside the sample itself rather than in a run's flags.
+            tuple(row.sample, file(row.path),
+                  resolveThreshold(row.min_counts, params.min_counts),
+                  resolveThreshold(row.min_cells,  params.min_cells))
+        }                            // tuple(sample, path, min_counts, min_cells)
 
     // Leiden resolution sweep. Null by default (see nextflow.config) so the list
     // lives only in the clustering script; a `val` process input cannot be null,
     // so pass an empty string and let the module's conditional append omit the flag.
+    // Stays a plain val, not a tuple field: the sweep is cohort-wide by design, since
+    // comparing resolutions across samples is the whole point of cluster_report.
     def resolutions = params.resolutions ?: ''
 
-    // Filtering cut. Same null-means-unset contract as resolutions, but tested with an
-    // explicit != null rather than ?: — 0 is a meaningful threshold (keep everything)
-    // and Groovy truthiness would silently turn it back into the script's default.
-    def minCounts = params.min_counts != null ? params.min_counts : ''
-    def minCells  = params.min_cells  != null ? params.min_cells  : ''
-
-    CLUSTER_SDATA(inputs, resolutions, minCounts, minCells)
+    CLUSTER_SDATA(inputs, resolutions)
 
     // Handoff samplesheet of the clustered zarrs (see create_sdata for rationale).
     CLUSTER_SDATA.out.samplesheet_row
@@ -196,21 +212,20 @@ workflow cluster_sdata_gpu {
 
     def inputs = channel
         .fromPath(params.samplesheet)
-        .splitCsv(header: true)      // Map(sample, path)
+        .splitCsv(header: true)      // Map(sample, path[, min_counts, min_cells])
         .map { row ->
             if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
-            tuple(row.sample, file(row.path))
-        }                            // tuple(sample, path)
+            // See cluster_sdata above for why the cut is per-sample.
+            tuple(row.sample, file(row.path),
+                  resolveThreshold(row.min_counts, params.min_counts),
+                  resolveThreshold(row.min_cells,  params.min_cells))
+        }                            // tuple(sample, path, min_counts, min_cells)
 
     // See cluster_sdata above for why an empty string stands in for "unset".
     def resolutions = params.resolutions ?: ''
 
-    // See cluster_sdata above for why these use an explicit null test, not ?:.
-    def minCounts = params.min_counts != null ? params.min_counts : ''
-    def minCells  = params.min_cells  != null ? params.min_cells  : ''
-
-    CLUSTER_SDATA_GPU(inputs, resolutions, minCounts, minCells)
+    CLUSTER_SDATA_GPU(inputs, resolutions)
 
     // Handoff samplesheet of the clustered zarrs (see create_sdata for rationale).
     CLUSTER_SDATA_GPU.out.samplesheet_row
@@ -226,12 +241,15 @@ workflow cluster_sdata_gpu_ooc {
 
     def inputs = channel
         .fromPath(params.samplesheet)
-        .splitCsv(header: true)      // Map(sample, path)
+        .splitCsv(header: true)      // Map(sample, path[, min_counts, min_cells])
         .map { row ->
             if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
             if (!row.path)   error "Samplesheet row missing 'path': ${row}"
-            tuple(row.sample, file(row.path))
-        }                            // tuple(sample, path)
+            // See cluster_sdata above for why the cut is per-sample.
+            tuple(row.sample, file(row.path),
+                  resolveThreshold(row.min_counts, params.min_counts),
+                  resolveThreshold(row.min_cells,  params.min_cells))
+        }                            // tuple(sample, path, min_counts, min_cells)
 
     // HVG selection is off by default (params.n_top_genes = null) so this step
     // matches cluster_sdata/cluster_sdata_gpu. A `val` process input cannot be
@@ -242,11 +260,7 @@ workflow cluster_sdata_gpu_ooc {
     // See cluster_sdata above for why an empty string stands in for "unset".
     def resolutions = params.resolutions ?: ''
 
-    // See cluster_sdata above for why these use an explicit null test, not ?:.
-    def minCounts = params.min_counts != null ? params.min_counts : ''
-    def minCells  = params.min_cells  != null ? params.min_cells  : ''
-
-    CLUSTER_SDATA_GPU_OOC(inputs, params.chunk_size, nTopGenes, resolutions, minCounts, minCells)
+    CLUSTER_SDATA_GPU_OOC(inputs, params.chunk_size, nTopGenes, resolutions)
 
     // Handoff samplesheet of the clustered zarrs (see create_sdata for rationale).
     CLUSTER_SDATA_GPU_OOC.out.samplesheet_row
