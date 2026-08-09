@@ -42,9 +42,17 @@ process SAMPLE_SUMMARY {
     // The major cell-type reference the cluster centroids are correlated against,
     // likewise under the fixed name the notebook reads.
     path reference, stageAs: 'ovary_reference_major.csv.gz'
+    // The hand-made cell type calls. Optional in substance — the notebook falls back to
+    // the argmax per cell type when the file has no row for a (sample, cell type) — but
+    // staged unconditionally, since Nextflow has no optional path input and the shipped
+    // asset is a header-only sheet.
+    path cell_types, stageAs: 'cell_type_annotations.csv'
 
     output:
     path "sample_summary.pptx", emit: report
+    // The draft cell type map: argmax per cell type, with both cluster numberings and
+    // the score behind each call. Edited by hand and fed back via --cell_type_annotations.
+    path "cluster_annotations.csv", emit: annotations
 
     script:
     // Redirect caches and temp files into the task dir: an OSCER compute node's /tmp is
@@ -60,5 +68,6 @@ process SAMPLE_SUMMARY {
     stub:
     """
     touch sample_summary.pptx
+    touch cluster_annotations.csv
     """
 }

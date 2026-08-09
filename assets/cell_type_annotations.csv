@@ -1,0 +1,15 @@
+# Hand-made cell type calls, read by sample_summary. One row per (sample, cell_type)
+# naming the cluster that IS that cell type — the same direction the marker slides ask,
+# "which cluster is the granulosa one".
+#
+# Rows are OVERRIDES on the argmax the deck picks from the marker means. A row with a
+# blank cluster_v1 means "not present in this sample", which is how a judgement overrides
+# the default downward — the argmax always exists, even for a set with no signal.
+#
+# Keyed on cluster_v1, the size ranking, which is fixed by the cell counts in the zarr.
+# The deck labels its slides with cluster_v2, derived from the dendrogram at render time
+# and liable to move. Read v2 off the slides and use the emitted cluster_annotations.csv,
+# which carries both, to write the v1 here.
+#
+# cell_type must be one of the marker set names: granulosa, oocyte, theca.
+sample,cell_type,cluster_v1

@@ -342,6 +342,9 @@ workflow sample_summary {
     // anything derived — a different tissue needs a different marker file.
     if (!params.follicle_markers)   error "Please provide --follicle_markers"
     if (!params.reference_major)    error "Please provide --reference_major"
+    // Defaulted to a header-only asset, so this only fires if explicitly unset. Its rows
+    // override the argmax per cell type; a sample with no rows takes the defaults.
+    if (!params.cell_type_annotations) error "Please provide --cell_type_annotations"
 
     // Point --samplesheet at a cluster_sdata* handoff sheet — this report reads the
     // clustered zarrs (obs, var, and the leiden_res_* columns), not create_sdata's raw ones.
@@ -364,6 +367,7 @@ workflow sample_summary {
         file(params.chosen_resolutions),
         file(params.follicle_markers),
         file(params.reference_major),
+        file(params.cell_type_annotations),
     )
 }
 

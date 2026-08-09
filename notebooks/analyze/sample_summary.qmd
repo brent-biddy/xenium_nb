@@ -73,6 +73,24 @@ DEFAULT_RESOLUTION = 0.5
 # absent every sample simply takes the default.
 RESOLUTIONS_CSV = Path("chosen_resolutions.csv")
 
+# Hand-made cell type calls, staged flat beside the zarrs like the resolution table and
+# optional in the same way: absent, every cell type falls back to its argmax cluster.
+#
+# Keyed on cluster_v1, NOT v2. v1 is the size ranking and is fixed by the cell counts in
+# the zarr; v2 is derived from the dendrogram at render time and moves whenever the
+# clustering or the centroids change — measured on these samples the permutation is
+# aggressive, not near-identity (ROI1_A's oocyte cluster sits at v1 5 / v2 6, ROI1_B's
+# follicle at v1 7 / v2 1). Keyed on v2, every call would silently point at a different
+# cluster after any re-run. The deck emits cluster_annotations.csv carrying both ids so
+# a v2 read off a slide can be written back as v1.
+#
+# One row per (sample, cell_type), not per cluster: the call this deck supports is "which
+# cluster is the granulosa one", and a cluster can legitimately answer for two cell types
+# — a follicle sectioned whole is granulosa cells around an oocyte, and on ROI1_B both
+# sets peak on the same cluster. A blank cluster_v1 means "not present in this sample",
+# which is a real judgement and must survive rather than falling back to the argmax.
+CELL_TYPES_CSV = Path("cell_type_annotations.csv")
+
 # Follicle marker sets, staged flat beside the zarrs by the same rule. Built by
 # scripts/convert_ovary_reference.py from Sci Adv adm7506 Data S5, whose Granulosa,
 # Oocyte and Theca sheets carry per-sample values rather than per-cell-type means — so
@@ -183,6 +201,29 @@ if RESOLUTIONS_CSV.exists():
     if missing_cols:
         raise ValueError(f"chosen_resolutions.csv missing column(s): {sorted(missing_cols)}")
     OVERRIDES = dict(zip(chosen["sample"].astype(str), chosen["resolution"].astype(float)))
+
+
+# (sample, cell_type) -> cluster_v1, from the hand-made sheet. A row whose cluster is
+# blank maps to None, which is DISTINCT from the pair being absent: absent means "no
+# judgement was made, fall back to the argmax", blank means "judged not present here".
+CELL_TYPE_CALLS = {}
+if CELL_TYPES_CSV.exists():
+    called = pd.read_csv(CELL_TYPES_CSV, comment="#", dtype=str)
+    missing_cols = {"sample", "cell_type", "cluster_v1"} - set(called.columns)
+    if missing_cols:
+        raise ValueError(
+            f"{CELL_TYPES_CSV} missing column(s): {sorted(missing_cols)}")
+    unknown = sorted(set(called["cell_type"]) - set(MARKER_SETS))
+    if unknown:
+        # A typo would otherwise become its own silent category that never matches a
+        # marker set, so the call would vanish rather than fail.
+        raise ValueError(
+            f"{CELL_TYPES_CSV}: cell_type values {unknown} are not marker sets "
+            f"({sorted(MARKER_SETS)})")
+    for sample_id, cell_type, cluster in zip(called["sample"], called["cell_type"],
+                                             called["cluster_v1"]):
+        cluster = None if pd.isna(cluster) or not str(cluster).strip() else str(cluster).strip()
+        CELL_TYPE_CALLS[(str(sample_id), str(cell_type))] = cluster
 
 
 # Cluster-id colours here encode ORDER, not identity: the v2 ids are 1..n in
@@ -653,6 +694,109 @@ def umap_clusters(adata, sample, name):
     plt.close(fig)
 
 
+def resolve_cell_types(sample, scores, v2_to_v1):
+    """Which cluster answers for each cell type, as (cell_type -> v2 id or None).
+
+    The default is the argmax down each COLUMN of the marker means: the cluster
+    expressing that set most. Per column and not per row, because the question is "which
+    cluster is the granulosa one" — a cluster may answer for two cell types, and on
+    ROI1_B one does, a follicle sectioned whole being granulosa cells around an oocyte.
+    The row question is the one the raw means cannot answer, since the sets sit at very
+    different levels.
+
+    A hand-made call replaces the default for that (sample, cell_type). A call present
+    but blank means "not in this sample" and returns None, which is how a judgement
+    overrides the default DOWNWARD — the argmax always exists, even for a set with no
+    signal, so without this theca could never be dismissed.
+
+    Returns v2 ids because every slide downstream is labelled with them; the sheet is
+    keyed on v1 and translated here.
+    """
+    v1_to_v2 = {v1: v2 for v2, v1 in v2_to_v1.items()}
+    resolved = {}
+    for cell_type in scores.columns:
+        column = scores[cell_type]
+        if (sample, cell_type) in CELL_TYPE_CALLS:
+            called_v1 = CELL_TYPE_CALLS[(sample, cell_type)]
+            resolved[cell_type] = v1_to_v2.get(called_v1) if called_v1 else None
+        else:
+            resolved[cell_type] = (str(column.idxmax()) if column.notna().any()
+                                   else None)
+    return resolved
+
+
+def cell_type_labels(resolved):
+    """v2 cluster id -> label, joining the cell types that share a cluster.
+
+    A cluster claimed by two cell types is labelled with both rather than one of them
+    being dropped: on ROI1_B granulosa and oocyte peak on the same cluster because the
+    section caught a whole follicle, and "granulosa + oocyte" is the accurate reading of
+    that, not a collision to break. Rendering it that way is also what makes the
+    difference between samples visible — ROI1_A resolves the two into separate clusters
+    and ROI1_B does not.
+    """
+    by_cluster = {}
+    for cell_type, cluster in resolved.items():
+        if cluster is not None:
+            by_cluster.setdefault(cluster, []).append(cell_type)
+    return {cluster: " + ".join(sorted(types)) for cluster, types in by_cluster.items()}
+
+
+def spatial_cell_types(adata, sample, name, labels):
+    """One slide's figure: the section coloured by cell type rather than cluster id.
+
+    Only the called clusters carry a colour. Everything else is grey and labelled
+    unassigned — which on these samples is most of the stroma, and correctly so: the
+    marker sets say nothing about it, and coluring it would imply they had.
+
+    Same geometry as the cluster tissue plot (figure shaped to the tissue, marker sized
+    from the axes, y inverted), so the two read as the same section.
+    """
+    x, y = adata.obsm["spatial"][:, 0], adata.obsm["spatial"][:, 1]
+    aspect = (x.max() - x.min()) / (y.max() - y.min())
+    plot_w = FIGSIZE[0] - SPATIAL_LEGEND_WIDTH
+    if aspect >= plot_w / FIGSIZE[1]:
+        w, h = plot_w, plot_w / aspect
+    else:
+        w, h = FIGSIZE[1] * aspect, FIGSIZE[1]
+    fig, ax = plt.subplots(figsize=(w + SPATIAL_LEGEND_WIDTH, h))
+
+    pos = ax.get_position()
+    area_pt2 = (pos.width * w) * (pos.height * h) * 72 ** 2
+    size = float(np.clip(SPATIAL_COVERAGE * area_pt2 / adata.n_obs, 0.5, 6.0))
+
+    cluster = adata.obs[name].astype(str)
+    called = cluster.map(labels)
+    # Unassigned first and in grey, so the called cells are drawn over it.
+    unassigned = called.isna().to_numpy()
+    ax.scatter(x[unassigned], y[unassigned], color="0.85", label="unassigned",
+               s=size, alpha=1.0, edgecolors="none", rasterized=True)
+
+    palette = gradient_colors(max(len(set(labels.values())), 1))
+    for i, label in enumerate(sorted(set(labels.values()))):
+        m = (called == label).to_numpy()
+        if m.any():
+            ax.scatter(x[m], y[m], color=palette[i], label=label,
+                       s=size, alpha=1.0, edgecolors="none", rasterized=True)
+
+    ax.set_aspect("equal")
+    ax.invert_yaxis()
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.legend(loc="center left", bbox_to_anchor=(1.0, 0.5), frameon=False,
+              fontsize=7, markerscale=6, handletextpad=0.2, title="cell type",
+              title_fontsize=7)
+
+    n_called = int((~unassigned).sum())
+    fig.suptitle(f"{sample} · {n_called:,} of {adata.n_obs:,} cells assigned",
+                 fontsize=9, x=0.01, ha="left")
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+
 def spatial_clusters(adata, sample, name):
     """One slide's figure: this sample's cells in tissue coordinates, coloured by cluster.
 
@@ -832,6 +976,8 @@ def qc_violins(adata, sample, name, resolution):
 # starting its own line, so pandoc prints a literal "## ..." as text and drops the image
 # entirely. display(Markdown) does not hit it — each call emits its own complete block,
 # and each figure ends with plt.show() so it lands between them.
+annotation_rows = []
+
 for path in ZARRS:
     # ad.read_zarr on tables/table rather than spatialdata.read_zarr: this deck never
     # touches the images, points, or shapes, and the table is the whole input. One object
@@ -935,10 +1081,31 @@ for path in ZARRS:
         # becomes v2 id j + 1.
         centroids = centroids.iloc[order]
         centroids.index = [str(j + 1) for j in range(len(order))]
+        # v2 id -> v1 id, the round trip of the relabel above. The cell type sheet is
+        # keyed on v1 (fixed by cell count) while every slide is labelled v2 (derived
+        # here), so the two have to be translatable.
+        v2_to_v1 = {str(j + 1): str(order[j] + 1) for j in range(len(order))}
 
         # Marker-set scores off the same centroids, so the heatmap and the within-sample
         # correlation describe one definition of a cluster's expression profile.
         marker_set_score_table = marker_set_scores(centroids)
+        resolved_cell_types = resolve_cell_types(sample, marker_set_score_table, v2_to_v1)
+        cluster_to_label = cell_type_labels(resolved_cell_types)
+
+        # One row per (sample, cell type) for the emitted draft. Carries both ids and the
+        # score so a v2 read off the slides can be written back as v1, and so the number
+        # behind a default call is visible beside it.
+        for cell_type, cluster_v2 in resolved_cell_types.items():
+            score = (marker_set_score_table.loc[cluster_v2, cell_type]
+                     if cluster_v2 is not None else np.nan)
+            annotation_rows.append({
+                "sample": sample,
+                "cell_type": cell_type,
+                "cluster_v1": v2_to_v1.get(cluster_v2) if cluster_v2 else "",
+                "cluster_v2": cluster_v2 or "",
+                "score": round(float(score), 4) if np.isfinite(score) else "",
+                "source": "hand" if (sample, cell_type) in CELL_TYPE_CALLS else "argmax",
+            })
 
         # The v1 UMAP comes first: it establishes what each cluster number and colour
         # refers to, which the correlation heatmap then reads against.
@@ -1041,6 +1208,20 @@ for path in ZARRS:
         ))
         marker_score_heatmap(sample, marker_set_score_table)
 
+        display(Markdown("## Cell types in tissue"))
+        display(Markdown(
+            "The section coloured by cell type rather than cluster id. Each cell type is "
+            "assigned to the cluster expressing its markers most, unless "
+            "cell_type_annotations.csv overrides it — the emitted cluster_annotations.csv "
+            "carries the defaults, both cluster numberings and the score behind each call, "
+            "to be edited and fed back. A cluster claimed by two cell types carries both "
+            "names: a follicle sectioned whole is granulosa cells around an oocyte, and "
+            "the two do not always separate into their own clusters. Grey is unassigned, "
+            "which is most of the stroma here — the follicle marker sets say nothing "
+            "about it."
+        ))
+        spatial_cell_types(adata, sample, "cluster_v2", cluster_to_label)
+
     except Exception:
         display(Markdown(f"```\n{traceback.format_exc()}\n```"))
 
@@ -1048,4 +1229,9 @@ for path in ZARRS:
     # deck's footprint, so holding two at once would double it for no reason.
     del adata
     gc.collect()
+
+# The draft cell type map, emitted beside the deck. Written unconditionally, so a render
+# with no hand-made sheet still produces the file to start from, and a render with one
+# reproduces it with `source` marking which rows were judged rather than defaulted.
+pd.DataFrame(annotation_rows).to_csv("cluster_annotations.csv", index=False)
 ```
