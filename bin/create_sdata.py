@@ -19,6 +19,8 @@ Usage:
 import argparse
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
 import scanpy as sc
 import spatialdata_io
 from spatialdata_io import xenium_aligned_image
@@ -28,6 +30,18 @@ from spatialdata.transformations import Identity
 import session_info
 
 from timer import timer, timing_summary
+
+# The five Xenium control/codeword counters, as spatialdata_io's reader names them in
+# obs. They are per-cell counts taken from cells.parquet, not features in X — which is
+# why the negative-control fraction below is summed by hand rather than passed to
+# calculate_qc_metrics as qc_vars.
+CONTROL_COLS = [
+    "control_probe_counts",
+    "genomic_control_counts",
+    "control_codeword_counts",
+    "unassigned_codeword_counts",
+    "deprecated_codeword_counts",
+]
 
 
 def parse_args():
@@ -115,9 +129,118 @@ def main():
     qc_obs = sdata.tables["table"].obs
     qc_obs.drop(columns="total_transcripts", inplace=True)
 
+    # Negative-control burden, the one per-cell QC metric calculate_qc_metrics cannot
+    # produce here. qc_vars needs its variables to be features in X, and the five
+    # control/codeword counters are not — the reader lands them in obs, from
+    # cells.parquet. So the sum and the fraction are written explicitly.
+    #
+    # Computed here for the same reason as everything above: this is the one point X
+    # and the reader's own columns are together in memory, so every consumer can read
+    # the metric instead of re-deriving it. Both cluster_report and qc_report used to
+    # derive it themselves, which is two definitions of one number.
+    #
+    # The denominator is transcript_counts + controls rather than obs["total_counts"].
+    # On this object the two are identical by construction, but total_counts is the
+    # column cluster_sdata_gpu_ooc's calculate_qc_metrics overwrites with a plain row
+    # sum, whereas transcript_counts always equals X.sum(axis=1). Building the
+    # denominator from the parts is what keeps the metric meaning one thing everywhere.
+    control_counts = qc_obs[CONTROL_COLS].sum(axis=1)
+    total = qc_obs["transcript_counts"] + control_counts
+    qc_obs["control_counts"] = control_counts
+    # A cell with no transcripts and no controls has no fraction to report — 0/0 is a
+    # NaN here rather than a 0 that would read as a clean cell.
+    qc_obs["pct_control"] = 100 * control_counts / total.replace(0, np.nan)
+
+    # Mean transcripts per detected gene — how concentrated a cell's counts are across
+    # the genes it detects. Transcripts and genes rise together, so this is the residual
+    # after that trend: a cell high on it has its counts piled into few genes, which is
+    # either a very specialised cell or a segmentation artifact that swept one bright
+    # neighbour's transcripts into an otherwise empty mask.
+    #
+    # Written the "transcripts per gene" way round rather than its reciprocal because it
+    # is unbounded above, so those concentrated cells separate instead of being squashed
+    # against a ceiling of 1. Not the log10(genes)/log10(transcripts) "novelty score"
+    # from scRNA-seq either: that convention assumes a whole transcriptome, and on a 5K
+    # panel it compresses into ~0.92-0.98 where nothing is legible.
+    #
+    # NaN, not 0, where a cell detects no genes: 0 would place the emptiest cells at the
+    # bottom of the range next to genuinely diffuse ones.
+    qc_obs["transcripts_per_gene"] = (
+        qc_obs["transcript_counts"] / qc_obs["n_genes_by_transcripts"].replace(0, np.nan)
+    )
+
+    # Share of a cell's area taken up by its nucleus. A segmentation check more than an
+    # expression one: the ratio sits around 0.5 on these ROIs, and cells far below it are
+    # mostly cytoplasm — either genuinely large cells or a boundary that swept in
+    # neighbouring space — while cells near 1 are nucleus with almost no cytoplasm around
+    # it, which is what an over-tight boundary or a nucleus-expansion fallback looks like.
+    #
+    # The reader leaves nucleus_area as NaN, NOT 0, for a cell segmented without a
+    # nucleus (70 of 21,724 on one ROI, matching nucleus_count == 0 exactly). That NaN
+    # propagates here on purpose: those cells have no ratio to report, and a 0 would put
+    # them at the bottom of the range beside genuinely cytoplasm-heavy cells.
+    qc_obs["nucleus_ratio"] = (
+        qc_obs["nucleus_area"] / qc_obs["cell_area"].replace(0, np.nan)
+    )
+
+    # Which class of codebook entry each gene's probe belongs to — predesigned catalogue
+    # panel vs. separately-designed custom probes, on the gene axis. That distinction is
+    # the one question the per-gene abundance and detection metrics cannot answer: whether
+    # custom probes land in the same abundance-detection cloud as the catalogue ones, or
+    # off in a corner, which would be a probe-design problem rather than biology.
+    #
+    # This is a LOOKUP, not a summary, which is what makes it safe to compute here.
+    # feature_name -> codeword_category is strictly one-to-one (verified: 0 of 7,415
+    # features on a test ROI carry two categories), so collapsing the molecule table to
+    # one row per feature loses nothing and cannot disagree with a downstream derivation.
+    #
+    # drop_duplicates rather than groupby().first(): both give one row per feature, but
+    # drop_duplicates is a single pass and stays cheap under Dask, which matters when a
+    # whole-slide sample has hundreds of millions of molecules. Only the two columns are
+    # read — the coordinates and ids are most of the table's width.
+    #
+    # Only the gene categories survive onto var, since controls are not features in X:
+    # the reader lands them in obs as the five counter columns summed above. So this
+    # column takes two values plus the unmapped state below.
+    with timer("Codeword category"):
+        tx = sdata.points["transcripts"][["feature_name", "codeword_category"]]
+        lookup = tx.drop_duplicates().compute()
+        lookup = lookup.astype({"feature_name": str, "codeword_category": str})
+        category = (lookup.set_index("feature_name")["codeword_category"]
+                          .reindex(sdata.tables["table"].var.index))
+
+    # A gene with no transcript ANYWHERE in the sample has no row in the molecule table
+    # to read a category from, so reindex leaves a missing value. That is a real state —
+    # the probe is on the panel and detected nothing — not a lookup failure, and it is
+    # kept rather than filled.
+    #
+    # Written as a CATEGORICAL, which is what makes the unmapped state survive the write.
+    # An object column of strings-plus-None goes through spatialdata's writer as a plain
+    # vlen-utf8 string array, and None is coerced to the literal string "None" — verified
+    # on a real ROI, where the three unmapped genes came back as a third category and
+    # isna() returned 0, silently turning "no transcript anywhere" into a label. A
+    # categorical is stored as codes plus categories with -1 for missing, so the gap
+    # round-trips as a genuine NA.
+    #
+    # Categorical also keeps comparisons safe: `col == "custom_gene"` yields a plain bool
+    # mask with False at the missing entries, rather than the pd.NA that a nullable string
+    # dtype produces and that raises "boolean value of NA is ambiguous" downstream.
+    sdata.tables["table"].var["codeword_category"] = pd.Categorical(
+        category.astype(object).where(category.notna(), None)
+    )
+
+    # Read back as a Series so the summary below uses the column as stored.
+    category = sdata.tables["table"].var["codeword_category"]
+    n_unmapped = int(category.isna().sum())
+
     print(f"Cells:              {len(qc_obs):,}")
     print(f"Median transcripts: {qc_obs['transcript_counts'].median():,.0f}")
     print(f"Median genes:       {qc_obs['n_genes_by_transcripts'].median():,.0f}")
+    print(f"Gene categories:    "
+          f"{dict(category.dropna().value_counts())}, unmapped {n_unmapped:,}")
+    print(f"Cells w/ control:   {(control_counts > 0).sum():,} "
+          f"({100 * (control_counts > 0).mean():.2f}%)")
+    print(f"Mean control %:     {qc_obs['pct_control'].mean():.4f}")
 
     # spatialdata_io auto-detects an H&E image if one is named with the expected
     # Xenium suffix alongside the data. If not auto-detected, load it explicitly

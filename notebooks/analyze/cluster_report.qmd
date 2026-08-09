@@ -66,17 +66,6 @@ CLUSTER_SLIDES = 2
 # resolution wins, so a run with a custom --resolutions still renders.
 SPATIAL_RESOLUTION = 1.0
 
-# obs columns holding the five Xenium control/codeword counters. Summed for the
-# negative-control panel; each one alone is too sparse to read on a UMAP.
-CONTROL_COLS = [
-    "control_probe_counts",
-    "genomic_control_counts",
-    "control_codeword_counts",
-    "unassigned_codeword_counts",
-    "deprecated_codeword_counts",
-]
-
-
 def load_sample(path):
     """Read one zarr's obs, UMAP, and spatial coords without pulling X into memory.
 
@@ -93,15 +82,22 @@ def load_sample(path):
     df["spatial_x"] = spatial[:, 0]
     df["spatial_y"] = spatial[:, 1]
 
-    # Negative-control fraction, computed here rather than read from obs. It cannot use
-    # total_counts: create_sdata's total_counts is transcripts + all five counters, but
-    # cluster_sdata's calculate_qc_metrics overwrites it with X.sum(axis=1) — so the
-    # column means different things before and after clustering. transcript_counts is
-    # the one that always equals the row sum of X, so the denominator is rebuilt from it.
-    present = [c for c in CONTROL_COLS if c in df.columns]
-    if present:
-        controls = df[present].sum(axis=1)
-        df["pct_control"] = 100 * controls / (df["transcript_counts"] + controls)
+    # This deck computes no QC metric of its own. Every column it plots — including
+    # pct_control, which it used to derive here — comes from create_sdata, which
+    # annotates them at the one point X and the reader's own columns are together in
+    # memory. A report that recomputes a metric is a second definition of it, and the
+    # two drift silently.
+    #
+    # Deliberately no fallback for zarrs written before create_sdata emitted a column:
+    # a fallback is that second definition wearing a disguise, and it would let a stale
+    # cohort render a deck whose numbers came from somewhere other than the pipeline.
+    # Failing here instead names the fix, which is to re-run create_sdata.
+    missing = [c for c, _, _ in QC_METRICS if c not in df.columns]
+    if missing:
+        raise KeyError(
+            f"{Path(path).name}: obs is missing {missing}. These come from create_sdata "
+            "— re-run it over this sample rather than deriving them here."
+        )
 
     return df
 
@@ -241,7 +237,11 @@ def cluster_colors(labels):
 # read 0.0 for every cell, and no doublet caller runs in this pipeline.
 QC_METRICS = [
     ("transcript_counts", "Transcripts", True),
-    ("n_genes_by_counts", "Genes detected", False),
+    # n_genes_by_transcripts, not n_genes_by_counts: the latter existed only because
+    # cluster_sdata* re-ran calculate_qc_metrics with the default expr_type. That call
+    # is gone, and create_sdata's own column — computed once, before any filtering — is
+    # what clustered zarrs now carry.
+    ("n_genes_by_transcripts", "Genes detected", False),
     ("cell_area", "Cell area (µm²)", False),
     ("pct_control", "Negative control %", False),
 ]
