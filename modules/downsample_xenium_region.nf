@@ -6,8 +6,16 @@ process DOWNSAMPLE_XENIUM_REGION {
     publishDir { "${params.outdir}/${sample}/downsample_xenium_region" },
         mode: 'link'
 
+    // he_image/he_alignment are `path`, not `val`, and are optional — main.nf passes
+    // `[]` when the samplesheet omits them, which stages nothing and leaves the
+    // variable falsy. They must be staged: an unstaged absolute path is a host path
+    // the container cannot see. Apptainer's default binds ($HOME, /tmp, cwd) hide
+    // this locally, but an H&E anywhere else — e.g. OSCER /scratch, which is bound
+    // only at the work dir Nextflow mounts — is simply missing inside the container.
+    // Staging is safe against the output glob: inputs land at the work dir root,
+    // while the published artifacts are everything under ${region_name}/.
     input:
-    tuple val(sample), path(input_path), val(xmin), val(ymin), val(xmax), val(ymax), val(region_name), val(he_image), val(he_alignment)
+    tuple val(sample), path(input_path), val(xmin), val(ymin), val(xmax), val(ymax), val(region_name), path(he_image), path(he_alignment)
 
     output:
     tuple val(sample), path("${region_name}/*"), emit: artifacts

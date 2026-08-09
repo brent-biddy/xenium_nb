@@ -1450,7 +1450,11 @@ def main():
     )
     regions = load_regions(args)
     pixel_size = args.pixel_size if args.pixel_size else XENIUM_PIXEL_SIZE_UM
-    he_image = args.he_image.resolve() if args.he_image else None
+    # absolute(), not resolve(): under Nextflow the H&E is staged into the work dir
+    # as a symlink to its original location, and resolve() would follow it back to
+    # that host path — which is exactly the unbound path staging exists to avoid.
+    # absolute() anchors a relative path to the cwd without dereferencing.
+    he_image = args.he_image.absolute() if args.he_image else None
     he_alignment = load_he_alignment(args.he_alignment) if args.he_alignment else None
 
     print(f"Input:      {input_dir}")
