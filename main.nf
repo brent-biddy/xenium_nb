@@ -171,7 +171,13 @@ workflow cluster_sdata {
     // so pass an empty string and let the module's conditional append omit the flag.
     def resolutions = params.resolutions ?: ''
 
-    CLUSTER_SDATA(inputs, resolutions)
+    // Filtering cut. Same null-means-unset contract as resolutions, but tested with an
+    // explicit != null rather than ?: — 0 is a meaningful threshold (keep everything)
+    // and Groovy truthiness would silently turn it back into the script's default.
+    def minCounts = params.min_counts != null ? params.min_counts : ''
+    def minCells  = params.min_cells  != null ? params.min_cells  : ''
+
+    CLUSTER_SDATA(inputs, resolutions, minCounts, minCells)
 
     // Handoff samplesheet of the clustered zarrs (see create_sdata for rationale).
     CLUSTER_SDATA.out.samplesheet_row
@@ -197,7 +203,11 @@ workflow cluster_sdata_gpu {
     // See cluster_sdata above for why an empty string stands in for "unset".
     def resolutions = params.resolutions ?: ''
 
-    CLUSTER_SDATA_GPU(inputs, resolutions)
+    // See cluster_sdata above for why these use an explicit null test, not ?:.
+    def minCounts = params.min_counts != null ? params.min_counts : ''
+    def minCells  = params.min_cells  != null ? params.min_cells  : ''
+
+    CLUSTER_SDATA_GPU(inputs, resolutions, minCounts, minCells)
 
     // Handoff samplesheet of the clustered zarrs (see create_sdata for rationale).
     CLUSTER_SDATA_GPU.out.samplesheet_row
@@ -229,7 +239,11 @@ workflow cluster_sdata_gpu_ooc {
     // See cluster_sdata above for why an empty string stands in for "unset".
     def resolutions = params.resolutions ?: ''
 
-    CLUSTER_SDATA_GPU_OOC(inputs, params.chunk_size, nTopGenes, resolutions)
+    // See cluster_sdata above for why these use an explicit null test, not ?:.
+    def minCounts = params.min_counts != null ? params.min_counts : ''
+    def minCells  = params.min_cells  != null ? params.min_cells  : ''
+
+    CLUSTER_SDATA_GPU_OOC(inputs, params.chunk_size, nTopGenes, resolutions, minCounts, minCells)
 
     // Handoff samplesheet of the clustered zarrs (see create_sdata for rationale).
     CLUSTER_SDATA_GPU_OOC.out.samplesheet_row

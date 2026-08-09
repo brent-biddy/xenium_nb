@@ -40,6 +40,13 @@ except ImportError:  # older anndata: same functionality under the old name
 
 DEFAULT_RESOLUTIONS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
+# Must stay in step with cluster_sdata.py and cluster_sdata_gpu.py. Note this step
+# applies the cut as a boolean mask over obs/var rather than through filter_cells /
+# filter_genes (see the QC block), so the flags mean the same thing but reach the data
+# by a different route.
+DEFAULT_MIN_COUNTS = 10
+DEFAULT_MIN_CELLS = 5
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -73,6 +80,23 @@ def parse_args():
         metavar="RES",
         help="Leiden resolutions to sweep; one obs column is written per value "
         f"(default: {' '.join(str(r) for r in DEFAULT_RESOLUTIONS)}).",
+    )
+    # Underscored, unlike this file's --table-key / --chunk-size / --n-top-genes, to
+    # match cluster_sdata.py and cluster_sdata_gpu.py: the three steps take the same
+    # cut and one module pattern passes it, so the flag spelling has to agree.
+    parser.add_argument(
+        "--min_counts",
+        type=int,
+        default=DEFAULT_MIN_COUNTS,
+        help="Drop cells with fewer than this many transcripts. Read the cut off the "
+        f"retention curves in the qc_report deck (default: {DEFAULT_MIN_COUNTS}).",
+    )
+    parser.add_argument(
+        "--min_cells",
+        type=int,
+        default=DEFAULT_MIN_CELLS,
+        help="Drop genes detected in fewer than this many cells "
+        f"(default: {DEFAULT_MIN_CELLS}).",
     )
     return parser.parse_args()
 
@@ -108,6 +132,7 @@ def main():
     print(f"Output:     {output_path}")
     print(f"Chunk size: {args.chunk_size:,} rows")
     print(f"Res:        {', '.join(f'{r:g}' for r in resolutions)}")
+    print(f"Filter:     min_counts={args.min_counts}, min_cells={args.min_cells}")
 
     # Managed memory lets chunks spill to host RAM instead of OOM-ing when the
     # dataset (or an intermediate) doesn't fit in VRAM — the whole point of an
@@ -141,9 +166,9 @@ def main():
         n_before = adata.n_obs
         # Boolean-index + .copy() rather than filter_cells/filter_genes: filtering
         # through views is incompatible with — and much slower on — Dask-backed X.
-        cell_mask = adata.obs["total_counts"].to_numpy() >= 10
+        cell_mask = adata.obs["total_counts"].to_numpy() >= args.min_counts
         adata = adata[cell_mask].copy()
-        gene_mask = adata.var["n_cells_by_counts"].to_numpy() >= 5
+        gene_mask = adata.var["n_cells_by_counts"].to_numpy() >= args.min_cells
         adata = adata[:, gene_mask].copy()
 
     print(f"Filtered {n_before - adata.n_obs:,} low-quality cells.")

@@ -19,6 +19,8 @@ process CLUSTER_SDATA {
     input:
     tuple val(sample), path(input_path)
     val resolutions
+    val min_counts
+    val min_cells
 
     output:
     tuple val(sample), path("clustered.zarr"), emit: zarr
@@ -34,6 +36,10 @@ process CLUSTER_SDATA {
     // so it can be given as a single --resolutions value on the Nextflow CLI.
     // toString() first: a single value (--resolutions 1.0) arrives as a Number.
     if (resolutions) clusterArgs << "--resolutions ${resolutions.toString().tokenize(',').join(' ')}"
+    // Omitted when unset so the filtering cut, like the resolution sweep, keeps its
+    // single definition in the Python script rather than being restated in the config.
+    if (min_counts != '') clusterArgs << "--min_counts ${min_counts}"
+    if (min_cells != '') clusterArgs << "--min_cells ${min_cells}"
     """
     export XDG_CACHE_HOME="\$PWD/.cache"
     export TMPDIR="\$PWD/tmp"
