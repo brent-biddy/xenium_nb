@@ -35,6 +35,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scanpy as sc
+import yaml
 from IPython.display import display, Markdown
 from matplotlib.colors import to_hex
 from scipy.cluster.hierarchy import leaves_list, linkage
@@ -63,6 +64,27 @@ DEFAULT_RESOLUTION = 0.5
 # own resolution the moment one is written for it. Optional as a file too — if it is
 # absent every sample simply takes the default.
 RESOLUTIONS_CSV = Path("chosen_resolutions.csv")
+
+# Follicle marker sets, staged flat beside the zarrs by the same rule. Built by
+# scripts/convert_ovary_reference.py from Sci Adv adm7506 Data S5, whose Granulosa,
+# Oocyte and Theca sheets carry per-sample values rather than per-cell-type means — so
+# these can only be SCORED, not correlated the way the major-type reference is.
+#
+# Required, not optional: unlike chosen_resolutions.csv, a missing file here would
+# silently drop a whole section rather than fall back to a sensible default, and the
+# follicle types are the ones the major-type reference cannot name at all.
+MARKERS_YAML = Path("ovary_follicle_markers.yaml")
+
+# Scores are relative, not absolute. sc.tl.score_genes subtracts the mean of a
+# reference set of similarly-expressed genes, so a score near zero means "no different
+# from background", values are comparable only ACROSS cells within a sample, and no
+# threshold separates positive from negative. A cluster scoring highest for a set is
+# evidence; a merely positive score is not. Theca in particular is under-powered on a
+# 5K panel — 19 of its 46 markers were present on one test ROI — and its slide should
+# be read as suggestive.
+MARKER_SETS = yaml.safe_load(MARKERS_YAML.read_text()) if MARKERS_YAML.exists() else {}
+if not MARKER_SETS:
+    raise FileNotFoundError(f"{MARKERS_YAML} not staged beside the notebook.")
 
 # The per-cell QC columns each sample's panel shows, as (obs column, axis label, log).
 # All are strictly positive and heavily right-skewed, so all are shown on a log scale.
@@ -232,6 +254,67 @@ def centroid_correlation(sample, corr, order):
     cbar.ax.tick_params(labelsize=7)
 
     fig.suptitle(f"{sample} · {len(order)} clusters", fontsize=9)
+    plt.show()
+    plt.close(fig)
+
+
+def marker_scores(adata, sample, name):
+    """One slide's figure: each follicle marker set on the UMAP, then per cluster.
+
+    The follicle cell types are the ones the major-type reference cannot name — it holds
+    Endothelial, Immune, Pericyte and Stromal only, so a granulosa or oocyte cluster is
+    assigned to whichever of those four it least badly resembles. Scoring the marker sets
+    separately is what makes those clusters identifiable at all, which is why this slide
+    sits before the reference correlation rather than after it.
+
+    Two views of the same numbers, because they answer different questions. The UMAP
+    panels show WHERE the signal is — a set that concentrates in one region is a cell
+    type, one that smears across the embedding is not. The final panel averages each set
+    within each cluster, which is what says whether the clustering actually isolated it:
+    a set can be clearly localised on the UMAP and still be split across three clusters.
+
+    Scores are read from obs, computed once in the per-sample block below where the
+    log-normalized layer already exists.
+    """
+    columns = [f"score_{marker_set}" for marker_set in MARKER_SETS]
+    fig, axes = plt.subplots(1, len(columns) + 1,
+                             figsize=(FIGSIZE[0], FIGSIZE[1] * 0.95))
+
+    for ax, marker_set, column in zip(axes, MARKER_SETS, columns):
+        sc.pl.umap(
+            adata,
+            color=column,
+            # magma over the default: these are signed, near-zero-centred values, and a
+            # sequential dark-to-bright ramp reads "more" without implying a midpoint the
+            # score does not have.
+            cmap="magma",
+            frameon=False,
+            title=f"{marker_set} ({adata.uns['marker_n_genes'][marker_set]} genes)",
+            ax=ax,
+            show=False,
+        )
+        ax.title.set_fontsize(8)
+
+    # Per-cluster means, clusters down the rows in the same size-ranked order the UMAP
+    # slide uses, so a row here refers to the cluster carrying that number there.
+    means = (adata.obs.groupby(name, observed=True)[columns].mean()
+             .reindex([str(i) for i in range(adata.obs[name].nunique())]))
+    ax = axes[-1]
+    image = ax.imshow(means.to_numpy(), cmap="magma", aspect="auto")
+    ax.set_xticks(range(len(columns)))
+    ax.set_xticklabels(list(MARKER_SETS), rotation=45, ha="right", fontsize=7)
+    ax.set_yticks(range(means.shape[0]))
+    ax.set_yticklabels(means.index, fontsize=7)
+    ax.set_ylabel("cluster", fontsize=7)
+    ax.set_title("mean score per cluster", fontsize=8)
+    for row in range(means.shape[0]):
+        for col in range(means.shape[1]):
+            ax.text(col, row, f"{means.iat[row, col]:.2f}", ha="center", va="center",
+                    fontsize=6, color="white")
+    fig.colorbar(image, ax=ax, fraction=0.05)
+
+    fig.suptitle(f"{sample} — follicle marker scores", fontsize=10)
+    fig.tight_layout()
     plt.show()
     plt.close(fig)
 
@@ -440,6 +523,26 @@ for path in ZARRS:
         agg = sc.get.aggregate(adata, by="cluster_size", func="mean", layer="cp10k")
         centroids = pd.DataFrame(np.log1p(agg.layers["mean"]),
                                  index=list(agg.obs_names), columns=agg.var_names)
+
+        # Score the follicle marker sets off the SAME layer, log1p'd in place now that
+        # the centroids have taken their mean from the linear values. In place rather
+        # than a second layer because this deck already holds one extra copy of the
+        # count matrix and a whole-slide sample makes that the dominant cost.
+        #
+        # Scoring reads this layer rather than X on purpose. Under the current recipe X
+        # is log-normalized and would give the same answer, but cluster_sdata scales X
+        # before writing, and a scaled X would silently score z-like values instead of
+        # expression. Deriving from layers["counts"] is true either way.
+        adata.layers["cp10k"] = np.log1p(adata.layers["cp10k"])
+        adata.uns["marker_n_genes"] = {}
+        for marker_set, genes in MARKER_SETS.items():
+            present = [gene for gene in genes if gene in adata.var_names]
+            adata.uns["marker_n_genes"][marker_set] = len(present)
+            # ctrl_size defaults to 50 and is capped at the set size by scanpy; left
+            # alone so every set uses the same background definition the method assumes.
+            sc.tl.score_genes(adata, present, score_name=f"score_{marker_set}",
+                              layer="cp10k")
+
         # Drop the second copy of the matrix now: the figures below do not need it.
         del adata.layers["cp10k"]
         gc.collect()
@@ -475,6 +578,18 @@ for path in ZARRS:
             "position."
         ))
         umap_clusters(adata, sample, "cluster_size")
+
+        display(Markdown("## Follicle marker scores"))
+        display(Markdown(
+            "Granulosa, oocyte and theca marker sets from Sci Adv adm7506 Data S5, "
+            "scored per cell against a background of similarly-expressed genes and shown "
+            "in UMAP coordinates, with each set's mean per cluster on the right. Panel "
+            "titles give how many of each set's genes are on this panel. Scores are "
+            "relative: zero means no different from background, and values are comparable "
+            "across cells within a sample rather than against a fixed threshold. Clusters "
+            "are the size-ranked ids from the previous slide."
+        ))
+        marker_scores(adata, sample, "cluster_size")
 
         display(Markdown("## Cluster centroid correlation"))
         display(Markdown(

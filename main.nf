@@ -337,6 +337,10 @@ workflow sample_summary {
     // explicitly unset. Its rows override the notebook's per-sample resolution; samples
     // without one fall back to the notebook's default.
     if (!params.chosen_resolutions) error "Please provide --chosen_resolutions"
+    // Likewise defaulted in nextflow.config, to the asset built by
+    // scripts/convert_ovary_reference.py. Tissue-specific, so it is a path rather than
+    // anything derived — a different tissue needs a different marker file.
+    if (!params.follicle_markers)   error "Please provide --follicle_markers"
 
     // Point --samplesheet at a cluster_sdata* handoff sheet — this report reads the
     // clustered zarrs (obs, var, and the leiden_res_* columns), not create_sdata's raw ones.
@@ -357,6 +361,7 @@ workflow sample_summary {
         file("${projectDir}/notebooks/analyze/sample_summary.qmd"),
         file("${projectDir}/resources/ouhsc_ppt_template.pptx"),
         file(params.chosen_resolutions),
+        file(params.follicle_markers),
     )
 }
 

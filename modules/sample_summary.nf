@@ -35,6 +35,10 @@ process SAMPLE_SUMMARY {
     // whatever basename --chosen_resolutions happened to point at, and the notebook's
     // fixed-name read would fail for every CSV not already called chosen_resolutions.csv.
     path resolutions, stageAs: 'chosen_resolutions.csv'
+    // The follicle marker sets, likewise staged under the fixed name the notebook reads.
+    // Required rather than optional: absent, the marker section would vanish silently,
+    // and it covers exactly the cell types the major-type reference cannot name.
+    path markers, stageAs: 'ovary_follicle_markers.yaml'
 
     output:
     path "sample_summary.pptx", emit: report
