@@ -11,9 +11,11 @@ forms sample_summary consumes, and writes them into assets/.
       Spearman-correlated against.
 
   Data S5 -> assets/ovary_follicle_markers.yaml
-      Granulosa / Oocyte / Theca marker gene lists. These sheets carry per-sample
-      values rather than per-cell-type means, so they cannot be made into reference
-      columns and are scored instead.
+      Granulosa / Oocyte / Theca markers as {gene: quality score}. These sheets carry
+      per-sample values rather than per-cell-type means, so they cannot be made into
+      reference columns and are scored instead. EVERY gene is written out with the
+      paper's own 1-5 quality score; which of them to actually use is the deck's
+      decision, not this script's.
 
 Run outside the pipeline container, which has no openpyxl — the committed assets are
 the gzipped CSV and the YAML, not the workbooks. Mirrors sammy_r21's
@@ -93,19 +95,43 @@ def read_major_reference(path):
 
 
 def read_follicle_markers(path):
-    """The three follicle gene sets, read from column A until the first blank row."""
+    """The three follicle gene sets as {gene: quality score}, read until the first blank row.
+
+    The paper scores every marker 1-5 in a `Score` column at the far right of each sheet:
+    1 established marker, 2 well annotated and biologically significant, 3 well annotated
+    but not biologically significant, 4 poorly annotated gene, 5 poor marker based on
+    comparisons across clusters. Ignoring it is expensive — of the 19 theca markers on a
+    5K panel, 6 are score 5 and 3 more are score 4, so more than half of what would be
+    scored is flagged as bad by the people who assembled the list.
+
+    The scores are carried into the asset rather than applied here, so the threshold
+    stays a decision the notebook makes and revisiting it does not mean re-running this
+    converter over the workbooks.
+    """
     workbook = openpyxl.load_workbook(path, read_only=True, data_only=True)
     sets = {}
     for name, sheet in S5_SETS.items():
-        genes = []
-        for row in workbook[sheet].iter_rows(min_row=2, max_col=1, values_only=True):
+        worksheet = workbook[sheet]
+        header = list(worksheet.iter_rows(min_row=1, max_row=1, values_only=True))[0]
+        score_col = next(i for i, cell in enumerate(header)
+                         if str(cell).strip() == "Score")
+        genes = {}
+        for row in worksheet.iter_rows(min_row=2, values_only=True):
             gene = row[0]
             # A blank ends the list; a footnote paragraph follows it in some sheets.
             if gene is None or not str(gene).strip():
                 break
-            genes.append(str(gene).strip())
+            try:
+                score = int(row[score_col])
+            except (TypeError, ValueError):
+                # Unscored is not the same as badly scored, so it round-trips as null
+                # and the notebook decides what to do with it.
+                score = None
+            genes[str(gene).strip()] = score
         sets[name] = genes
-        print(f"  {name}: {len(genes)} genes")
+        by_score = {s: sum(1 for v in genes.values() if v == s) for s in (1, 2, 3, 4, 5)}
+        print(f"  {name}: {len(genes)} genes  "
+              + " ".join(f"score{s}={n}" for s, n in by_score.items() if n))
     workbook.close()
     return sets
 
@@ -136,7 +162,9 @@ def main():
               f"({len(shared) / len(panel) * 100:.1f}% of the panel)")
         for name, genes in sets.items():
             on_panel = panel & set(genes)
-            print(f"  {name:<10} {len(on_panel):>3} of {len(genes):>3} markers on panel")
+            established = {g for g, score in genes.items() if score == 1} & panel
+            print(f"  {name:<10} {len(on_panel):>3} of {len(genes):>3} markers on panel, "
+                  f"{len(established):>2} of them established (score 1)")
 
 
 if __name__ == "__main__":

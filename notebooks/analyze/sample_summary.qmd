@@ -83,16 +83,39 @@ RESOLUTIONS_CSV = Path("chosen_resolutions.csv")
 # follicle types are the ones the major-type reference cannot name at all.
 MARKERS_YAML = Path("ovary_follicle_markers.yaml")
 
+# Worst marker-quality score to keep, on the paper's own 1-5 scale: 1 established
+# marker, 2 well annotated and biologically significant, 3 well annotated but not
+# biologically significant, 4 poorly annotated gene, 5 poor marker based on comparisons
+# across clusters.
+#
+# The asset carries every gene with its score and the filter happens HERE, so changing
+# how conservative this is costs an edit to one line rather than a re-run of
+# scripts/convert_ovary_reference.py over the source workbooks.
+#
+# Keeping everything is not a neutral default. Of the 19 theca markers on a 5K panel, 6
+# are score 5 and 3 more are score 4 — more than half of what would be scored is flagged
+# as bad by the people who assembled the list, which is the likeliest reason theca has
+# never resolved anything on these samples. At 1 the sets are small but canonical: 10
+# granulosa (AMH, FOXL2, FST, GREM1, HSD17B1...), 7 oocyte (FIGLA, LHX8, NLRP5, OOSP2,
+# PADI6...) and 5 theca (CYP11A1, CYP17A1, DLK1, INSL3...) on that panel.
+MARKER_MAX_SCORE = 1
+
 # Scores are relative, not absolute. sc.tl.score_genes subtracts the mean of a
 # reference set of similarly-expressed genes, so a score near zero means "no different
 # from background", values are comparable only ACROSS cells within a sample, and no
 # threshold separates positive from negative. A cluster scoring highest for a set is
-# evidence; a merely positive score is not. Theca in particular is under-powered on a
-# 5K panel — 19 of its 46 markers were present on one test ROI — and its slide should
-# be read as suggestive.
-MARKER_SETS = yaml.safe_load(MARKERS_YAML.read_text()) if MARKERS_YAML.exists() else {}
-if not MARKER_SETS:
+# evidence; a merely positive score is not.
+_scored_markers = yaml.safe_load(MARKERS_YAML.read_text()) if MARKERS_YAML.exists() else {}
+if not _scored_markers:
     raise FileNotFoundError(f"{MARKERS_YAML} not staged beside the notebook.")
+# An unscored gene (null in the asset) is dropped rather than kept: the paper scored
+# every marker it published, so a missing score means the sheet changed shape and the
+# safe reading is not to trust the gene.
+MARKER_SETS = {
+    name: sorted(gene for gene, score in genes.items()
+                 if score is not None and score <= MARKER_MAX_SCORE)
+    for name, genes in _scored_markers.items()
+}
 
 # The major cell-type reference: genes x cell type mean expression, built by
 # scripts/convert_ovary_reference.py from Sci Adv adm7506 Data S6 and staged flat under
@@ -349,6 +372,121 @@ def reference_correlation(sample, corr):
 
     ax.set_title(f"{sample} — cluster centroids vs major cell types\n"
                  f"{len(REFERENCE_GENES)} type-specific genes", fontsize=10)
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+
+def marker_dotplot(adata, sample, name):
+    """One slide's figure: the marker genes themselves, per cluster.
+
+    The scored heatmap says which cluster owns a set; this says WHY, and the two are
+    worth having side by side. A set score cannot distinguish a cluster expressing every
+    marker from one expressing two of them strongly, and on sets this small — 5 to 10
+    genes at MARKER_MAX_SCORE = 1 — that difference decides whether a call is real.
+
+    Dot area is the fraction of the cluster's cells with any count for the gene, and
+    colour is mean expression among all of them. The fraction is the more robust of the
+    two on Xenium: at ~200 transcripts per cell against a 5K panel, a genuine oocyte
+    often has zero counts for a given marker, so mean expression is noisy where "half the
+    cluster expresses it at all" is not.
+
+    Read from layers["lognorm"] rather than X, which cluster_sdata leaves scaled — a
+    dotplot of z-like values would colour by how unusual a gene is for a cell, not by
+    how much of it there is. standard_scale="var" then puts each gene on its own 0-1
+    range down the column, so a quiet marker is visible beside an abundant one.
+    """
+    if "lognorm" not in adata.layers:
+        raise KeyError(
+            f"{sample}: layers['lognorm'] is missing. cluster_sdata writes it alongside "
+            "counts; re-run it over this sample rather than reading the scaled X."
+        )
+    present = {set_name: [g for g in genes if g in adata.var_names]
+               for set_name, genes in MARKER_SETS.items()}
+    present = {k: v for k, v in present.items() if v}
+    if not present:
+        raise ValueError(f"{sample}: no marker genes from any set are on this panel.")
+
+    # scanpy's own `title`, not a suptitle: dotplot lays out its own axes and puts the
+    # gene-group brackets above the main panel, where a figure-level title lands on top
+    # of them.
+    axes = sc.pl.dotplot(
+        adata,
+        var_names=present,          # dict -> genes grouped and bracketed by set
+        groupby=name,
+        layer="lognorm",
+        standard_scale="var",
+        cmap="viridis",
+        figsize=(FIGSIZE[0] * 0.92, FIGSIZE[1] * 0.82),
+        title=f"{sample} — marker genes by cluster "
+              f"(quality score <= {MARKER_MAX_SCORE})",
+        show=False,
+    )
+    fig = axes["mainplot_ax"].get_figure() if isinstance(axes, dict) else plt.gcf()
+    plt.show()
+    plt.close(fig)
+
+
+def marker_set_scores(centroids):
+    """Cluster x marker-set scores, built from the centroids rather than from cells.
+
+    Each marker gene is standardized ACROSS clusters and the set's genes are then
+    averaged, so a score answers "does this cluster express this set more than the other
+    clusters do" on one scale for every set. Standardizing per gene first is what makes
+    the sets comparable: without it an abundant marker sets its set's score almost alone,
+    and a 5-gene set with one loud member outranks a 10-gene set that is uniformly up.
+
+    Built from centroids, not per cell. sc.tl.score_genes on this data scores a 7-gene
+    set against ~200 transcripts drawn from 5,101 genes, so most cells hold zero of the
+    set even in the cluster that owns it, and the per-cell score is mostly sampling
+    noise; averaging within a cluster afterwards is doing the same aggregation this does
+    up front, but through a noisier path. It also sidesteps score_genes' control set,
+    which is capped at the size of the gene list — a 5-gene theca set would be judged
+    against a 5-gene background.
+
+    A gene absent from the panel is dropped, and a set with none left scores NaN rather
+    than 0: no evidence is not evidence of absence.
+    """
+    scores = {}
+    for set_name, genes in MARKER_SETS.items():
+        present = [g for g in genes if g in centroids.columns]
+        if not present:
+            scores[set_name] = pd.Series(np.nan, index=centroids.index)
+            continue
+        block = centroids[present]
+        # A gene constant across clusters carries no information and would divide by 0.
+        spread = block.std(axis=0).replace(0, np.nan)
+        scores[set_name] = ((block - block.mean(axis=0)) / spread).mean(axis=1)
+    return pd.DataFrame(scores)
+
+
+def marker_score_heatmap(sample, scores):
+    """One slide's figure: the cluster x marker-set scores as a heatmap.
+
+    Diverging colormap centred at zero, because the score is standardized across
+    clusters and its sign is the reading: above zero means this cluster expresses the
+    set more than the sample's clusters do on average, below means less. A sequential
+    ramp would make "slightly below average" look like a small amount of something.
+    """
+    values = scores.to_numpy(dtype=float)
+    limit = float(np.nanmax(np.abs(values))) if np.isfinite(values).any() else 1.0
+
+    fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.5, FIGSIZE[1]))
+    image = ax.imshow(values, cmap="RdBu_r", aspect="auto", vmin=-limit, vmax=limit)
+    ax.set_xticks(range(scores.shape[1]))
+    ax.set_xticklabels(scores.columns, rotation=45, ha="right", fontsize=8)
+    ax.set_yticks(range(scores.shape[0]))
+    ax.set_yticklabels(scores.index, fontsize=7)
+    ax.set_ylabel("cluster (v1)", fontsize=8)
+    for row in range(scores.shape[0]):
+        for col in range(scores.shape[1]):
+            value = values[row, col]
+            if np.isfinite(value):
+                ax.text(col, row, f"{value:.2f}", ha="center", va="center", fontsize=7,
+                        color="white" if abs(value) > limit * 0.55 else "black")
+    fig.colorbar(image, ax=ax, fraction=0.05)
+    ax.set_title(f"{sample} — marker set scores\n"
+                 f"per-gene z across clusters, averaged per set", fontsize=9)
     fig.tight_layout()
     plt.show()
     plt.close(fig)
@@ -720,11 +858,9 @@ for path in ZARRS:
         centroids = pd.DataFrame(np.log1p(agg.layers["mean"]),
                                  index=list(agg.obs_names), columns=agg.var_names)
 
-        # NOTE: the follicle marker scoring that used to run here is removed for now,
-        # along with the reference correlation below — marker_scores() and
-        # reference_correlation() are still defined and their assets still staged, and
-        # both go back into the per-sample sequence once their place in the deck is
-        # settled. Nothing is paid for a figure that is not drawn.
+        # Marker-set scores off the same centroids, so the heatmap and the within-sample
+        # correlation describe one definition of a cluster's expression profile.
+        marker_set_score_table = marker_set_scores(centroids)
 
         # Drop the second copy of the matrix now: the figures below do not need it.
         del adata.layers["cp10k"]
@@ -812,6 +948,29 @@ for path in ZARRS:
             "than a cell type."
         ))
         qc_violins(adata, sample, "cluster_v2", resolution)
+
+        display(Markdown("## Marker genes by cluster"))
+        display(Markdown(
+            "Granulosa, oocyte and theca markers from Sci Adv adm7506 Data S5, kept at "
+            f"quality score {MARKER_MAX_SCORE} or better on the paper's own 1-5 scale, so "
+            "these are its established markers rather than its whole published list. Dot "
+            "area is the fraction of a cluster's cells with any count for that gene, "
+            "colour is mean expression scaled to each gene's own range so a quiet marker "
+            "is visible beside an abundant one. Clusters carry the v1 ids."
+        ))
+        marker_dotplot(adata, sample, "cluster_v1")
+
+        display(Markdown("## Marker set scores by cluster"))
+        display(Markdown(
+            "Each marker gene standardized across this sample's clusters and averaged "
+            "within its set, so a score says whether a cluster expresses that set more "
+            "than the sample's clusters do on average — above zero more, below zero "
+            "less. Built from the cluster centroids rather than per cell: at ~200 "
+            "transcripts against a 5,101-gene panel, most cells hold none of a 7-gene "
+            "set even in the cluster that owns it. Scores are comparable between sets "
+            "but not between samples, and name no cell type on their own."
+        ))
+        marker_score_heatmap(sample, marker_set_score_table)
 
     except Exception:
         display(Markdown(f"```\n{traceback.format_exc()}\n```"))
