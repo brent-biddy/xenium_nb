@@ -71,11 +71,13 @@ UMAP_MARGIN = 0.04
 # already, so adopting qc_report's font rcParams as well would change only the handful of
 # places that do not, and reshuffle layouts that were tuned against the current sizes.
 #
-# The cost is file size, roughly 16x the pixel count of 100 dpi. Worth watching on a
-# cohort of whole-slide samples, where the tissue scatters are already the heavy slides.
+# The cost is file size, and it is quadratic in the number: two samples at 400 dpi came to
+# 67 MB, which a six-sample cohort extrapolates to ~200 MB. 200 dpi is a quarter of those
+# pixels and was chosen on that trade — it still covers a 1080p projector, which is what
+# these slides are actually shown on, and gives up only zooming in past 100%.
 plt.rcParams.update({
-    "figure.dpi": 400,
-    "savefig.dpi": 400,
+    "figure.dpi": 200,
+    "savefig.dpi": 200,
 })
 
 # Every clustered zarr is staged into this notebook's working directory by the Nextflow
@@ -261,6 +263,12 @@ ZOOM_OUTLINE_WIDTH = 1.0
 # mistaken for one more category in the palette.
 ZOOM_TARGET_COLOR = "white"
 
+# The target's outline weight, in the same points as ZOOM_OUTLINE_WIDTH. Heavier than its
+# neighbours' so the eye lands on it first, but only slightly: the colour is what marks the
+# cell, and at 3x the boundary was thick enough to eat into the cytoplasm it encircles and
+# to hide how the segmentation actually traced the cell.
+ZOOM_TARGET_OUTLINE_WIDTH = ZOOM_OUTLINE_WIDTH * 1.5
+
 CURATED_OOCYTES = pd.DataFrame()
 if OOCYTES_CSV.exists():
     CURATED_OOCYTES = pd.read_csv(OOCYTES_CSV)
@@ -403,6 +411,30 @@ def style_on_data_labels(ax, color="white", outline="black", linewidth=2.5):
     for t in ax.texts:
         t.set_color(color)
         t.set_path_effects([patheffects.withStroke(linewidth=linewidth, foreground=outline)])
+
+
+def umap_figure_height(coords, panel_width, chrome_in):
+    """Figure height, in inches, for a UMAP slide fitted to the embedding not to the slide.
+
+    match_umap_axes puts every UMAP on equal aspect, which shrinks the axes BOX to the
+    embedding's shape and then centres that box in whatever space the figure gave it. A
+    height taken from the slide rather than from the data is therefore not spent on a bigger
+    UMAP — it becomes a band of empty slide above and below the panel, which is what every
+    one of these slides looked like. Sizing the figure to the embedding spends it on the
+    panel instead.
+
+    `panel_width` is the inches the AXES itself can use: subtract a legend that sits outside
+    it before calling. `chrome_in` is everything vertical the panel does not occupy — the
+    suptitle, any panel titles, a colourbar — and is fitted against the rendered slide
+    rather than derived, since tight_layout distributes whatever is left over. It only has
+    to be close enough not to squeeze the panel or leave a second band.
+
+    Capped at the slide's height budget so a TALL embedding letterboxes sideways as it
+    always has, rather than growing a figure that no longer fits the layout.
+    """
+    span_x = (coords[:, 0].max() - coords[:, 0].min()) * (1 + 2 * UMAP_MARGIN)
+    span_y = (coords[:, 1].max() - coords[:, 1].min()) * (1 + 2 * UMAP_MARGIN)
+    return min(FIGSIZE[1] * 0.95, panel_width * span_y / span_x + chrome_in)
 
 
 def match_umap_axes(ax, coords):
@@ -778,8 +810,11 @@ def marker_umaps(adata, sample):
         adata.obs[column] = np.asarray(mean).ravel()
         columns.append((column, f"{set_name} ({len(genes)} genes)"))
 
-    fig, axes = plt.subplots(1, len(columns),
-                             figsize=(FIGSIZE[0], FIGSIZE[1] * 0.95), squeeze=False)
+    # Three panels across a fixed width fixes the panel width; the embedding's own aspect
+    # then fixes the height they can use. Chrome here is the suptitle, each panel's title
+    # and the horizontal colourbar with its tick labels — the most of any UMAP slide.
+    height = umap_figure_height(adata.obsm["X_umap"], FIGSIZE[0] / len(columns), 1.1)
+    fig, axes = plt.subplots(1, len(columns), figsize=(FIGSIZE[0], height), squeeze=False)
     for ax, (column, title) in zip(axes.ravel(), columns):
         # Cells sorted low-to-high so the expressing ones are drawn last: at this
         # sparsity the bright cells are a small minority and would otherwise be buried
@@ -808,8 +843,11 @@ def marker_umaps(adata, sample):
         # after the fact. Underneath rather than beside because these panels are wider
         # than they are tall once the aspect is fixed, so horizontal space is the scarce
         # one; and each set keeps its own scale, since the sets are not comparable.
+        # Kept small deliberately: the panel is read for WHERE the signal sits, and the bar
+        # is only there to say what the ramp means, so it should not compete with the
+        # embedding for either height or width.
         bar = fig.colorbar(ax.collections[-1], ax=ax, orientation="horizontal",
-                           fraction=0.05, pad=0.03, shrink=0.85)
+                           fraction=0.03, pad=0.02, shrink=0.55)
         bar.ax.tick_params(labelsize=6)
         bar.outline.set_visible(False)
 
@@ -843,7 +881,11 @@ def umap_clusters(adata, sample, name):
 
     Marker size is left to scanpy, which already scales it as 120000 / n_cells.
     """
-    fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.6, FIGSIZE[1]))
+    # The cluster ids sit on the data, so the axes gets the whole figure width and the only
+    # chrome is the suptitle above it.
+    width = FIGSIZE[0] * 0.6
+    fig, ax = plt.subplots(figsize=(width, umap_figure_height(adata.obsm["X_umap"],
+                                                              width, 0.35)))
 
     sizes = adata.obs[name].value_counts()
     order = np.argsort(-adata.obs[name].map(sizes).to_numpy(), kind="stable")
@@ -981,9 +1023,15 @@ def annotated_umap(adata, sample, name, labels, title):
     expression space. A call covering a compact island is a different claim from one
     spread over half a lobe, and the tissue plot cannot distinguish them.
     """
-    fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.62, FIGSIZE[1]))
-
     coords = adata.obsm["X_umap"]
+    # The legend sits outside the axes, so tight_layout takes its width off the panel — the
+    # height has to be fitted to what the panel actually gets, not to the whole figure.
+    # SPATIAL_LEGEND_WIDTH is the same reservation spatial_cell_types makes for the same
+    # legend on the tissue slide this one is read beside.
+    width = FIGSIZE[0] * 0.62
+    fig, ax = plt.subplots(figsize=(width, umap_figure_height(
+        coords, width - SPATIAL_LEGEND_WIDTH, 0.35)))
+
     called = adata.obs[name].astype(str).map(labels)
     unassigned = called.isna().to_numpy()
     ax.scatter(coords[unassigned, 0], coords[unassigned, 1], color="0.85",
@@ -1317,7 +1365,7 @@ def oocyte_zoom(sdata, sample, record, resolution, px_per_um):
             # rather than a heavier one of the same kind.
             view = view.pl.render_shapes("oocyte_target", fill_alpha=0.0, outline_alpha=1.0,
                                          outline_color=ZOOM_TARGET_COLOR,
-                                         outline_width=ZOOM_OUTLINE_WIDTH * 3)
+                                         outline_width=ZOOM_TARGET_OUTLINE_WIDTH)
         view.pl.show(ax=ax, coordinate_systems="global", title=title, frameon=False,
                      scalebar_dx=1.0 / px_per_um, scalebar_units="um")
         ax.set_title(title, fontsize=8)
@@ -1816,7 +1864,7 @@ for path in ZARRS:
                 "call — an oocyte is round and far larger than the flat stromal cells "
                 "around it, and the tissue underneath is independent of the counts every "
                 "other slide is drawn from. Every cell is outlined in black; the "
-                "yellow-green outline is the curated target cell. Both panels are the "
+                f"{ZOOM_TARGET_COLOR} outline is the curated target cell. Both panels are the "
                 "same window: clusters on the left with the "
                 "v2 ids and colours from the slides above, cell type calls on the right "
                 "with the palette of the tissue plot, grey for unassigned. Where no cell "
