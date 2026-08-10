@@ -40,6 +40,9 @@ import yaml
 from IPython.display import display, Markdown
 from matplotlib.colors import to_hex
 from matplotlib.patches import Rectangle
+from matplotlib.text import Text
+from matplotlib_scalebar.scalebar import ScaleBar
+from spatialdata.models import PointsModel
 from spatialdata.transformations import get_transformation
 from scipy.cluster.hierarchy import leaves_list, linkage
 from scipy.spatial.distance import squareform
@@ -268,6 +271,58 @@ ZOOM_TARGET_COLOR = "white"
 # cell, and at 3x the boundary was thick enough to eat into the cytoplasm it encircles and
 # to hide how the segmentation actually traced the cell.
 ZOOM_TARGET_OUTLINE_WIDTH = ZOOM_OUTLINE_WIDTH * 1.5
+
+# The mark naming a zoom's window on the overview slide. Red is already this deck's "the one
+# under discussion" mark, on the evidence heatmaps (see outline_calls) — the two never share
+# a slide, and reusing it keeps one meaning for one colour rather than inventing a second
+# mark for the same idea.
+ZOOM_MARK_COLOR = "red"
+
+# One colour per marker set for the transcript panel on the zoom slides, keyed by set name
+# and applied in sorted-name order (spatialdata_plot takes a LIST ordered by the categories —
+# a dict is silently ignored by this version). Deliberately NOT the cell type palette: these
+# are the raw molecules a call was made from, not the call, and granulosa and theca are one
+# joint cell type there while they are separate evidence here.
+#
+# Chosen against H&E rather than against each other: the background is pink and purple at
+# middling luminance, so all three are high saturation and far off that hue. tab10's defaults
+# were the first attempt and failed for theca — its green sat at roughly the stroma's own
+# luminance, and at ~33 scattered molecules against granulosa's ~700 it was invisible.
+#
+# Applied by color_marker_points AFTER rendering, not by render_points' `palette` — that
+# argument is silently ignored for points in this version (verified: the drawn colours stay
+# tab10 whatever is passed), the same trap as `palette` on shapes.
+MARKER_TX_COLORS = {"granulosa": "#00e5ff", "oocyte": "#ffd400", "theca": "#e60000"}
+
+# Transcript dot size on the zoom panels, in the points units render_points takes on the
+# matplotlib path (a window this size holds ~1,300 marker molecules, well under the 10k where
+# spatialdata_plot switches to datashader). Big enough to read singly, small enough that a
+# follicle's dense core stays granular rather than a solid blob.
+MARKER_TX_POINT_SIZE = 2
+
+# Forwarded to matplotlib-scalebar wherever a panel carries a scale. Its default draws the
+# bar on an opaque white panel, which blanks the corner of the image underneath it — on a
+# zoom that corner is tissue. Removing the box is most of the change; the rest is what the
+# box was quietly doing, and each of these was picked by rendering the alternatives over a
+# real zoom rather than by taste:
+#   * `location` lower right, not the default upper right, where the bar collided with the
+#     cells hanging past the top edge of the window and was clipped by the panel.
+#   * `scale_loc` "top" with `sep` 1, so the label sits just above its bar. Without the box
+#     the two defaulted to overlapping each other, which is what made the first attempt
+#     unreadable.
+#   * white, not black. Against fills at ZOOM_FILL_ALPHA over H&E a black bar disappears
+#     entirely; white carries, and style_scalebar gives it a dark stroke so it survives the
+#     pale corners too.
+SCALEBAR_PARAMS = {"frameon": False, "location": "lower right", "scale_loc": "top",
+                   "sep": 1, "border_pad": 0.6, "color": "white",
+                   "font_properties": {"size": 7}}
+
+# The switch for the above. OFF: boxed, the bar hid tissue; boxless, it stayed hard to read
+# at any colour tried, because a 25 µm bar on a 200 µm window is short and thin against
+# cells of exactly its own scale. The size information is not lost with it — every zoom is
+# the same ZOOM_RADIUS_UM window and the caption says so in µm. Set True to bring it back;
+# SCALEBAR_PARAMS and style_scalebar are kept rather than deleted for that reason.
+SHOW_SCALEBAR = False
 
 CURATED_OOCYTES = pd.DataFrame()
 if OOCYTES_CSV.exists():
@@ -885,7 +940,7 @@ def umap_clusters(adata, sample, name):
     # chrome is the suptitle above it.
     width = FIGSIZE[0] * 0.6
     fig, ax = plt.subplots(figsize=(width, umap_figure_height(adata.obsm["X_umap"],
-                                                              width, 0.35)))
+                                                              width, 0.25)))
 
     sizes = adata.obs[name].value_counts()
     order = np.argsort(-adata.obs[name].map(sizes).to_numpy(), kind="stable")
@@ -1030,7 +1085,7 @@ def annotated_umap(adata, sample, name, labels, title):
     # legend on the tissue slide this one is read beside.
     width = FIGSIZE[0] * 0.62
     fig, ax = plt.subplots(figsize=(width, umap_figure_height(
-        coords, width - SPATIAL_LEGEND_WIDTH, 0.35)))
+        coords, width - SPATIAL_LEGEND_WIDTH, 0.25)))
 
     called = adata.obs[name].astype(str).map(labels)
     unassigned = called.isna().to_numpy()
@@ -1058,6 +1113,54 @@ def annotated_umap(adata, sample, name, labels, title):
     plt.close(fig)
 
 
+def tissue_figure(adata, legend_width=SPATIAL_LEGEND_WIDTH):
+    """Figure, axes and marker size for a slide drawn in tissue coordinates.
+
+    Three things are specific to tissue coordinates and all three would be wrong on
+    defaults. The FIGURE is shaped to the tissue's own aspect, because equal aspect is
+    non-negotiable here and a fixed box would render a wide strip as a band across an empty
+    slide. The MARKER is sized from the axes area and the cell count, since one constant
+    cannot serve a 21k-cell strip and a 700k-cell section. And y is INVERTED — that part is
+    style_tissue_axes, since it has to happen after the data is drawn.
+
+    get_position() is the pre-tight_layout fraction of the figure, close enough to size a
+    dot; 72 pt to the inch, squared, converts inches² to scatter's `s` units.
+
+    Shared by every section-scale slide so they are literally the same geometry rather than
+    three copies that agree today. `legend_width` is the reservation for a legend outside the
+    axes — pass 0 for a slide that carries none.
+    """
+    x, y = adata.obsm["spatial"][:, 0], adata.obsm["spatial"][:, 1]
+    aspect = (x.max() - x.min()) / (y.max() - y.min())
+    plot_w = FIGSIZE[0] - legend_width
+    if aspect >= plot_w / FIGSIZE[1]:
+        w, h = plot_w, plot_w / aspect
+    else:
+        w, h = FIGSIZE[1] * aspect, FIGSIZE[1]
+    fig, ax = plt.subplots(figsize=(w + legend_width, h))
+
+    pos = ax.get_position()
+    area_pt2 = (pos.width * w) * (pos.height * h) * 72 ** 2
+    size = float(np.clip(SPATIAL_COVERAGE * area_pt2 / adata.n_obs, 0.5, 6.0))
+    return fig, ax, size
+
+
+def style_tissue_axes(ax):
+    """Equal aspect, inverted y and no frame, for an axes drawn in tissue coordinates.
+
+    y is inverted because Xenium global coordinates run downward from the top-left of the
+    scan, so a section drawn on default axes is upside down against its own H&E. Applied
+    after the data is drawn rather than inside tissue_figure, since inverting an empty axes
+    is undone by the first autoscale.
+    """
+    ax.set_aspect("equal")
+    ax.invert_yaxis()
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+
 def spatial_cell_types(adata, sample, name, labels, title):
     """One slide's figure: the section coloured by cell type rather than cluster id.
 
@@ -1069,17 +1172,7 @@ def spatial_cell_types(adata, sample, name, labels, title):
     from the axes, y inverted), so the two read as the same section.
     """
     x, y = adata.obsm["spatial"][:, 0], adata.obsm["spatial"][:, 1]
-    aspect = (x.max() - x.min()) / (y.max() - y.min())
-    plot_w = FIGSIZE[0] - SPATIAL_LEGEND_WIDTH
-    if aspect >= plot_w / FIGSIZE[1]:
-        w, h = plot_w, plot_w / aspect
-    else:
-        w, h = FIGSIZE[1] * aspect, FIGSIZE[1]
-    fig, ax = plt.subplots(figsize=(w + SPATIAL_LEGEND_WIDTH, h))
-
-    pos = ax.get_position()
-    area_pt2 = (pos.width * w) * (pos.height * h) * 72 ** 2
-    size = float(np.clip(SPATIAL_COVERAGE * area_pt2 / adata.n_obs, 0.5, 6.0))
+    fig, ax, size = tissue_figure(adata)
 
     cluster = adata.obs[name].astype(str)
     called = cluster.map(labels)
@@ -1094,12 +1187,7 @@ def spatial_cell_types(adata, sample, name, labels, title):
             ax.scatter(x[m], y[m], color=color, label=label,
                        s=size, alpha=1.0, edgecolors="none", rasterized=True)
 
-    ax.set_aspect("equal")
-    ax.invert_yaxis()
-    ax.set_xticks([])
-    ax.set_yticks([])
-    for spine in ax.spines.values():
-        spine.set_visible(False)
+    style_tissue_axes(ax)
     ax.legend(loc="center left", bbox_to_anchor=(1.0, 0.5), frameon=False,
               fontsize=7, markerscale=6, handletextpad=0.2, title="cell type",
               title_fontsize=7)
@@ -1129,31 +1217,12 @@ def spatial_clusters(adata, sample, name):
     15 µm cell is well under a pixel, so the polygons cost a great deal of render time to
     draw the same dots.
 
-    Three things are specific to tissue coordinates and all three would be wrong on
-    defaults. The FIGURE is shaped to the tissue's own aspect, because equal aspect is
-    non-negotiable here and a fixed box would render a wide strip as a band across an
-    empty slide. The MARKER is sized from the axes area and the cell count, since one
-    constant cannot serve a 21k-cell strip and a 700k-cell section. And y is INVERTED,
-    because Xenium global coordinates run downward from the top-left of the scan.
-    cluster_report does all three the same way.
+    Figure shape, marker size and the inverted y axis are tissue_figure's and
+    style_tissue_axes', shared with every other section-scale slide here; cluster_report
+    does all three the same way.
     """
     x, y = adata.obsm["spatial"][:, 0], adata.obsm["spatial"][:, 1]
-
-    # Shape the figure to the data, leaving room for the legend beside it.
-    aspect = (x.max() - x.min()) / (y.max() - y.min())
-    plot_w = FIGSIZE[0] - SPATIAL_LEGEND_WIDTH
-    if aspect >= plot_w / FIGSIZE[1]:
-        w, h = plot_w, plot_w / aspect
-    else:
-        w, h = FIGSIZE[1] * aspect, FIGSIZE[1]
-    fig, ax = plt.subplots(figsize=(w + SPATIAL_LEGEND_WIDTH, h))
-
-    # Marker area (pt²) letting the cells cover SPATIAL_COVERAGE of the axes once.
-    # get_position() is the pre-tight_layout fraction of the figure, close enough to
-    # size a dot; 72 pt to the inch, squared, converts inches² to scatter's `s` units.
-    pos = ax.get_position()
-    area_pt2 = (pos.width * w) * (pos.height * h) * 72 ** 2
-    size = float(np.clip(SPATIAL_COVERAGE * area_pt2 / adata.n_obs, 0.5, 6.0))
+    fig, ax, size = tissue_figure(adata)
 
     # Largest cluster first, so small ones are drawn last and land on top. The reverse
     # buries a 500-cell cluster under a 10,000-cell one wherever they overlap — which in
@@ -1166,12 +1235,7 @@ def spatial_clusters(adata, sample, name):
         ax.scatter(x[m], y[m], color=colors[int(level) - 1], label=level,
                    s=size, alpha=1.0, edgecolors="none", rasterized=True)
 
-    ax.set_aspect("equal")
-    ax.invert_yaxis()
-    ax.set_xticks([])
-    ax.set_yticks([])
-    for spine in ax.spines.values():
-        spine.set_visible(False)
+    style_tissue_axes(ax)
 
     # Legend rather than on-data labels: a cluster spread across a whole section has its
     # median in the middle of everything else, so the label lands on cells it does not
@@ -1234,6 +1298,155 @@ def stage_representatives(adata):
     return chosen.to_dict("records")
 
 
+def style_scalebar(ax):
+    """Give a boxless scale bar a dark stroke, so it reads over whatever it lands on.
+
+    SCALEBAR_PARAMS draws the bar white with no box behind it, which is legible over the
+    cell fills but thin against a pale patch of H&E. The stroke is the same trick
+    style_on_data_labels uses on the cluster ids: an outline in the opposite tone means the
+    mark no longer depends on what is underneath it.
+
+    Applied after the fact because matplotlib-scalebar takes a colour but no path effects.
+    The bar and its label are a Rectangle and a Text inside the ScaleBar artist, so both are
+    reached through findobj rather than by walking the offsetbox by hand.
+    """
+    for bar in ax.findobj(ScaleBar):
+        for artist in bar.findobj(Text) + bar.findobj(Rectangle):
+            artist.set_path_effects(
+                [patheffects.withStroke(linewidth=2, foreground="black")])
+
+
+def color_marker_points(ax, values, colors):
+    """Recolour a rendered points panel per marker set, legend included.
+
+    render_points' own `palette` does nothing for points in this version — whatever is
+    passed, the drawn colours come out tab10 — so the colours are set on the artist after
+    the fact. That is not a style preference: on this panel the default put theca at the
+    stroma's own luminance and lost it (see MARKER_TX_COLORS).
+
+    spatialdata_plot draws every point in ONE PathCollection with a per-point colour array,
+    rather than one collection per category, so the colours go on in row order — `values` is
+    the frame's marker_set column, in the same order it was registered. The empty
+    collections beside it are the legend's proxies; the legend has already been built by
+    show(), so its handles carry their own colours and are recoloured by label. Run this
+    BEFORE legend_below, which rebuilds the legend from those same handles.
+    """
+    collections = list(ax.collections)
+    if not collections:
+        return
+    drawn = max(collections, key=lambda c: len(c.get_offsets()))
+    # Edge as well as face, and the same colour for both. render_points gives each dot an
+    # edge in its own colour, so the drawn dot is the marker plus its stroke; clearing the
+    # edge instead of recolouring it leaves the face alone and the dots read visibly smaller
+    # than they did before — a size change nobody asked for, disguised as a colour change.
+    point_colors = [colors[v] for v in values]
+    drawn.set_facecolor(point_colors)
+    drawn.set_edgecolor(point_colors)
+
+    legend = ax.get_legend()
+    if legend is None:
+        return
+    for handle, text in zip(legend.legend_handles, legend.get_texts()):
+        if text.get_text() in colors:
+            handle.set_facecolor(colors[text.get_text()])
+
+
+def legend_below(ax):
+    """Move an axes' legend from beside it to a row underneath it.
+
+    spatialdata_plot puts every legend to the RIGHT of its panel, which is fine for one
+    panel and unworkable for three: each legend is drawn in the gap the next panel occupies,
+    so the labels collide with it and are clipped — on a three-panel zoom the cluster numbers
+    vanished entirely and the cell type names ran under the transcript panel.
+
+    Underneath is where the room is, since these panels are square and the slide is wide.
+    The legend is rebuilt rather than repositioned because matplotlib's `loc` is fixed at
+    construction; handles and text come off the original, so the colours stay whatever
+    spatialdata_plot assigned.
+
+    Short keys (cluster ids) go in one row, long ones (cell type names) in two columns —
+    seven names at full width would run off both edges of the panel.
+    """
+    leg = ax.get_legend()
+    if leg is None:
+        return
+    handles = leg.legend_handles
+    labels = [t.get_text() for t in leg.get_texts()]
+    leg.remove()
+    ncol = len(labels) if max((len(l) for l in labels), default=0) <= 4 else 2
+    ax.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, -0.01),
+              frameon=False, fontsize=6, ncol=ncol, handletextpad=0.2,
+              columnspacing=0.8, borderpad=0.0)
+
+
+def zoom_window_centre(adata, record):
+    """The (x, y) centre of a curated cell's zoom window, in µm.
+
+    obsm["spatial"] is µm while the `global` frame a crop is taken in is PIXELS, so this is
+    the µm half of that pair — the drawing side. oocyte_zoom converts it once for the crop
+    and every box here uses it as-is, which is what keeps a box and the window it stands for
+    from drifting apart by a scale factor.
+    """
+    idx = adata.obs_names.get_loc(str(record["cell_id"]))
+    return (float(v) for v in adata.obsm["spatial"][idx])
+
+
+def oocyte_zoom_map(adata, sample, records):
+    """One slide's figure: the section with every zoom window boxed, in developmental order.
+
+    The zoom slides that follow are 200 µm windows out of a section a few millimetres
+    across, and nothing on them says where. This is the slide that says it, and it says all
+    of them at once — which is the part an inset on each zoom cannot do. Whether the stages
+    come from one cortical region or from opposite ends of the section is a question about
+    the series rather than about any one window, and it is visible here and nowhere else.
+
+    Cells are drawn in one grey rather than by cluster or cell type. The calls have their own
+    slides directly above; repeating them here would compete with the boxes for attention on
+    a slide whose only question is where.
+
+    Numbered rather than labelled in place: the stage names run to "early transitioning", and
+    two windows in the same follicle-rich region would overlap into an unreadable pile. The
+    numbers run in developmental order, so the key doubles as the running order of the slides
+    that follow.
+
+    A point at the window's CENTRE rather than a box at its extent. Drawn true to size the
+    windows are a tenth of this section across and four of five on one test ROI overlapped
+    into a knot in one corner — the marks fought each other and the tissue for a slide whose
+    question is only where. The cost is that the slide no longer shows how much tissue a zoom
+    covers, so the caption states the window size instead.
+    """
+    fig, ax, size = tissue_figure(adata)
+    x, y = adata.obsm["spatial"][:, 0], adata.obsm["spatial"][:, 1]
+    ax.scatter(x, y, color="0.85", s=size, alpha=1.0, edgecolors="none", rasterized=True)
+
+    for n, record in enumerate(records, start=1):
+        cx, cy = zoom_window_centre(adata, record)
+        ax.scatter([cx], [cy], color=ZOOM_MARK_COLOR, s=10, zorder=4, edgecolors="none")
+        # The number rides a POINTS offset rather than a µm one, so it clears its mark by the
+        # same visible gap whatever the section's scale. va="bottom" against that offset puts
+        # it above the mark on screen, which is below it in data terms — y is inverted here.
+        ax.annotate(str(n), (cx, cy), xytext=(0, 4), textcoords="offset points",
+                    ha="center", va="bottom", fontsize=7, fontweight="bold",
+                    color=ZOOM_MARK_COLOR, zorder=5)
+
+    style_tissue_axes(ax)
+    # Proxy handles: the boxes are patches on the data, and a legend built from them would
+    # key every entry to the same red square. The number is what distinguishes them, so it
+    # carries the entry and the handle is suppressed.
+    ax.legend([Rectangle((0, 0), 0, 0, fill=False, edgecolor="none")] * len(records),
+              [f"{n} · {r['Stage.Labels']}" for n, r in enumerate(records, start=1)],
+              loc="center left", bbox_to_anchor=(1.0, 0.5), frameon=False,
+              fontsize=7, handlelength=0, handletextpad=0, title="zoom windows",
+              title_fontsize=7, labelcolor=ZOOM_MARK_COLOR)
+
+    fig.suptitle(f"{sample} · {len(records)} zoom windows · "
+                 f"{2 * ZOOM_RADIUS_UM:g} µm each · tissue",
+                 fontsize=9, x=0.01, ha="left")
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+
 def oocyte_zoom(sdata, sample, record, resolution, px_per_um):
     """One slide's figure: a window around one curated oocyte, clusters beside cell types.
 
@@ -1285,9 +1498,9 @@ def oocyte_zoom(sdata, sample, record, resolution, px_per_um):
         add_cluster_ids already writes for the cluster ids. Passing `palette=` as a DICT is
         silently ignored by this version of spatialdata_plot — only a list ordered by the
         categories takes effect — so the uns route is both less code and less breakable.
-      * The scale bar is `show`'s own `scalebar_dx`, one pixel's size in µm. A zoom is read
-        for size — whether a body is one large cell or several small ones — so unlike the
-        section slides it needs a scale on the panel.
+      * The scale bar is `show`'s own `scalebar_dx`, one pixel's size in µm, and is OFF —
+        see SHOW_SCALEBAR for why and for how to restore it. The window's size is on the
+        slide either way, in the caption.
 
     The target cell is outlined in black over the top, as its own registered single-row
     shapes element: it marks the cell under discussion rather than a category, so it must
@@ -1297,8 +1510,7 @@ def oocyte_zoom(sdata, sample, record, resolution, px_per_um):
     """
     adata = sdata["table"]
     cell_id = str(record["cell_id"])
-    idx = adata.obs_names.get_loc(cell_id)
-    cx, cy = (float(v) for v in adata.obsm["spatial"][idx])
+    cx, cy = zoom_window_centre(adata, record)
 
     lo = [(cx - ZOOM_RADIUS_UM) * px_per_um, (cy - ZOOM_RADIUS_UM) * px_per_um]
     hi = [(cx + ZOOM_RADIUS_UM) * px_per_um, (cy + ZOOM_RADIUS_UM) * px_per_um]
@@ -1330,12 +1542,60 @@ def oocyte_zoom(sdata, sample, record, resolution, px_per_um):
     if not target.empty:
         crop.shapes["oocyte_target"] = target
 
+    # The marker molecules themselves, as their own points element. Both panels beside this
+    # one are drawn from the count matrix by way of a cluster label, so they can only ever
+    # show what the clustering concluded; this is the evidence underneath it, at the same
+    # magnification and in the same window.
+    #
+    # Unlike a filtered SHAPES element, a filtered points element does NOT keep its
+    # transformations — dask drops .attrs across the filter, so it must go back through
+    # PointsModel.parse with the transformation passed explicitly, and the parent's is read
+    # before the filter for exactly that reason. (Verified: registering the filtered frame
+    # directly raises "attrs does not contain transform".)
+    present_sets = {name: [g for g in genes if g in adata.var_names]
+                    for name, genes in MARKER_SETS.items()}
+    gene_to_set = {g: name for name, genes in present_sets.items() for g in genes}
+    tx = crop["transcripts"]
+    marker_tx = tx[tx["feature_name"].astype(str).isin(list(gene_to_set))]
+    marker_tx = marker_tx.assign(marker_set=marker_tx["feature_name"].astype(str).map(
+        gene_to_set, meta=("marker_set", "object")))
+    # Materialized because the ordering below needs the counts, and a zoom window holds a
+    # few thousand molecules — this is the one place in the deck where computing the graph
+    # is cheaper than working around it.
+    marker_tx = marker_tx.compute()
+
+    # Commonest set FIRST, rarest LAST, in both the row order and the category order —
+    # spatialdata_plot draws per category, and matplotlib draws in row order within one, so
+    # only doing one of the two leaves the outcome to which path the version takes. Theca
+    # runs to ~33 molecules against granulosa's ~700 in the same window, and drawn first it
+    # is simply painted over by the other two.
+    counts = marker_tx["marker_set"].value_counts()
+    tx_order = list(counts.sort_values(ascending=False).index)
+    marker_tx = (marker_tx.assign(_n=marker_tx["marker_set"].map(counts))
+                          .sort_values("_n", ascending=False, kind="stable")
+                          .drop(columns="_n"))
+    marker_tx["marker_set"] = pd.Categorical(marker_tx["marker_set"], categories=tx_order)
+    crop.points["marker_tx"] = PointsModel.parse(
+        marker_tx, coordinates={"x": "x", "y": "y"}, feature_key="marker_set",
+        transformations=get_transformation(tx, get_all=True))
+
     panels = (("cluster_v2", f"clusters (v2) · resolution {resolution:g}"),
               ("cell_type", "cell types"))
 
     has_image = ZOOM_BASE_IMAGE in crop.images
 
-    fig, axes = plt.subplots(1, 2, figsize=FIGSIZE)
+    # Height fitted to the panels rather than to the slide, the same trade the UMAP slides
+    # make: the window is square and equal aspect holds it that way, so three panels across a
+    # fixed width already fixes their height, and a taller figure only adds empty slide above
+    # them. Chrome is the suptitle, the panel titles and the legend row underneath each.
+    fig, axes = plt.subplots(1, 3, figsize=(FIGSIZE[0], FIGSIZE[0] / 3 + 0.8))
+    # Margins set here rather than by tight_layout, which this figure cannot use (see the
+    # tissue slides: spatialdata_plot attaches free-standing axes it does not know about).
+    # The bottom margin is the legend row's, the top the suptitle's. left/right must be set
+    # too, and symmetrically: matplotlib's defaults are 0.125 and 0.9, which reserve an inch
+    # on the left for a y axis these frameless panels do not have and half that on the right,
+    # so the whole row sat visibly right of centre on the slide.
+    fig.subplots_adjust(left=0.02, right=0.98, top=0.88, bottom=0.16)
     for ax, (column, title) in zip(axes, panels):
         # The histology first, so the cells compose over it. Chained rather than drawn on
         # the axes by hand: spatialdata_plot puts both in the same coordinate system, which
@@ -1366,13 +1626,34 @@ def oocyte_zoom(sdata, sample, record, resolution, px_per_um):
             view = view.pl.render_shapes("oocyte_target", fill_alpha=0.0, outline_alpha=1.0,
                                          outline_color=ZOOM_TARGET_COLOR,
                                          outline_width=ZOOM_TARGET_OUTLINE_WIDTH)
+        scalebar = ({"scalebar_dx": 1.0 / px_per_um, "scalebar_units": "um",
+                     "scalebar_params": SCALEBAR_PARAMS} if SHOW_SCALEBAR else {})
         view.pl.show(ax=ax, coordinate_systems="global", title=title, frameon=False,
-                     scalebar_dx=1.0 / px_per_um, scalebar_units="um")
+                     **scalebar)
         ax.set_title(title, fontsize=8)
+        if SHOW_SCALEBAR:
+            style_scalebar(ax)
+        legend_below(ax)
         # The extent is left to spatialdata_plot. bounding_box returns whole cells that
         # INTERSECT the window, so cells straddling the edge hang past the H&E square —
         # trimming the axes back to the window was tried and made the panels worse, so the
         # overhang stays.
+
+    # Third panel: the marker molecules over the same histology, with no cell fills and no
+    # boundaries. The segmentation is what the other two panels are conditioned on, so
+    # leaving it off is the point — a transcript sitting outside every polygon is visible
+    # here and nowhere else, and drawing the outlines over it turned the panel to mud.
+    tx_ax = axes[2]
+    tx_base = crop.pl.render_images(ZOOM_BASE_IMAGE) if has_image else crop
+    # No `palette` here: it is accepted and ignored for points (see MARKER_TX_COLORS), so
+    # passing one would read as though the colours were set when they were not.
+    tx_base.pl.render_points(
+        "marker_tx", color="marker_set", size=MARKER_TX_POINT_SIZE,
+    ).pl.show(ax=tx_ax, coordinate_systems="global", title="marker transcripts",
+              frameon=False)
+    tx_ax.set_title("marker transcripts", fontsize=8)
+    color_marker_points(tx_ax, marker_tx["marker_set"], MARKER_TX_COLORS)
+    legend_below(tx_ax)
 
     # The absence of the H&E is named on the slide rather than left to be inferred from a
     # white background, which would otherwise look like a rendering fault.
@@ -1845,6 +2126,19 @@ for path in ZARRS:
             # and the zoom window has to be converted to crop in the right place.
             px_per_um = float(
                 get_transformation(sdata["cell_boundaries"], "global").scale[0])
+
+            # The map before the windows it indexes, so the zooms that follow are read as
+            # positions in one section rather than as unrelated crops.
+            display(Markdown("## Oocyte zoom windows"))
+            display(Markdown(
+                f"Where each of the zoom slides that follow was taken from. Each mark is the "
+                f"centre of a {2 * ZOOM_RADIUS_UM:g} µm window, sitting on the curated "
+                "oocyte representing that stage. Cells are one grey — the cluster and cell "
+                "type calls are on the slides above, and this one shows position only. Marks "
+                "are numbered in developmental order, which is the order of the slides that "
+                "follow."
+            ))
+            oocyte_zoom_map(adata, sample, representatives)
         else:
             display(Markdown("## Oocyte zooms"))
             display(Markdown(
@@ -1866,10 +2160,13 @@ for path in ZARRS:
                 "other slide is drawn from. Every cell is outlined in black; the "
                 f"{ZOOM_TARGET_COLOR} outline is the curated target cell. Both panels are the "
                 "same window: clusters on the left with the "
-                "v2 ids and colours from the slides above, cell type calls on the right "
+                "v2 ids and colours from the slides above, cell type calls in the middle "
                 "with the palette of the tissue plot, grey for unassigned. Where no cell "
                 "is drawn the H&E shows through unmodified — that is unsegmented space, "
-                "including the gaps inside a large oocyte."
+                "including the gaps inside a large oocyte. The right panel is every "
+                f"transcript of the marker sets themselves, at quality score "
+                f"{MARKER_MAX_SCORE} or better, over the same histology with no "
+                "segmentation drawn — the molecules the calls beside it were made from."
             ))
             oocyte_zoom(sdata, sample, record, resolution, px_per_um)
 
