@@ -455,13 +455,18 @@ def gradient_colors(n, cmap_name=CLUSTER_CMAP, span=CLUSTER_CMAP_RANGE):
     return [to_hex(cmap(t)) for t in np.interp(np.linspace(0, cumulative[-1], n), cumulative, ts)]
 
 
-def style_on_data_labels(ax, color="white", outline="black", linewidth=2.5):
+def style_on_data_labels(ax, color="white", outline="black", linewidth=1.5):
     """Restyle scanpy's on-data cluster labels to `color` text with an `outline` stroke.
 
     scanpy's legend_fontoutline hardcodes a white stroke around black text, which is hard to
     read on light clusters — and turbo's middle is pale yellow-green. Flip it to white text
     with a black outline, which reads on both ends of the ramp. The cluster labels are the
     only Text artists scanpy adds to the axes body, so restyling ax.texts hits exactly them.
+
+    The stroke has to stay THIN relative to the glyph. withStroke widens the outline
+    outward and inward from the path, so a heavy one on a small digit closes over the
+    counters and the label reads as a dark blob with a suggestion of a number inside it —
+    which is what 2.5 pt under a 7 pt font did here. Raise the font before the stroke.
     """
     for t in ax.texts:
         t.set_color(color)
@@ -921,13 +926,12 @@ def umap_clusters(adata, sample, name):
     palette in uns, so both versions of this slide are the same call with a different
     column — they cannot drift apart in styling.
 
-    legend_loc="on data" puts each cluster's id at its cluster's MEDIAN position, which is
-    what we want: a cluster split across two lobes of the embedding puts its mean in the
-    empty space between them, where the label sits on no cells at all. The labels are then
-    restyled to white-on-black by style_on_data_labels, since scanpy's own outline is the
-    wrong way round for turbo's pale middle. Labels on the data rather than a legend because
-    past ~10 clusters a legend eats the panel — and here the number carries the identity
-    while colour carries the ORDER, so both channels are doing work.
+    The ids are in a legend BESIDE the panel, not on the data. On-data labels sit at each
+    cluster's median, which reads well at the 7 clusters a test crop gives and fails at the
+    16-28 the real whole-slide samples give: labels land on top of each other wherever
+    several clusters share a lobe, and no font or outline weight fixes that. A legend cannot
+    collide at any cluster count, and it is what the tissue slides already do — so the two
+    views of one numbering now carry it the same way.
 
     Cells are handed over sorted by descending cluster size, so the small clusters are
     drawn last and land on top. scanpy draws one scatter in row order, and the reverse
@@ -936,11 +940,11 @@ def umap_clusters(adata, sample, name):
 
     Marker size is left to scanpy, which already scales it as 120000 / n_cells.
     """
-    # The cluster ids sit on the data, so the axes gets the whole figure width and the only
-    # chrome is the suptitle above it.
-    width = FIGSIZE[0] * 0.6
-    fig, ax = plt.subplots(figsize=(width, umap_figure_height(adata.obsm["X_umap"],
-                                                              width, 0.25)))
+    # Room for the legend beside the panel, the same reservation the tissue slides and the
+    # cell type UMAP make, so the panels line up in width across the section.
+    width = FIGSIZE[0] * 0.62
+    fig, ax = plt.subplots(figsize=(width, umap_figure_height(
+        adata.obsm["X_umap"], width - SPATIAL_LEGEND_WIDTH, 0.25)))
 
     sizes = adata.obs[name].value_counts()
     order = np.argsort(-adata.obs[name].map(sizes).to_numpy(), kind="stable")
@@ -948,9 +952,9 @@ def umap_clusters(adata, sample, name):
     sc.pl.umap(
         adata[order],
         color=name,
-        legend_loc="on data",
-        legend_fontsize=7,
-        legend_fontweight="bold",
+        # Suppressed and rebuilt below: scanpy's own margin legend takes the panel's width
+        # rather than the space reserved for it, and orders its keys by draw order.
+        legend_loc=None,
         # UMAP axes carry no interpretable units — drop the frame entirely.
         frameon=False,
         title="",
@@ -958,8 +962,20 @@ def umap_clusters(adata, sample, name):
         ax=ax,
         show=False,
     )
-    style_on_data_labels(ax)
     match_umap_axes(ax, adata.obsm["X_umap"])
+
+    # Proxy handles from the same uns palette the scatter was drawn from, keyed in NUMERIC
+    # order — the draw order above is by cluster size, so handles taken off the axes would
+    # read 2, 1, 5, 3... The tissue slide reorders its own handles for exactly this reason.
+    # Two columns past 12 ids, where one column runs taller than the panel it labels.
+    levels = list(adata.obs[name].cat.categories)
+    colors = adata.uns[f"{name}_colors"]
+    handles = [plt.Line2D([], [], marker="o", linestyle="none", markersize=4,
+                          color=colors[int(level) - 1]) for level in levels]
+    ax.legend(handles, [str(level) for level in levels],
+              loc="center left", bbox_to_anchor=(1.0, 0.5), frameon=False,
+              fontsize=7, handletextpad=0.2, title=name, title_fontsize=7,
+              ncol=1 if len(levels) <= 12 else 2, columnspacing=0.8)
 
     n_clusters = adata.obs[name].nunique()
     fig.suptitle(f"{sample} · {adata.n_obs:,} cells · {n_clusters} clusters",
