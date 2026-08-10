@@ -46,7 +46,9 @@ DEFAULT_RESOLUTIONS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 # by a different route.
 DEFAULT_MIN_COUNTS = 20
 DEFAULT_MIN_CELLS = 100
-DEFAULT_MAX_COUNTS_QUANTILE = 0.98
+# See cluster_sdata.py: off by default, because a top-percentile cut on ovary
+# removes oocytes, which are the most transcript-rich cells in the tissue.
+DEFAULT_MAX_COUNTS_QUANTILE = 0
 
 # The embedding recipe — see cluster_sdata.py for what these are and why.
 HVG_N_TOP_GENES = 2000
