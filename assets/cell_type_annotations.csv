@@ -1,0 +1,20 @@
+# Hand-made cell type calls, read by sample_summary. One row per (sample, cell_type,
+# cluster) — the relation is many-to-many in both directions. One cell type over many
+# clusters: a stroma-dominated section splits into several stromal clusters and they are
+# all Stromal, so give Stromal a row per cluster. One cluster under many cell types: a
+# follicle sectioned whole is granulosa cells around an oocyte, and both may peak on the
+# same cluster, so give each its own row naming that cluster.
+#
+# Rows are OVERRIDES on the argmax the deck picks. Naming a cell type at all replaces its
+# default entirely — list every cluster you want it to cover. A row with a BLANK cluster
+# means "not present in this sample", which is how a judgement overrides the default
+# downward: the argmax always exists, even for a cell type with no signal.
+#
+# Keyed on cluster_v2, the ids the slides are labelled with. v2 is derived from the
+# dendrogram at render time, so it moves if the clustering, the resolution or the
+# centroids change — re-derive the calls after re-clustering rather than trusting an old
+# sheet. The emitted cluster_annotations.csv carries v1 alongside as a record of what a
+# call pointed at when it was made.
+#
+# cell_type must be one of: granulosa, oocyte, theca, Endothelial, Immune, Pericyte, Stromal
+sample,cell_type,cluster_v2
