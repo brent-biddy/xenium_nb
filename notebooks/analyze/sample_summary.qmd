@@ -338,7 +338,7 @@ SHOW_OOCYTE_ZOOMS = False
 
 CURATED_OOCYTES = pd.DataFrame()
 if OOCYTES_CSV.exists():
-    CURATED_OOCYTES = pd.read_csv(OOCYTES_CSV)
+    CURATED_OOCYTES = pd.read_csv(OOCYTES_CSV, comment="#")
     missing_cols = ({"cell_id", "Stage.Labels", "Quality", "cell_area"}
                     - set(CURATED_OOCYTES.columns))
     if missing_cols:
@@ -373,7 +373,12 @@ QC_COLUMNS = [
 # Samples absent from it (or from a missing file) fall back to DEFAULT_RESOLUTION.
 OVERRIDES = {}
 if RESOLUTIONS_CSV.exists():
-    chosen = pd.read_csv(RESOLUTIONS_CSV)
+    # comment="#", as the cell type sheet already reads: these sheets are hand-edited and
+    # a header block explaining the choices travels usefully with the file. Without it
+    # pandas takes the first comment line as the header, `sample` and `resolution` read as
+    # missing, and the raise below takes the whole setup cell down — which leaves every
+    # function it defines undefined and every sample failing on a NameError instead.
+    chosen = pd.read_csv(RESOLUTIONS_CSV, comment="#")
     missing_cols = {"sample", "resolution"} - set(chosen.columns)
     if missing_cols:
         raise ValueError(f"chosen_resolutions.csv missing column(s): {sorted(missing_cols)}")
