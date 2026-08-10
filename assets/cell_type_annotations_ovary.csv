@@ -1,0 +1,98 @@
+# Hand-made cell type calls for the 6-sample ovary cohort, read against the
+# sample_summary render of 2026-08-10 (chosen_resolutions_ovary.csv). Brent's calls.
+#
+# The cluster ids are cluster_v2, derived per render from the correlation ordering, so
+# these rows are valid only against that clustering: change the resolution, the
+# filtering or the reference and the numbers move.
+#
+# Clusters per sample, and the ones deliberately left unassigned:
+#   roi_1  12 clusters, 11 assigned, unassigned: [5]
+#   roi_2  12 clusters, 11 assigned, unassigned: [1]
+#   roi_3  16 clusters, 13 assigned, unassigned: [3, 5, 6]
+#   roi_4  12 clusters, 12 assigned, unassigned: none
+#   roi_5  13 clusters, 12 assigned, unassigned: [1]
+#   roi_6  16 clusters, 15 assigned, unassigned: [11]
+#
+# granulosa is absent in every sample: it never resolved a cluster of its own at these
+# resolutions, so the cohort reports no granulosa cells at all.
+sample,cell_type,cluster_v2
+roi_1,granulosa,
+roi_1,oocyte,1
+roi_1,theca,7
+roi_1,Endothelial,2
+roi_1,Immune,4
+roi_1,Pericyte,3
+roi_1,Stromal,6
+roi_1,Stromal,8
+roi_1,Stromal,9
+roi_1,Stromal,10
+roi_1,Stromal,11
+roi_1,Stromal,12
+roi_2,granulosa,
+roi_2,oocyte,6
+roi_2,theca,5
+roi_2,Endothelial,2
+roi_2,Immune,4
+roi_2,Pericyte,3
+roi_2,Stromal,7
+roi_2,Stromal,8
+roi_2,Stromal,9
+roi_2,Stromal,10
+roi_2,Stromal,11
+roi_2,Stromal,12
+roi_3,granulosa,
+roi_3,oocyte,2
+roi_3,theca,7
+roi_3,Endothelial,15
+roi_3,Endothelial,14
+roi_3,Immune,1
+roi_3,Immune,4
+roi_3,Pericyte,16
+roi_3,Stromal,9
+roi_3,Stromal,10
+roi_3,Stromal,11
+roi_3,Stromal,12
+roi_3,Stromal,13
+roi_3,Stromal,8
+roi_4,granulosa,
+roi_4,oocyte,11
+roi_4,theca,12
+roi_4,Endothelial,1
+roi_4,Immune,3
+roi_4,Pericyte,2
+roi_4,Stromal,4
+roi_4,Stromal,5
+roi_4,Stromal,6
+roi_4,Stromal,7
+roi_4,Stromal,8
+roi_4,Stromal,9
+roi_4,Stromal,10
+roi_5,granulosa,
+roi_5,oocyte,4
+roi_5,theca,12
+roi_5,Endothelial,2
+roi_5,Immune,5
+roi_5,Pericyte,3
+roi_5,Stromal,6
+roi_5,Stromal,7
+roi_5,Stromal,8
+roi_5,Stromal,9
+roi_5,Stromal,10
+roi_5,Stromal,11
+roi_5,Stromal,13
+roi_6,granulosa,
+roi_6,oocyte,3
+roi_6,theca,6
+roi_6,Endothelial,1
+roi_6,Immune,4
+roi_6,Pericyte,2
+roi_6,Stromal,12
+roi_6,Stromal,13
+roi_6,Stromal,14
+roi_6,Stromal,15
+roi_6,Stromal,5
+roi_6,Stromal,7
+roi_6,Stromal,8
+roi_6,Stromal,9
+roi_6,Stromal,10
+roi_6,Stromal,16
