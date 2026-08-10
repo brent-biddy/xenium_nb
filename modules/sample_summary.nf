@@ -47,6 +47,10 @@ process SAMPLE_SUMMARY {
     // staged unconditionally, since Nextflow has no optional path input and the shipped
     // asset is a header-only sheet.
     path cell_types, stageAs: 'cell_type_annotations.csv'
+    // The hand-curated oocyte list, likewise under the fixed name the notebook reads. It
+    // drives the per-stage zoom slides; a sample with no curated cells simply gets none,
+    // which the notebook says on a slide rather than passing over in silence.
+    path oocytes, stageAs: 'curated_oocytes.csv'
 
     output:
     path "sample_summary.pptx", emit: report

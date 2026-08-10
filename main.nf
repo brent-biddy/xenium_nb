@@ -345,6 +345,10 @@ workflow sample_summary {
     // Defaulted to a header-only asset, so this only fires if explicitly unset. Its rows
     // override the argmax per cell type; a sample with no rows takes the defaults.
     if (!params.cell_type_annotations) error "Please provide --cell_type_annotations"
+    // Defaulted in nextflow.config to the curated oocyte asset. Tissue-specific in the
+    // same way the markers are — it drives the per-stage zoom slides, and a sample with
+    // no curated cells in it simply gets none.
+    if (!params.curated_oocytes)    error "Please provide --curated_oocytes"
 
     // Point --samplesheet at a cluster_sdata* handoff sheet — this report reads the
     // clustered zarrs (obs, var, and the leiden_res_* columns), not create_sdata's raw ones.
@@ -368,6 +372,7 @@ workflow sample_summary {
         file(params.follicle_markers),
         file(params.reference_major),
         file(params.cell_type_annotations),
+        file(params.curated_oocytes),
     )
 }
 

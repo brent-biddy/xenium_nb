@@ -29,15 +29,18 @@ import gc
 import traceback
 from pathlib import Path
 
-import anndata as ad
 import matplotlib.patheffects as patheffects
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scanpy as sc
+import spatialdata as sd
+import spatialdata_plot  # noqa: F401 — registers the .pl accessor used by the zoom slides
 import yaml
 from IPython.display import display, Markdown
 from matplotlib.colors import to_hex
+from matplotlib.patches import Rectangle
+from spatialdata.transformations import get_transformation
 from scipy.cluster.hierarchy import leaves_list, linkage
 from scipy.spatial.distance import squareform
 
@@ -51,6 +54,29 @@ SPATIAL_LEGEND_WIDTH = 1.2
 # fixed size cannot serve every section: at s=3 a 21k-cell strip reads well but a
 # 32k-cell section is a solid mat, and at s=1 the strip is speckle.
 SPATIAL_COVERAGE = 0.45
+
+# Fraction of the embedding's own span left as margin around every UMAP panel, so the
+# cells at the edge are not clipped by the axes. One value for all of them, since the
+# panels are meant to be the same picture at different sizes.
+UMAP_MARGIN = 0.04
+
+# Raster resolution for every figure in the deck, set once here rather than per call.
+# Matplotlib's default is 100, which is what made the text soft: these figures are 9in
+# wide on a 10in slide, so a 7pt label is about ten pixels tall before PowerPoint scales
+# it up. qc_report.qmd carries the full reasoning for the number — briefly, 400 covers a
+# 4K screen at this figure width, 300 covers 1440p and print at 100%, 200 covers a 1080p
+# projector and nothing above it.
+#
+# Only the dpi is set. This deck passes an explicit fontsize to nearly every text call
+# already, so adopting qc_report's font rcParams as well would change only the handful of
+# places that do not, and reshuffle layouts that were tuned against the current sizes.
+#
+# The cost is file size, roughly 16x the pixel count of 100 dpi. Worth watching on a
+# cohort of whole-slide samples, where the tissue scatters are already the heavy slides.
+plt.rcParams.update({
+    "figure.dpi": 400,
+    "savefig.dpi": 400,
+})
 
 # Every clustered zarr is staged into this notebook's working directory by the Nextflow
 # process, so globbing is the whole input contract — no params to pass or drift. These
@@ -169,6 +195,81 @@ _z = REFERENCE.sub(REFERENCE.mean(axis=1), axis=0).div(
     REFERENCE.std(axis=1).replace(0, np.nan), axis=0)
 REFERENCE_GENES = sorted({gene for cell_type in REFERENCE.columns
                           for gene in _z[cell_type].nlargest(TYPE_SPECIFIC_TOP_N).index})
+
+# The hand-curated oocyte list, staged flat beside the zarrs under this fixed name. One
+# row per putative oocyte with the stage a curator assigned it, how confident they were,
+# and its segmented area.
+#
+# Cells are matched to a sample by whether their cell_id is in that sample's obs_names,
+# NOT by the sheet's Donor.ROI column. The column names the whole slide (ROI1) while a
+# sample here is a crop of it (ROI1_A), so a name join finds nothing — while id
+# membership scopes to the crop for free, and keeps working for whole-slide samples.
+OOCYTES_CSV = Path("curated_oocytes.csv")
+
+# Developmental order, which is the order the zoom slides run in — the section reads as a
+# series rather than as whatever order the sheet happens to hold. Labels outside this list
+# still get a slide, after these, so a curator adding a stage does not lose it silently.
+OOCYTE_STAGE_ORDER = ["primordial", "early transitioning", "transitioning",
+                      "late transitioning", "primary", "secondary"]
+
+# Dropped rather than given a slide: "other" names no stage, and it is the single largest
+# label in the sheet (186 of 542 across the six ROIs), so it would take a slide per sample
+# to say nothing about development. The rows stay in the sheet — this only skips them here.
+OOCYTE_STAGE_EXCLUDE = {"other"}
+
+# Worst-to-best ordering of the curator's own confidence, used to pick which oocyte
+# represents a stage. Ranked rather than filtered: a stage whose only cells are poor still
+# gets its slide, captioned with that quality, because "the only primary oocyte in this
+# section is a poor one" is itself worth seeing. An unrecognised value sorts last.
+OOCYTE_QUALITY_RANK = {"good": 0, "okay": 1, "poor": 2, "terrible": 3}
+
+# Half-width of the zoom window, in µm — obsm["spatial"] is in µm for a Xenium read
+# (verified: the test crops span exactly the 2000x700 and 1000x2200 boxes
+# downsample_xenium_region was given). 100 µm puts a ~30 µm oocyte at about a seventh of
+# the window and still shows the follicle's surroundings, which is what says whether the
+# cluster tracks the oocyte or the whole follicle. At ~0.015 cells/µm² the window holds
+# roughly 600 cells.
+ZOOM_RADIUS_UM = 100.0
+
+# The image drawn UNDER the cells in the zoom panels. H&E rather than the DAPI or
+# morphology stains, because the question these slides answer is morphological — an
+# oocyte is recognisable on H&E to anyone who reads ovary sections, and a call that
+# disagrees with the histology is visibly wrong in a way no per-cell metric shows.
+#
+# Optional by nature: create_sdata only writes it when the sample was given an --he_image
+# and its alignment matrix, so a cohort mixing aligned and unaligned samples is normal.
+# Absent, the cells are drawn over white and the caption says so — falling back to a
+# different stain would put two samples' panels on different backgrounds under one
+# heading, which reads as a difference in the tissue.
+ZOOM_BASE_IMAGE = "he_image"
+
+# How opaque the cell fill sits over that image. Chosen by rendering the same window at
+# 0.0, 0.35 and 0.6: at 0.0 the cluster is only a coloured rim and unreadable at a glance,
+# at 0.6 the fills flatten the histology into blocks, and 0.35 keeps both — the stroma's
+# fibre texture still runs under the cells while the cluster colour is plain.
+ZOOM_FILL_ALPHA = 0.35
+
+# Boundary line width, in points. The cells are drawn from the `cell_boundaries` SHAPES
+# element rather than the `cell_labels` raster: at this magnification the vector polygon
+# gives a clean edge where the raster's eroded contour gives a stepped one, and the width
+# is a continuous point value instead of a whole number of pixels.
+ZOOM_OUTLINE_WIDTH = 1.0
+
+# The curated cell's own outline. Not black, which every other cell now carries — the
+# target has to differ in kind, not merely in weight. White reads against both H&E's
+# pink/purple and the turbo cluster fills, and unlike a saturated hue it cannot be
+# mistaken for one more category in the palette.
+ZOOM_TARGET_COLOR = "white"
+
+CURATED_OOCYTES = pd.DataFrame()
+if OOCYTES_CSV.exists():
+    CURATED_OOCYTES = pd.read_csv(OOCYTES_CSV)
+    missing_cols = ({"cell_id", "Stage.Labels", "Quality", "cell_area"}
+                    - set(CURATED_OOCYTES.columns))
+    if missing_cols:
+        raise ValueError(f"{OOCYTES_CSV} missing column(s): {sorted(missing_cols)}")
+    CURATED_OOCYTES = CURATED_OOCYTES[
+        ~CURATED_OOCYTES["Stage.Labels"].isin(OOCYTE_STAGE_EXCLUDE)]
 
 # The per-cell QC columns each sample's panel shows, as (obs column, axis label, log).
 #
@@ -304,6 +405,30 @@ def style_on_data_labels(ax, color="white", outline="black", linewidth=2.5):
         t.set_path_effects([patheffects.withStroke(linewidth=linewidth, foreground=outline)])
 
 
+def match_umap_axes(ax, coords):
+    """Put a UMAP panel on equal aspect and the sample's full extent.
+
+    Every UMAP in a sample's section shows the same embedding, so they should differ only
+    in scale — but matplotlib stretches data to fill whatever box it is given, and the
+    boxes are not the same shape: the cluster UMAP has one axes across most of the slide
+    while the marker panel has three side by side. Left alone the same embedding comes out
+    tall and narrow on one slide and wide on another, and a reader comparing an island's
+    position between them is comparing two different distortions.
+
+    Equal aspect fixes the shape and the shared limits fix the framing, so the panels are
+    the same picture at different sizes. The cost is letterboxing — a wide box around a
+    tall embedding leaves margin at the sides — which is the right trade: whitespace is
+    honest where a stretched embedding is not. UMAP axes carry no units and are not drawn,
+    so nothing else needs to change.
+    """
+    x, y = coords[:, 0], coords[:, 1]
+    pad_x = (x.max() - x.min()) * UMAP_MARGIN
+    pad_y = (y.max() - y.min()) * UMAP_MARGIN
+    ax.set_xlim(x.min() - pad_x, x.max() + pad_x)
+    ax.set_ylim(y.min() - pad_y, y.max() + pad_y)
+    ax.set_aspect("equal")
+
+
 def md_table(df):
     """Render a DataFrame as a markdown table.
 
@@ -402,7 +527,7 @@ def centroid_correlation(sample, corr, order):
     plt.close(fig)
 
 
-def reference_correlation(sample, corr):
+def reference_correlation(sample, corr, resolved):
     """One slide's figure: each cluster's centroid against the major cell types.
 
     Spearman, over genes specific to a reference type rather than every shared gene —
@@ -440,6 +565,7 @@ def reference_correlation(sample, corr):
         for col in range(corr.shape[1]):
             ax.text(col, row, f"{corr.iat[row, col]:.2f}", ha="center", va="center",
                     fontsize=7, color="white")
+    outline_calls(ax, corr.index, corr.columns, resolved)
     fig.colorbar(image, ax=ax, fraction=0.04)
 
     ax.set_title(f"{sample} — cluster centroids vs major cell types\n"
@@ -531,7 +657,7 @@ def marker_set_scores(centroids):
     return pd.DataFrame(scores)
 
 
-def marker_score_heatmap(sample, scores):
+def marker_score_heatmap(sample, scores, resolved):
     """One slide's figure: the cluster x marker-set means under three normalizations.
 
     The same matrix three times, because the three answer different questions and no one
@@ -597,6 +723,10 @@ def marker_score_heatmap(sample, scores):
                 shade = (value - vmin) / (vmax - vmin) if vmax > vmin else 0.0
                 ax.text(col, row, f"{value:.2f}", ha="center", va="center", fontsize=6,
                         color="black" if shade > 0.55 else "white")
+        # The same boxes on all three panels. The call is one decision made on the raw
+        # values; drawing it only on the raw panel would suggest the normalizations each
+        # produce their own, when the normalized panels are the same numbers rescaled.
+        outline_calls(ax, scores.index, scores.columns, resolved)
         bar = fig.colorbar(image, ax=ax, fraction=0.045)
         bar.set_label(bar_label, fontsize=6)
         bar.ax.tick_params(labelsize=5)
@@ -662,10 +792,26 @@ def marker_umaps(adata, sample):
             cmap="magma",
             frameon=False,
             title=title,
+            # Scanpy's own colourbar is a full-height bar to the right of each panel. With
+            # three panels on one slide that is three tall bars taking width from the
+            # embeddings and setting the row's height, which is what left the UMAPs small
+            # in a field of white. Suppressed here and re-drawn horizontally below.
+            colorbar_loc=None,
             ax=ax,
             show=False,
         )
+        match_umap_axes(ax, adata.obsm["X_umap"])
         ax.title.set_fontsize(8)
+
+        # Horizontal bar under the panel, off the PathCollection scanpy left on the axes —
+        # the same handle qc_report reaches for when it needs to touch a scanpy scatter
+        # after the fact. Underneath rather than beside because these panels are wider
+        # than they are tall once the aspect is fixed, so horizontal space is the scarce
+        # one; and each set keeps its own scale, since the sets are not comparable.
+        bar = fig.colorbar(ax.collections[-1], ax=ax, orientation="horizontal",
+                           fraction=0.05, pad=0.03, shrink=0.85)
+        bar.ax.tick_params(labelsize=6)
+        bar.outline.set_visible(False)
 
     fig.suptitle(f"{sample} — mean marker expression per cell "
                  f"(quality score <= {MARKER_MAX_SCORE})", fontsize=9, x=0.01, ha="left")
@@ -716,6 +862,7 @@ def umap_clusters(adata, sample, name):
         show=False,
     )
     style_on_data_labels(ax)
+    match_umap_axes(ax, adata.obsm["X_umap"])
 
     n_clusters = adata.obs[name].nunique()
     fig.suptitle(f"{sample} · {adata.n_obs:,} cells · {n_clusters} clusters",
@@ -784,6 +931,47 @@ def cell_type_labels(resolved):
     return {cluster: " + ".join(sorted(types)) for cluster, types in by_cluster.items()}
 
 
+def outline_calls(ax, row_labels, col_labels, resolved):
+    """Box the cluster each cell type was assigned to, on an evidence heatmap.
+
+    The heatmaps show the evidence; the assignment is an argmax read off it. Drawing the
+    box makes the two one object — without it a reader has to run the argmax by eye down
+    every column and hope they agree with what the tissue plots were coloured by.
+
+    One style regardless of where the call came from. A hand-made call in
+    cell_type_annotations.csv REPLACES the default rather than sitting beside it, so the
+    box means the same thing either way: this is the cluster answering for that cell type.
+    Marking the source here would answer a question about the sheet rather than about the
+    evidence, and the emitted cluster_annotations.csv already records it per row in its
+    `source` column.
+
+    A hand call naming several clusters boxes all of them, and one naming none — the
+    "not present in this sample" judgement — boxes nothing, which is the honest picture of
+    a cell type that was considered and dismissed.
+    """
+    positions = {str(label): i for i, label in enumerate(row_labels)}
+    for col, cell_type in enumerate(col_labels):
+        for cluster in resolved.get(cell_type, []):
+            row = positions.get(str(cluster))
+            if row is None:
+                continue
+            ax.add_patch(Rectangle((col - 0.5, row - 0.5), 1, 1, fill=False,
+                                   edgecolor="red", linewidth=1.6, zorder=4))
+
+
+def cell_type_palette(labels):
+    """Cell type label -> colour, in the sorted order every cell type slide draws them.
+
+    Shared by the three slides that colour by cell type — the UMAP, the tissue plot and
+    the oocyte zoom — so a label is the same colour on all of them. They are read against
+    each other, and the palette depends on how many labels a sample resolved, so three
+    copies of `gradient_colors(len(...))` would agree only as long as each was handed the
+    same dict.
+    """
+    ordered = sorted(set(labels.values()))
+    return dict(zip(ordered, gradient_colors(max(len(ordered), 1))))
+
+
 def annotated_umap(adata, sample, name, labels, title):
     """One slide's figure: the UMAP coloured by cell type rather than cluster id.
 
@@ -801,14 +989,13 @@ def annotated_umap(adata, sample, name, labels, title):
     ax.scatter(coords[unassigned, 0], coords[unassigned, 1], color="0.85",
                label="unassigned", s=2, alpha=1.0, edgecolors="none", rasterized=True)
 
-    ordered = sorted(set(labels.values()))
-    palette = gradient_colors(max(len(ordered), 1))
-    for i, label in enumerate(ordered):
+    for label, color in cell_type_palette(labels).items():
         m = (called == label).to_numpy()
         if m.any():
-            ax.scatter(coords[m, 0], coords[m, 1], color=palette[i], label=label,
+            ax.scatter(coords[m, 0], coords[m, 1], color=color, label=label,
                        s=2, alpha=1.0, edgecolors="none", rasterized=True)
 
+    match_umap_axes(ax, coords)
     ax.set_xticks([]); ax.set_yticks([])
     for spine in ax.spines.values():
         spine.set_visible(False)
@@ -853,11 +1040,10 @@ def spatial_cell_types(adata, sample, name, labels, title):
     ax.scatter(x[unassigned], y[unassigned], color="0.85", label="unassigned",
                s=size, alpha=1.0, edgecolors="none", rasterized=True)
 
-    palette = gradient_colors(max(len(set(labels.values())), 1))
-    for i, label in enumerate(sorted(set(labels.values()))):
+    for label, color in cell_type_palette(labels).items():
         m = (called == label).to_numpy()
         if m.any():
-            ax.scatter(x[m], y[m], color=palette[i], label=label,
+            ax.scatter(x[m], y[m], color=color, label=label,
                        s=size, alpha=1.0, edgecolors="none", rasterized=True)
 
     ax.set_aspect("equal")
@@ -958,6 +1144,196 @@ def spatial_clusters(adata, sample, name):
     fig.suptitle(f"{sample} · {adata.n_obs:,} cells · {labels.nunique()} clusters · tissue",
                  fontsize=9, x=0.01, ha="left")
     fig.tight_layout()
+    plt.show()
+    plt.close(fig)
+
+
+def stage_representatives(adata):
+    """One curated oocyte per developmental stage in this sample, in developmental order.
+
+    The sheet holds every putative oocyte a curator marked — 48 of them in one test crop —
+    which is far more than a deck can carry a slide each for. Taking one per stage turns
+    that list into a developmental series: the question these slides answer is whether the
+    clustering resolves an oocyte at all and from what stage onward, and a second
+    primordial follicle does not help answer it.
+
+    The representative is the curator's most confident call for that stage, breaking ties
+    on the largest segmented area — the bigger cell of two equally-graded ones is the
+    easier read at this magnification. Quality is ranked rather than filtered so a stage
+    represented only by a poor cell still gets its slide, with the grade in the caption.
+
+    Both sorts are `kind="stable"`, so two rows agreeing on every key keep their sheet
+    order rather than swapping between renders of the same data.
+    """
+    if CURATED_OOCYTES.empty:
+        return []
+    present = CURATED_OOCYTES[CURATED_OOCYTES["cell_id"].isin(set(adata.obs_names))]
+    if present.empty:
+        return []
+
+    unknown_quality = len(OOCYTE_QUALITY_RANK)
+    ranked = present.assign(
+        _quality=present["Quality"].map(OOCYTE_QUALITY_RANK).fillna(unknown_quality)
+    ).sort_values(["_quality", "cell_area"], ascending=[True, False], kind="stable")
+
+    # A stage the order does not name still gets a slide, sorted after the ones it does —
+    # a curator adding a label should not have it silently dropped.
+    stage_rank = {stage: i for i, stage in enumerate(OOCYTE_STAGE_ORDER)}
+    chosen = ranked.groupby("Stage.Labels", sort=False).head(1)
+    chosen = chosen.sort_values(
+        "Stage.Labels", kind="stable",
+        key=lambda col: col.map(lambda s: stage_rank.get(s, len(stage_rank))))
+    return chosen.to_dict("records")
+
+
+def oocyte_zoom(sdata, sample, record, resolution, px_per_um):
+    """One slide's figure: a window around one curated oocyte, clusters beside cell types.
+
+    The section-scale tissue slides cannot answer this. At 2,000 µm across, a 30 µm oocyte
+    is a single dot, so "the oocyte cluster sits inside follicles" is a claim the reader
+    has to take on trust. Here the follicle fills the panel and the claim is checkable.
+
+    Cells are drawn at their SEGMENTED BOUNDARY by spatialdata_plot's render_shapes, not
+    as centroid dots, over the sample's H&E. That is the whole point of the
+    magnification: at this scale a cell is tens of pixels across, so its shape carries the
+    information — an oocyte is round and enormous beside flat stromal cells, and a
+    segmentation merge is visible as one body where two belong. The section plots'
+    centroids are right for their scale and wrong for this one.
+
+    The histology underneath is what makes the slide checkable rather than merely
+    detailed. Every other slide in this deck is drawn from the counts, so a cluster is
+    only ever compared against other things derived from the same counts; here the call
+    sits on an independent image of the tissue, and an oocyte call on something that is
+    visibly not an oocyte is a disagreement no per-cell metric can produce.
+
+    render_shapes on `cell_boundaries`, NOT render_labels on `cell_labels` — the opposite
+    of what cluster_report and qc_report do, and deliberately. Those draw whole sections,
+    where a cell is about two points across and the rasterised label mask is
+    indistinguishable from the polygon at a fraction of the cost. Here a cell fills a
+    good part of the panel, and the difference is visible: the raster's outline is an
+    eroded pixel contour, so it steps, and its width is a whole number of pixels; the
+    polygon gives a clean edge and a continuous point width. Drawn at a transparent fill
+    over histology, that edge is doing most of the work.
+
+    The catch is that the table annotates `cell_labels`, so render_shapes cannot read its
+    obs columns as delivered. Rather than build a parallel table, the CROP's table is
+    re-pointed at `cell_boundaries` in place — see below for why that cannot leak.
+
+    The two panels are the same crop rendered twice, coloured by the two things the deck
+    assigns: cluster ids on the left, cell type calls on the right. Read together they
+    separate two different failures — a follicle the clustering never resolved (left panel
+    shows the oocyte sharing stroma's cluster) from one it resolved but the annotation did
+    not name (left shows a distinct cluster, right shows it unassigned). Those need
+    opposite fixes, and neither tissue slide distinguishes them.
+
+    Three details are specific to going through the library rather than around it:
+
+      * The crop is a `query.bounding_box` in the GLOBAL frame, which for a Xenium read is
+        in PIXELS, while obsm["spatial"] — where the oocyte's centre comes from — is in µm.
+        The window is therefore converted with `px_per_um`, read off the element's own
+        transformation rather than hardcoded. Getting this wrong does not error; it crops
+        somewhere else in the section.
+      * Colours come from `uns["<column>_colors"]`, which is scanpy's convention and what
+        add_cluster_ids already writes for the cluster ids. Passing `palette=` as a DICT is
+        silently ignored by this version of spatialdata_plot — only a list ordered by the
+        categories takes effect — so the uns route is both less code and less breakable.
+      * The scale bar is `show`'s own `scalebar_dx`, one pixel's size in µm. A zoom is read
+        for size — whether a body is one large cell or several small ones — so unlike the
+        section slides it needs a scale on the panel.
+
+    The target cell is outlined in black over the top, as its own registered single-row
+    shapes element: it marks the cell under discussion rather than a category, so it must
+    not read as one more palette entry. Filtering a shapes element preserves its
+    transformations in .attrs, so it is assigned directly and NOT re-parsed through
+    ShapesModel, which would raise on transformations given twice.
+    """
+    adata = sdata["table"]
+    cell_id = str(record["cell_id"])
+    idx = adata.obs_names.get_loc(cell_id)
+    cx, cy = (float(v) for v in adata.obsm["spatial"][idx])
+
+    lo = [(cx - ZOOM_RADIUS_UM) * px_per_um, (cy - ZOOM_RADIUS_UM) * px_per_um]
+    hi = [(cx + ZOOM_RADIUS_UM) * px_per_um, (cy + ZOOM_RADIUS_UM) * px_per_um]
+    crop = sdata.query.bounding_box(axes=("x", "y"), min_coordinate=lo, max_coordinate=hi,
+                                    target_coordinate_system="global")
+
+    # Re-point the crop's table from cell_labels to cell_boundaries, so render_shapes can
+    # colour the polygons by the same obs columns render_labels would have read. Safe to do
+    # in place because `crop` is a NEW object built by the query — verified: the parent's
+    # attrs still say cell_labels afterwards, and `parent.table is crop.table` is False.
+    #
+    # Reusing the real table rather than building a second one keeps every obs column and
+    # the `<column>_colors` palettes; a parallel table would be a second thing to keep in
+    # step. The instance key has to change too: cell_labels is keyed on the integer label
+    # id, while the shapes are indexed by cell_id.
+    ct = crop["table"]
+    ct.obs["cell_id"] = ct.obs_names.astype(str)
+    ct.obs["region"] = pd.Categorical(["cell_boundaries"] * ct.n_obs)
+    # The region COLUMN must be rewritten before the call, not by it — it validates that
+    # obs and the target element agree and raises on the mismatch otherwise.
+    crop.set_table_annotates_spatialelement(
+        "table", region="cell_boundaries", region_key="region", instance_key="cell_id")
+
+    # Single-row element for the target's own outline. Registered on the crop rather than
+    # the whole object so it is dropped with it, and guarded because cell_boundaries
+    # carries the cells min_counts removed while the table does not — the reverse gap is
+    # not expected, but a missing polygon should cost the outline, not the slide.
+    target = crop["cell_boundaries"].loc[crop["cell_boundaries"].index == cell_id]
+    if not target.empty:
+        crop.shapes["oocyte_target"] = target
+
+    panels = (("cluster_v2", f"clusters (v2) · resolution {resolution:g}"),
+              ("cell_type", "cell types"))
+
+    has_image = ZOOM_BASE_IMAGE in crop.images
+
+    fig, axes = plt.subplots(1, 2, figsize=FIGSIZE)
+    for ax, (column, title) in zip(axes, panels):
+        # The histology first, so the cells compose over it. Chained rather than drawn on
+        # the axes by hand: spatialdata_plot puts both in the same coordinate system, which
+        # is the whole reason the H&E's affine alignment lands where the cells do.
+        base = crop.pl.render_images(ZOOM_BASE_IMAGE) if has_image else crop
+        view = base.pl.render_shapes(
+            "cell_boundaries",
+            color=column,
+            table_name="table",
+            # Part-transparent, so the histology reads through the call rather than being
+            # replaced by it — see ZOOM_FILL_ALPHA for how the value was chosen.
+            fill_alpha=ZOOM_FILL_ALPHA,
+            # Black, not the cell's own colour. With a transparent fill the boundary is
+            # what makes one cell distinguishable from its neighbour, and an outline in the
+            # fill's own hue has nothing to contrast against — which is why the label
+            # version read as a wash. White was tried and disappears against pink H&E.
+            outline_alpha=1.0,
+            outline_color="black",
+            outline_width=ZOOM_OUTLINE_WIDTH,
+        )
+        # Where no polygon is drawn, the H&E shows through unmodified. That is unsegmented
+        # space rather than missing data — the gaps inside a large oocyte are real, its
+        # cytoplasm not being fully covered by the segmentation, and with the histology
+        # underneath they read as what they are rather than as holes.
+        if not target.empty:
+            # Every cell is already outlined black, so the target needs a different signal
+            # rather than a heavier one of the same kind.
+            view = view.pl.render_shapes("oocyte_target", fill_alpha=0.0, outline_alpha=1.0,
+                                         outline_color=ZOOM_TARGET_COLOR,
+                                         outline_width=ZOOM_OUTLINE_WIDTH * 3)
+        view.pl.show(ax=ax, coordinate_systems="global", title=title, frameon=False,
+                     scalebar_dx=1.0 / px_per_um, scalebar_units="um")
+        ax.set_title(title, fontsize=8)
+        # The extent is left to spatialdata_plot. bounding_box returns whole cells that
+        # INTERSECT the window, so cells straddling the edge hang past the H&E square —
+        # trimming the axes back to the window was tried and made the panels worse, so the
+        # overhang stays.
+
+    # The absence of the H&E is named on the slide rather than left to be inferred from a
+    # white background, which would otherwise look like a rendering fault.
+    base_label = "H&E" if has_image else "no H&E for this sample"
+    fig.suptitle(
+        f"{sample} · {cell_id} · {record['Stage.Labels']} · curated {record['Quality']} · "
+        f"{float(record['cell_area']):,.0f} µm² · {crop['table'].n_obs:,} cells in window "
+        f"· {base_label}",
+        fontsize=9, x=0.01, ha="left")
     plt.show()
     plt.close(fig)
 
@@ -1066,11 +1442,14 @@ summary_rows = []
 composition_counts = {}
 
 for path in ZARRS:
-    # ad.read_zarr on tables/table rather than spatialdata.read_zarr: this deck never
-    # touches the images, points, or shapes, and the table is the whole input. One object
-    # per sample carries obs, the UMAP in obsm, and the counts layer together, so every
-    # slide below reads from it and scanpy can be handed it directly.
-    adata = ad.read_zarr(f"{path}/tables/table")
+    # spatialdata.read_zarr rather than ad.read_zarr on tables/table. Every slide but the
+    # oocyte zooms works off the table alone and is handed `adata` below — but the zooms
+    # paint cells at their segmented footprint, which needs the `cell_labels` element and
+    # the bounding-box query, and neither exists on a detached AnnData. The rest of the
+    # object costs nothing to carry: images, labels and points are all lazy, and only the
+    # cropped label tile is ever computed.
+    sdata = sd.read_zarr(path)
+    adata = sdata["table"]
 
     # obs["sample"] is written by create_sdata and survives clustering, so the sample id
     # comes from the object rather than the staged path — which is a meaningless
@@ -1327,9 +1706,11 @@ for path in ZARRS:
             "cluster. Each panel prints the values it colours by. In the normalized "
             "panels a set with no signal still has a brightest cell — theca's range here "
             "is 0.11 to 0.53 — so read those against the raw panel before believing "
-            "them. Nothing here names a cell type on its own."
+            "them. A red box marks the cluster assigned that set — the argmax down the "
+            "column, or the cluster named in cell_type_annotations.csv where a call has "
+            "been made by hand. Nothing here names a cell type on its own."
         ))
-        marker_score_heatmap(sample, marker_set_score_table)
+        marker_score_heatmap(sample, marker_set_score_table, resolved_cell_types)
 
         display(Markdown("## Cell types on the UMAP — follicle sets"))
         display(Markdown(
@@ -1359,10 +1740,12 @@ for path in ZARRS:
             "and the margin over the runner-up. The reference holds no follicle or "
             "epithelial types, so a granulosa or oocyte cluster is assigned to whichever "
             "of the four it least badly resembles — the marker slides are what name "
-            "those. No threshold is applied and nothing is written to obs; the numbers "
-            "are reported and the judgement is the reader's."
+            "those. A red box marks the cluster assigned that type — the argmax down the "
+            "column, or the cluster named in cell_type_annotations.csv where a call has "
+            "been made by hand. No threshold is applied and nothing is written to obs; "
+            "the numbers are reported and the judgement is the reader's."
         ))
-        reference_correlation(sample, reference_corr)
+        reference_correlation(sample, reference_corr, resolved_cell_types)
 
         display(Markdown("## Cell types on the UMAP — with major types"))
         display(Markdown(
@@ -1387,6 +1770,61 @@ for path in ZARRS:
         ))
         spatial_cell_types(adata, sample, "cluster_v2", cluster_to_label, "with major types")
 
+        # The oocyte zooms close the section. Everything above is at section scale, where a
+        # 30 µm oocyte is one dot; these are the only slides at a magnification where the
+        # cluster and cell type calls can actually be checked against a follicle.
+        representatives = stage_representatives(adata)
+        if representatives:
+            # The cell type calls as an obs column, so render_shapes can colour by them the
+            # same way it colours by cluster_v2 — the zoom reads columns off the table, and
+            # the calls otherwise live only in a dict. Written here rather than earlier
+            # because nothing above this point needs it: the tissue and UMAP slides map the
+            # labels themselves.
+            #
+            # Categories are fixed and unassigned sorts LAST, so the colour list below lines
+            # up with them; UNASSIGNED grey matches the other cell type slides.
+            called = adata.obs["cluster_v2"].astype(str).map(cluster_to_label)
+            palette = cell_type_palette(cluster_to_label)
+            adata.obs["cell_type"] = pd.Categorical(
+                called.fillna(UNASSIGNED), categories=list(palette) + [UNASSIGNED])
+            # scanpy's own `<column>_colors` convention, which spatialdata_plot reads. NOT
+            # the render_* `palette=` argument: a dict there is silently ignored by this
+            # version, and only a list ordered by the categories takes effect.
+            adata.uns["cell_type_colors"] = list(palette.values()) + ["#d9d9d9"]
+
+            # px per µm, off the element's own transformation rather than hardcoded: the
+            # global frame is in pixels for a Xenium read while obsm["spatial"] is in µm,
+            # and the zoom window has to be converted to crop in the right place.
+            px_per_um = float(
+                get_transformation(sdata["cell_boundaries"], "global").scale[0])
+        else:
+            display(Markdown("## Oocyte zooms"))
+            display(Markdown(
+                "No curated oocyte falls in this sample. The list is matched on cell id, "
+                "so a sample whose cells were never curated has no zooms — which is a gap "
+                "in the curation, not a result about the sample."
+            ))
+        for record in representatives:
+            display(Markdown(f"## Oocyte zoom — {record['Stage.Labels']}"))
+            display(Markdown(
+                f"A {2 * ZOOM_RADIUS_UM:g} µm window centred on one curated "
+                f"{record['Stage.Labels']} oocyte, graded "
+                f"{record['Quality']} by the curator — the most confident call for this "
+                "stage in this sample, ties broken on the largest segmented area. Cells "
+                "are painted at their segmented footprint over the sample's H&E, at "
+                f"{ZOOM_FILL_ALPHA:g} fill opacity so the histology reads through the "
+                "call — an oocyte is round and far larger than the flat stromal cells "
+                "around it, and the tissue underneath is independent of the counts every "
+                "other slide is drawn from. Every cell is outlined in black; the "
+                "yellow-green outline is the curated target cell. Both panels are the "
+                "same window: clusters on the left with the "
+                "v2 ids and colours from the slides above, cell type calls on the right "
+                "with the palette of the tissue plot, grey for unassigned. Where no cell "
+                "is drawn the H&E shows through unmodified — that is unsegmented space, "
+                "including the gaps inside a large oocyte."
+            ))
+            oocyte_zoom(sdata, sample, record, resolution, px_per_um)
+
         # Bookkeeping for the cohort tables after the loop. Medians rather than means:
         # every one of these is heavily right-skewed, so a mean sits above most cells.
         summary_rows.append({
@@ -1406,8 +1844,9 @@ for path in ZARRS:
         display(Markdown(f"```\n{traceback.format_exc()}\n```"))
 
     # Drop this sample before the next zarr is opened. The counts layer dominates the
-    # deck's footprint, so holding two at once would double it for no reason.
-    del adata
+    # deck's footprint, so holding two at once would double it for no reason. Both names
+    # go: `adata` is sdata's own table, so dropping only one leaves the matrix referenced.
+    del adata, sdata
     gc.collect()
 
 # The draft cell type map, emitted beside the deck. Written unconditionally, so a render
