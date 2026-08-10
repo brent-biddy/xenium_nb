@@ -1,5 +1,5 @@
 ---
-title: "xenium_nb — sample summary"
+title: "xenium_nb: sample summary"
 subtitle: "Clusters and centroid correlation, one sample per section"
 # Pin the kernel by name, as cluster_report.qmd does. Apptainer bind-mounts $HOME, so
 # kernelspecs from ~/.local/share/jupyter/kernels shadow the container's own — quarto's
@@ -660,7 +660,7 @@ def reference_correlation(sample, corr, resolved):
     outline_calls(ax, corr.index, corr.columns, resolved)
     fig.colorbar(image, ax=ax, fraction=0.04)
 
-    ax.set_title(f"{sample} — cluster centroids vs major cell types\n"
+    ax.set_title(f"{sample} · cluster centroids vs major cell types\n"
                  f"{len(REFERENCE_GENES)} type-specific genes", fontsize=10)
     fig.tight_layout()
     plt.show()
@@ -824,7 +824,7 @@ def marker_score_heatmap(sample, scores, resolved):
         bar.ax.tick_params(labelsize=5)
 
     axes[0].set_ylabel("cluster (v2)", fontsize=8)
-    fig.suptitle(f"{sample} — mean marker expression per cluster "
+    fig.suptitle(f"{sample} · mean marker expression per cluster "
                  f"(quality score <= {MARKER_MAX_SCORE})", fontsize=9, x=0.01, ha="left")
     plt.show()
     plt.close(fig)
@@ -911,7 +911,7 @@ def marker_umaps(adata, sample):
         bar.ax.tick_params(labelsize=6)
         bar.outline.set_visible(False)
 
-    fig.suptitle(f"{sample} — mean marker expression per cell "
+    fig.suptitle(f"{sample} · mean marker expression per cell "
                  f"(quality score <= {MARKER_MAX_SCORE})", fontsize=9, x=0.01, ha="left")
     fig.tight_layout()
     plt.show()
@@ -926,12 +926,13 @@ def umap_clusters(adata, sample, name):
     palette in uns, so both versions of this slide are the same call with a different
     column — they cannot drift apart in styling.
 
-    The ids are in a legend BESIDE the panel, not on the data. On-data labels sit at each
-    cluster's median, which reads well at the 7 clusters a test crop gives and fails at the
-    16-28 the real whole-slide samples give: labels land on top of each other wherever
-    several clusters share a lobe, and no font or outline weight fixes that. A legend cannot
-    collide at any cluster count, and it is what the tissue slides already do — so the two
-    views of one numbering now carry it the same way.
+    The ids are carried BOTH ways: on the data at each cluster's median, and in a legend
+    beside the panel. They answer different questions. The on-data label says which lobe is
+    which without a colour lookup, which is the whole point of the slide; the legend says
+    which id owns a colour even where labels collide, and they will collide — a test crop's
+    7 clusters place cleanly, but the real whole-slide samples run to 16-28 and several
+    share a lobe. Either alone leaves a gap the other covers, and the legend is what the
+    tissue slides already carry, so the two views of one numbering agree.
 
     Cells are handed over sorted by descending cluster size, so the small clusters are
     drawn last and land on top. scanpy draws one scatter in row order, and the reverse
@@ -952,9 +953,15 @@ def umap_clusters(adata, sample, name):
     sc.pl.umap(
         adata[order],
         color=name,
-        # Suppressed and rebuilt below: scanpy's own margin legend takes the panel's width
-        # rather than the space reserved for it, and orders its keys by draw order.
-        legend_loc=None,
+        # On-data labels are scanpy's; the margin legend is not, and is rebuilt below —
+        # scanpy's own takes the panel's width rather than the space reserved for it, and
+        # orders its keys by draw order.
+        legend_loc="on data",
+        # 10, not the 7 the margin text uses: this label has to be picked out against 20,000
+        # dots rather than read off a quiet margin, and the size is what lets
+        # style_on_data_labels' outline stay thin enough to keep the digit open.
+        legend_fontsize=10,
+        legend_fontweight="bold",
         # UMAP axes carry no interpretable units — drop the frame entirely.
         frameon=False,
         title="",
@@ -962,6 +969,7 @@ def umap_clusters(adata, sample, name):
         ax=ax,
         show=False,
     )
+    style_on_data_labels(ax)
     match_umap_axes(ax, adata.obsm["X_umap"])
 
     # Proxy handles from the same uns palette the scatter was drawn from, keyed in NUMERIC
@@ -1956,13 +1964,13 @@ for path in ZARRS:
 
         # The v1 UMAP comes first: it establishes what each cluster number and colour
         # refers to, which the correlation heatmap then reads against.
-        display(Markdown("## Clusters on the UMAP — v1 ids"))
+        display(Markdown("## Clusters on the UMAP: v1 ids"))
         display(Markdown(
             "Cells in UMAP coordinates, coloured by cluster at this sample's Leiden "
             "resolution. Clusters are renumbered 1-n by descending cell count, so cluster "
-            "1 is the largest — these ids are this deck's own and do not match the raw "
+            "1 is the largest. These ids are this deck's own and do not match the raw "
             "Leiden labels cluster_report uses. Each number sits at its cluster's median "
-            "position."
+            "position, and the legend beside the panel keys them."
         ))
         umap_clusters(adata, sample, "cluster_v1")
 
@@ -1971,7 +1979,7 @@ for path in ZARRS:
             "Spearman correlation between every pair of cluster centroids within this "
             "sample, across all genes. Centroids are CP10K pseudobulk, averaged linearly "
             "over each cluster's cells and then log1p'd. Both panels are the same matrix, "
-            "cell for cell — only the tick labels differ. Rows and columns are ordered by "
+            "cell for cell, and only the tick labels differ. Rows and columns are ordered by "
             "hierarchical clustering, so similar clusters sit adjacent as blocks: the "
             "v1 ids on the left therefore read out of numeric sequence, while "
             "the v2 ids on the right read 1-n. Reading across the two shows which "
@@ -1984,17 +1992,17 @@ for path in ZARRS:
         # The v2 UMAP follows the heatmaps, since they are what define
         # this numbering — reading it before the matrix that produced it would be
         # backwards.
-        display(Markdown("## Clusters on the UMAP — v2 ids"))
+        display(Markdown("## Clusters on the UMAP: v2 ids"))
         display(Markdown(
             "The same cells and the same clusters as the first UMAP, carrying the "
             "v2 ids from the heatmap above, so adjacent numbers are "
             "transcriptionally adjacent. Colours follow the new numbering, so a given "
-            "cluster is not the same colour here as on the v1 UMAP — the number "
+            "cluster is not the same colour here as on the v1 UMAP: the number "
             "identifies it, not the colour."
         ))
         umap_clusters(adata, sample, "cluster_v2")
 
-        display(Markdown("## Clusters in tissue — v2 ids"))
+        display(Markdown("## Clusters in tissue: v2 ids"))
         display(Markdown(
             "The same cells and clusters in tissue coordinates, carrying the v2 ids and "
             "colours from the UMAP above. y is inverted and the aspect is equal, so the "
@@ -2004,7 +2012,7 @@ for path in ZARRS:
         ))
         spatial_clusters(adata, sample, "cluster_v2")
 
-        display(Markdown("## Per-cell QC by cluster — v2 ids"))
+        display(Markdown("## Per-cell QC by cluster: v2 ids"))
         display(Markdown(
             "Per-cell QC distributions, one violin per cluster, at this sample's Leiden "
             "resolution. Clusters carry the v2 ids and colours from the slides above, so "
@@ -2030,8 +2038,8 @@ for path in ZARRS:
 
         display(Markdown("## Marker set expression on the UMAP"))
         display(Markdown(
-            "Mean expression of each marker set's genes per cell, in UMAP coordinates — "
-            "the same values the cluster heatmap aggregates, so the two agree by "
+            "Mean expression of each marker set's genes per cell, in UMAP coordinates. "
+            "These are the same values the cluster heatmap aggregates, so the two agree by "
             "construction. A set concentrated in one region is a cell type; one spread "
             "thinly across the embedding is a set of broadly expressed genes, and both "
             "give the same cluster mean. Most cells read zero: at ~200 transcripts "
@@ -2049,29 +2057,30 @@ for path in ZARRS:
             "oocyte markers sit near 0.06. Column-normalized asks which cluster is "
             "highest within a set; row-normalized asks which set is highest within a "
             "cluster. Each panel prints the values it colours by. In the normalized "
-            "panels a set with no signal still has a brightest cell — theca's range here "
-            "is 0.11 to 0.53 — so read those against the raw panel before believing "
-            "them. A red box marks the cluster assigned that set — the argmax down the "
+            "panels a set with no signal still has a brightest cell (theca's range here "
+            "is 0.11 to 0.53), so read those against the raw panel before believing "
+            "them. A red box marks the cluster assigned that set: the argmax down the "
             "column, or the cluster named in cell_type_annotations.csv where a call has "
             "been made by hand. Nothing here names a cell type on its own."
         ))
         marker_score_heatmap(sample, marker_set_score_table, resolved_cell_types)
 
-        display(Markdown("## Cell types on the UMAP — follicle sets"))
+        display(Markdown("## Cell types on the UMAP: follicle sets"))
         display(Markdown(
             "The same cells in UMAP coordinates, coloured by the follicle calls. Says "
-            "whether a called cell type is coherent in expression space — a compact "
-            "island is a different claim from a scatter across half the embedding — "
+            "whether a called cell type is coherent in expression space: a compact "
+            "island is a different claim from a scatter across half the embedding, "
             "which the tissue plot on the next slide cannot show."
         ))
         annotated_umap(adata, sample, "cluster_v2", marker_labels, "follicle sets")
 
-        display(Markdown("## Cell types in tissue — follicle sets"))
+        display(Markdown("## Cell types in tissue: follicle sets"))
         display(Markdown(
             "The section coloured by the follicle calls alone, before the major-type "
             "reference is brought in. Each cell type takes the cluster expressing its "
             "markers most, unless cell_type_annotations.csv overrides it. Grey is "
-            "unassigned, which is nearly all of the section — the follicle marker sets "
+            "unassigned, which is nearly all of the section, because the follicle marker "
+            "sets "
             "say nothing about stroma, endothelium or immune cells, and colouring them "
             "would imply they had."
         ))
@@ -2084,32 +2093,32 @@ for path in ZARRS:
             "specific to one of those types. Each row is labelled with its best match "
             "and the margin over the runner-up. The reference holds no follicle or "
             "epithelial types, so a granulosa or oocyte cluster is assigned to whichever "
-            "of the four it least badly resembles — the marker slides are what name "
-            "those. A red box marks the cluster assigned that type — the argmax down the "
+            "of the four it least badly resembles; the marker slides are what name "
+            "those. A red box marks the cluster assigned that type: the argmax down the "
             "column, or the cluster named in cell_type_annotations.csv where a call has "
             "been made by hand. No threshold is applied and nothing is written to obs; "
             "the numbers are reported and the judgement is the reader's."
         ))
         reference_correlation(sample, reference_corr, resolved_cell_types)
 
-        display(Markdown("## Cell types on the UMAP — with major types"))
+        display(Markdown("## Cell types on the UMAP: with major types"))
         display(Markdown(
             "The same UMAP with the reference's major types added, so the difference "
             "from the follicle-only version is what the correlation contributes."
         ))
         annotated_umap(adata, sample, "cluster_v2", cluster_to_label, "with major types")
 
-        display(Markdown("## Cell types in tissue — with major types"))
+        display(Markdown("## Cell types in tissue: with major types"))
         display(Markdown(
             "The same section with the reference's major types added, so what the "
             "correlation contributes over the marker sets alone is the difference between "
             "this slide and the previous one. Each cell type takes the cluster it scores "
-            "highest in, unless cell_type_annotations.csv overrides it — the emitted "
+            "highest in, unless cell_type_annotations.csv overrides it. The emitted "
             "cluster_annotations.csv carries the defaults, both cluster numberings and the "
             "score behind each call, to be edited and fed back. A cluster claimed by two "
             "cell types carries both names: a follicle sectioned whole is granulosa cells "
             "around an oocyte, and the two do not always separate. Grey is still "
-            "unassigned — one cluster per cell type is named by default, so a section "
+            "unassigned: one cluster per cell type is named by default, so a section "
             "splitting into several stromal clusters has only one of them coloured until "
             "the rest are written into the sheet."
         ))
@@ -2149,7 +2158,7 @@ for path in ZARRS:
             display(Markdown(
                 f"Where each of the zoom slides that follow was taken from. Each mark is the "
                 f"centre of a {2 * ZOOM_RADIUS_UM:g} µm window, sitting on the curated "
-                "oocyte representing that stage. Cells are one grey — the cluster and cell "
+                "oocyte representing that stage. Cells are one grey; the cluster and cell "
                 "type calls are on the slides above, and this one shows position only. Marks "
                 "are numbered in developmental order, which is the order of the slides that "
                 "follow."
@@ -2159,30 +2168,30 @@ for path in ZARRS:
             display(Markdown("## Oocyte zooms"))
             display(Markdown(
                 "No curated oocyte falls in this sample. The list is matched on cell id, "
-                "so a sample whose cells were never curated has no zooms — which is a gap "
+                "so a sample whose cells were never curated has no zooms, which is a gap "
                 "in the curation, not a result about the sample."
             ))
         for record in representatives:
-            display(Markdown(f"## Oocyte zoom — {record['Stage.Labels']}"))
+            display(Markdown(f"## Oocyte zoom: {record['Stage.Labels']}"))
             display(Markdown(
                 f"A {2 * ZOOM_RADIUS_UM:g} µm window centred on one curated "
                 f"{record['Stage.Labels']} oocyte, graded "
-                f"{record['Quality']} by the curator — the most confident call for this "
+                f"{record['Quality']} by the curator: the most confident call for this "
                 "stage in this sample, ties broken on the largest segmented area. Cells "
                 "are painted at their segmented footprint over the sample's H&E, at "
                 f"{ZOOM_FILL_ALPHA:g} fill opacity so the histology reads through the "
-                "call — an oocyte is round and far larger than the flat stromal cells "
+                "call. An oocyte is round and far larger than the flat stromal cells "
                 "around it, and the tissue underneath is independent of the counts every "
                 "other slide is drawn from. Every cell is outlined in black; the "
-                f"{ZOOM_TARGET_COLOR} outline is the curated target cell. Both panels are the "
-                "same window: clusters on the left with the "
+                f"{ZOOM_TARGET_COLOR} outline is the curated target cell. All three panels are "
+                "the same window: clusters on the left with the "
                 "v2 ids and colours from the slides above, cell type calls in the middle "
                 "with the palette of the tissue plot, grey for unassigned. Where no cell "
-                "is drawn the H&E shows through unmodified — that is unsegmented space, "
+                "is drawn the H&E shows through unmodified, which is unsegmented space, "
                 "including the gaps inside a large oocyte. The right panel is every "
                 f"transcript of the marker sets themselves, at quality score "
                 f"{MARKER_MAX_SCORE} or better, over the same histology with no "
-                "segmentation drawn — the molecules the calls beside it were made from."
+                "segmentation drawn: the molecules the calls beside it were made from."
             ))
             oocyte_zoom(sdata, sample, record, resolution, px_per_um)
 
@@ -2228,7 +2237,7 @@ if not summary.empty:
         "One row per sample: cells surviving cluster_sdata's filter, the resolution this "
         "deck splits on, the number of clusters at it, and the per-cell QC medians. "
         "Resolution is here as well as on the slides because without it the cluster "
-        "counts look comparable across samples when they are not — a sample split at 0.6 "
+        "counts look comparable across samples when they are not: a sample split at 0.6 "
         "will have more clusters than one split at 0.4 whatever its biology. Medians "
         "rather than means: all three metrics are heavily right-skewed."
     ))
@@ -2246,12 +2255,13 @@ if composition_counts:
     called_cols = [c for c in comp.columns if c != UNASSIGNED]
     comp = comp[sorted(called_cols) + ([UNASSIGNED] if UNASSIGNED in comp.columns else [])]
 
-    display(Markdown("## Cell type composition — share of cells"))
+    display(Markdown("## Cell type composition: share of cells"))
     display(Markdown(
         "Percent of each sample's cells falling in a cluster called as that cell type. A "
         "cluster claimed by two cell types contributes its cells to the joined label, not "
         "to each type separately, so the columns sum to 100 without double counting. "
-        "Unassigned is every cell in a cluster no cell type claims — most of the section "
+        "Unassigned is every cell in a cluster no cell type claims, which is most of the "
+        "section "
         "while only one cluster per cell type is named by default, and the column to "
         "watch as calls are written into the sheet."
     ))
@@ -2259,7 +2269,7 @@ if composition_counts:
     shares_table = shares.reset_index().rename(columns={"index": "Sample"})
     md_table(shares_table)
 
-    display(Markdown("## Cell type composition — cells"))
+    display(Markdown("## Cell type composition: cells"))
     display(Markdown(
         "The same table as counts, with a cohort row. Counts rather than shares are what "
         "a rare population needs: 0.4% of two samples is a different claim at 21,000 "
