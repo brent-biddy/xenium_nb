@@ -53,6 +53,9 @@ process SAMPLE_SUMMARY {
     // The draft cell type map: argmax per cell type, with both cluster numberings and
     // the score behind each call. Edited by hand and fed back via --cell_type_annotations.
     path "cluster_annotations.csv", emit: annotations
+    // Cell type composition per sample, the same numbers as the deck's tables — so a
+    // cohort's composition can be read without opening the pptx.
+    path "cell_type_composition.csv", emit: composition
 
     script:
     // Redirect caches and temp files into the task dir: an OSCER compute node's /tmp is
@@ -69,5 +72,6 @@ process SAMPLE_SUMMARY {
     """
     touch sample_summary.pptx
     touch cluster_annotations.csv
+    touch cell_type_composition.csv
     """
 }
