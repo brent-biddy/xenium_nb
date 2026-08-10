@@ -2232,9 +2232,8 @@ if not summary.empty:
 ```
 
 ```{python}
-# | output: asis
-# Composition, as counts and as shares. Two tables rather than one with both, since a
-# reader comparing samples wants the shares and one checking a number wants the counts.
+# comp and shares are built here, in a cell of their own, because both the chart below and
+# the tables after it read them and the chart comes first on the slides.
 if composition_counts:
     comp = pd.DataFrame(composition_counts).T.fillna(0).astype(int)
     # The vocabulary's own order, unassigned last: it is the largest column on these
@@ -2242,29 +2241,9 @@ if composition_counts:
     # rather than filtered, so a type absent from every sample still gets its column and
     # reads as the zero it is.
     comp = comp.reindex(columns=CELL_TYPE_VOCABULARY + [UNASSIGNED], fill_value=0)
-
-    display(Markdown("## Cell type composition: share of cells"))
-    display(Markdown(
-        "Percent of each sample's cells falling in a cluster called as that cell type. "
-        "Unassigned is every cell in a cluster no cell type claims."
-    ))
-    # Divided by the sample's cells, not by the row total, which double counts a cluster
-    # two types share.
+    # Divided by the sample's cells, not by the row total: a cluster no cell type claims
+    # is in `unassigned`, so the two agree, but the sample's own count is the definition.
     shares = comp.div(pd.Series(composition_totals), axis=0).mul(100).round(1)
-    shares_table = shares.reset_index().rename(columns={"index": "Sample"})
-    md_table(shares_table)
-
-    display(Markdown("## Cell type composition: cells"))
-    display(Markdown(
-        "The same table as counts rather than shares, with a cohort row."
-    ))
-    counts_table = comp.reset_index().rename(columns={"index": "Sample"})
-    for column in comp.columns:
-        counts_table[column] = [f"{v:,}" for v in comp[column]]
-    cohort = ["Cohort"] + [f"{int(comp[c].sum()):,}" for c in comp.columns]
-    counts_table.loc[len(counts_table)] = cohort
-    md_table(counts_table)
-
     # The same numbers as a file, so composition can be read without opening the deck.
     comp.to_csv("cell_type_composition.csv")
 ```
@@ -2316,4 +2295,30 @@ if composition_counts:
     plt.show()
     plt.close(fig)
 
+```
+
+```{python}
+# | output: asis
+# Composition as shares and as counts, after the chart: the chart is the read, and these
+# are where a number is checked. Two tables rather than one with both, since a reader
+# comparing samples wants the shares and one checking a number wants the counts.
+if composition_counts:
+    display(Markdown("## Cell type composition: share of cells"))
+    display(Markdown(
+        "Percent of each sample's cells falling in a cluster called as that cell type. "
+        "Unassigned is every cell in a cluster no cell type claims."
+    ))
+    shares_table = shares.reset_index().rename(columns={"index": "Sample"})
+    md_table(shares_table)
+
+    display(Markdown("## Cell type composition: cells"))
+    display(Markdown(
+        "The same table as counts rather than shares, with a cohort row."
+    ))
+    counts_table = comp.reset_index().rename(columns={"index": "Sample"})
+    for column in comp.columns:
+        counts_table[column] = [f"{v:,}" for v in comp[column]]
+    cohort = ["Cohort"] + [f"{int(comp[c].sum()):,}" for c in comp.columns]
+    counts_table.loc[len(counts_table)] = cohort
+    md_table(counts_table)
 ```
