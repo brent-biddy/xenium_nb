@@ -51,10 +51,21 @@ DEFAULT_MIN_CELLS = 100
 
 # Upper bound as a quantile of transcript_counts, not an absolute number: cells vary
 # ten-fold in depth between samples, so a fixed ceiling would be a different cut on
-# every one. Targets doublets and segmentation merges — two cells called as one — which
-# sit between populations and blur the boundary the clustering is trying to find.
-# Set to 0 to disable.
-DEFAULT_MAX_COUNTS_QUANTILE = 0.98
+# every one.
+#
+# DEFAULT 0 — OFF. It was 0.98, 10x's value, on the reasoning that the top 2% of cells by
+# transcript count are doublets and segmentation merges. That holds on the breast tumour
+# their vignette uses. It is catastrophic on ovary, where the largest and most
+# transcript-rich cells are oocytes: measured against a hand-curated list of 117 putative
+# oocytes in ROI1, the 0.98 cut removed 48 of 48 and 18 of 18 of the ones falling in the
+# two test crops — every single one. Their median transcript count is ~5,000 against a
+# cut at ~700, so they are not near the threshold, they are six to eight times past it.
+#
+# Any upper cut on this tissue trades doublets against the cell type the analysis exists
+# to find, and the trade is not close. Left at 0 rather than raised, because a threshold
+# that keeps oocytes is high enough to keep most merges too. Set it deliberately, per
+# sample, if a section genuinely needs one.
+DEFAULT_MAX_COUNTS_QUANTILE = 0
 
 # The embedding recipe, from the same 10x Xenium Prime vignette. Constants rather than
 # CLI flags on purpose: these define what "a cluster" means in this pipeline, and the
