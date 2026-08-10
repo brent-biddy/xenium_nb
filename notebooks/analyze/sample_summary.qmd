@@ -329,6 +329,13 @@ SCALEBAR_PARAMS = {"frameon": False, "location": "lower right", "scale_loc": "to
 # SCALEBAR_PARAMS and style_scalebar are kept rather than deleted for that reason.
 SHOW_SCALEBAR = False
 
+# The oocyte zoom section: the window map and the per-stage zooms. OFF, temporarily. It is
+# the most expensive part of a render - a crop, an H&E read and a points materialization per
+# stage per sample - and everything above it is read at section scale, so switching it off
+# is how the rest of the deck is iterated on quickly. Set True to bring it back; nothing is
+# deleted, and stage_representatives is simply not called while it is off.
+SHOW_OOCYTE_ZOOMS = False
+
 CURATED_OOCYTES = pd.DataFrame()
 if OOCYTES_CSV.exists():
     CURATED_OOCYTES = pd.read_csv(OOCYTES_CSV)
@@ -2122,7 +2129,7 @@ for path in ZARRS:
         # The oocyte zooms close the section. Everything above is at section scale, where a
         # 30 µm oocyte is one dot; these are the only slides at a magnification where the
         # cluster and cell type calls can actually be checked against a follicle.
-        representatives = stage_representatives(adata)
+        representatives = stage_representatives(adata) if SHOW_OOCYTE_ZOOMS else []
         if representatives:
             # The cell type calls as an obs column, so render_shapes can colour by them the
             # same way it colours by cluster_v2 — the zoom reads columns off the table, and
@@ -2156,7 +2163,7 @@ for path in ZARRS:
                 "are numbered in developmental order."
             ))
             oocyte_zoom_map(adata, sample, representatives)
-        else:
+        elif SHOW_OOCYTE_ZOOMS:
             display(Markdown("## Oocyte zooms"))
             display(Markdown(
                 "No curated oocyte falls in this sample. The list is matched on cell id, "
