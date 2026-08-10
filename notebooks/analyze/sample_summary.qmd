@@ -26,7 +26,9 @@ execute:
 ```{python}
 # | tags: [setup]
 import gc
+import logging
 import traceback
+import warnings
 from pathlib import Path
 
 import matplotlib.patheffects as patheffects
@@ -46,6 +48,21 @@ from spatialdata.models import PointsModel
 from spatialdata.transformations import get_transformation
 from scipy.cluster.hierarchy import leaves_list, linkage
 from scipy.spatial.distance import squareform
+
+# Chatter from the zoom slides, suppressed by message rather than wholesale: each of these
+# fires once per zoom, describes something the deck does deliberately, and would otherwise
+# bury a message worth reading in a cohort-sized render. `warning: false` in the front
+# matter keeps them off the SLIDES; this keeps them out of the render log too.
+#
+#   colormapping   render_points draws a categorical column, so cmap/norm do not apply.
+#   points/query   bounding_box is told the object has points and may be slow. It is the
+#                  crop we want, and a 200 µm window is small.
+#   feature_key    marker_set is a pandas Categorical by the time PointsModel sees it,
+#                  which is deliberate: the category order is what fixes the draw order.
+#   z ignored      the points carry a z column and these plots are 2D.
+warnings.filterwarnings("ignore", message="No data for colormapping provided")
+warnings.filterwarnings("ignore", message="The object has `points` element")
+logging.getLogger("spatialdata").setLevel(logging.ERROR)
 
 # The reference template is 16:9 at 10 x 5.625in; leave room for a slide title.
 FIGSIZE = (9.0, 4.3)
@@ -214,13 +231,15 @@ OOCYTE_STAGE_EXCLUDE = {"other"}
 # section is a poor one" is itself worth seeing. An unrecognised value sorts last.
 OOCYTE_QUALITY_RANK = {"good": 0, "okay": 1, "poor": 2, "terrible": 3}
 
-# Half-width of the zoom window, in µm — obsm["spatial"] is in µm for a Xenium read
+# Half-width of the zoom window, in µm. The window is a SQUARE: the crop is a bounding
+# box of +/- this many µm in x and y around the cell centre, so the slides describe it as
+# 2 x this on a side. obsm["spatial"] is in µm for a Xenium read
 # (verified: the test crops span exactly the 2000x700 and 1000x2200 boxes
 # downsample_xenium_region was given). 100 µm puts a ~30 µm oocyte at about a seventh of
 # the window and still shows the follicle's surroundings, which is what says whether the
 # cluster tracks the oocyte or the whole follicle. At ~0.015 cells/µm² the window holds
 # roughly 600 cells.
-ZOOM_RADIUS_UM = 100.0
+ZOOM_HALF_WIDTH_UM = 100.0
 
 # The image drawn UNDER the cells in the zoom panels. H&E rather than the DAPI or
 # morphology stains, because the question these slides answer is morphological — an
@@ -306,7 +325,7 @@ SCALEBAR_PARAMS = {"frameon": False, "location": "lower right", "scale_loc": "to
 # The switch for the above. OFF: boxed, the bar hid tissue; boxless, it stayed hard to read
 # at any colour tried, because a 25 µm bar on a 200 µm window is short and thin against
 # cells of exactly its own scale. The size information is not lost with it — every zoom is
-# the same ZOOM_RADIUS_UM window and the caption says so in µm. Set True to bring it back;
+# the same ZOOM_HALF_WIDTH_UM window and the caption says so in µm. Set True to bring it back;
 # SCALEBAR_PARAMS and style_scalebar are kept rather than deleted for that reason.
 SHOW_SCALEBAR = False
 
@@ -815,8 +834,7 @@ def marker_score_heatmap(sample, scores, resolved):
     """
     evidence_heatmap(
         sample, scores, resolved,
-        f"{sample} · mean marker expression per cluster "
-        f"(quality score <= {MARKER_MAX_SCORE})",
+        f"{sample} · mean marker expression per cluster",
         raw_label="log1p CP10K", column_label="within each set",
         row_label="within each cluster")
 
@@ -902,8 +920,8 @@ def marker_umaps(adata, sample):
         bar.ax.tick_params(labelsize=6)
         bar.outline.set_visible(False)
 
-    fig.suptitle(f"{sample} · mean marker expression per cell "
-                 f"(quality score <= {MARKER_MAX_SCORE})", fontsize=9, x=0.01, ha="left")
+    fig.suptitle(f"{sample} · mean marker expression per cell",
+                 fontsize=9, x=0.01, ha="left")
     fig.tight_layout()
     plt.show()
     plt.close(fig)
@@ -1455,7 +1473,7 @@ def oocyte_zoom_map(adata, sample, records):
               title_fontsize=7, labelcolor=ZOOM_MARK_COLOR)
 
     fig.suptitle(f"{sample} · {len(records)} zoom windows · "
-                 f"{2 * ZOOM_RADIUS_UM:g} µm each · tissue",
+                 f"{2 * ZOOM_HALF_WIDTH_UM:g} µm each · tissue",
                  fontsize=9, x=0.01, ha="left")
     fig.tight_layout()
     plt.show()
@@ -1527,8 +1545,8 @@ def oocyte_zoom(sdata, sample, record, resolution, px_per_um):
     cell_id = str(record["cell_id"])
     cx, cy = zoom_window_centre(adata, record)
 
-    lo = [(cx - ZOOM_RADIUS_UM) * px_per_um, (cy - ZOOM_RADIUS_UM) * px_per_um]
-    hi = [(cx + ZOOM_RADIUS_UM) * px_per_um, (cy + ZOOM_RADIUS_UM) * px_per_um]
+    lo = [(cx - ZOOM_HALF_WIDTH_UM) * px_per_um, (cy - ZOOM_HALF_WIDTH_UM) * px_per_um]
+    hi = [(cx + ZOOM_HALF_WIDTH_UM) * px_per_um, (cy + ZOOM_HALF_WIDTH_UM) * px_per_um]
     crop = sdata.query.bounding_box(axes=("x", "y"), min_coordinate=lo, max_coordinate=hi,
                                     target_coordinate_system="global")
 
@@ -1784,6 +1802,9 @@ annotation_rows = []
 # cohort's count matrices to build a table would defeat the point of dropping them.
 summary_rows = []
 composition_counts = {}
+# Cells per sample, kept beside the counts because a cluster claimed by two types is
+# counted in both columns: the shares below divide by the sample, not by the row total.
+composition_totals = {}
 
 for path in ZARRS:
     # spatialdata.read_zarr rather than ad.read_zarr on tables/table. Every slide but the
@@ -2026,13 +2047,15 @@ for path in ZARRS:
 
         display(Markdown("## Cell types on the UMAP: follicle sets"))
         display(Markdown(
-            "Cells in UMAP space, coloured by the follicle calls."
+            f"Cells in UMAP space, coloured by cell type: "
+            f"{', '.join(sorted(MARKER_SETS))}. Grey is {UNASSIGNED}."
         ))
         annotated_umap(adata, sample, "cluster_v2", marker_labels, "follicle sets")
 
         display(Markdown("## Cell types in tissue: follicle sets"))
         display(Markdown(
-            "Cells in tissue space, coloured by the follicle calls. Grey is unassigned."
+            f"Cells in tissue space, coloured by cell type: "
+            f"{', '.join(sorted(MARKER_SETS))}. Grey is {UNASSIGNED}."
         ))
         spatial_cell_types(adata, sample, "cluster_v2", marker_labels, "follicle sets")
 
@@ -2048,22 +2071,18 @@ for path in ZARRS:
 
         display(Markdown("## Cell types on the UMAP: with major types"))
         display(Markdown(
-            "The same UMAP with the reference's major types added, so the difference "
-            "from the follicle-only version is what the correlation contributes."
+            # Listed from the vocabulary itself, so a type added to the marker sets or
+            # the reference cannot leave the caption naming a set the deck no longer has.
+            f"Cells in UMAP space, coloured by cell type: "
+            f"{', '.join(CELL_TYPE_VOCABULARY)}. Grey is {UNASSIGNED}."
         ))
         annotated_umap(adata, sample, "cluster_v2", cluster_to_label, "with major types")
 
         display(Markdown("## Cell types in tissue: with major types"))
         display(Markdown(
-            "The section with the reference's major types added. Each cell type takes "
-            "the cluster it scores highest in, unless cell_type_annotations.csv overrides "
-            "it. The emitted "
-            "cluster_annotations.csv carries the defaults, both cluster numberings and the "
-            "score behind each call, to be edited and fed back. A cluster claimed by two "
-            "cell types carries both names: a follicle sectioned whole is granulosa cells "
-            "around an oocyte, and the two do not always separate. Grey is unassigned: "
-            "one cluster per cell type is named by default, so a section splitting into "
-            "several stromal clusters has only one of them coloured."
+            f"Cells in tissue space, coloured by cell type: "
+            f"{', '.join(CELL_TYPE_VOCABULARY)}. A cluster claimed by two cell types "
+            f"carries both names. Grey is {UNASSIGNED}."
         ))
         spatial_cell_types(adata, sample, "cluster_v2", cluster_to_label, "with major types")
 
@@ -2099,12 +2118,9 @@ for path in ZARRS:
             # positions in one section rather than as unrelated crops.
             display(Markdown("## Oocyte zoom windows"))
             display(Markdown(
-                f"Where each of the zoom slides that follow was taken from. Each mark is the "
-                f"centre of a {2 * ZOOM_RADIUS_UM:g} µm window, sitting on the curated "
-                "oocyte representing that stage. Cells are one grey; the cluster and cell "
-                "type calls are on the slides above, and this one shows position only. Marks "
-                "are numbered in developmental order, which is the order of the slides that "
-                "follow."
+                f"Each mark is the centre of a {2 * ZOOM_HALF_WIDTH_UM:g} µm square region we "
+                "focus in on, sitting on the curated oocyte representing that stage. Marks "
+                "are numbered in developmental order."
             ))
             oocyte_zoom_map(adata, sample, representatives)
         else:
@@ -2117,25 +2133,13 @@ for path in ZARRS:
         for record in representatives:
             display(Markdown(f"## Oocyte zoom: {record['Stage.Labels']}"))
             display(Markdown(
-                f"A {2 * ZOOM_RADIUS_UM:g} µm window centred on one curated "
-                f"{record['Stage.Labels']} oocyte, graded "
-                f"{record['Quality']} by the curator: the most confident call for this "
-                "stage in this sample, ties broken on the largest segmented area. Cells "
-                "are painted at their segmented footprint over the sample's H&E, at "
-                f"{ZOOM_FILL_ALPHA:g} fill opacity so the histology reads through the "
-                "call. An oocyte is round and far larger than the flat stromal cells "
-                "around it, and the tissue underneath is independent of the counts every "
-                "other slide is drawn from. Every cell is outlined in black; the "
-                f"{ZOOM_TARGET_COLOR} outline is the curated target cell. All three panels are "
-                "the same window: clusters on the left with the "
-                "similarity numbering and colours from the slides above, cell type calls "
-                "in the middle "
-                "with the palette of the tissue plot, grey for unassigned. Where no cell "
-                "is drawn the H&E shows through unmodified, which is unsegmented space, "
-                "including the gaps inside a large oocyte. The right panel is every "
-                f"transcript of the marker sets themselves, at quality score "
-                f"{MARKER_MAX_SCORE} or better, over the same histology with no "
-                "segmentation drawn: the molecules the calls beside it were made from."
+                f"A {2 * ZOOM_HALF_WIDTH_UM:g} µm square window centred on one putative "
+                f"oocyte (stage={record['Stage.Labels']}, "
+                f"seg. quality={record['Quality']}). Every cell is outlined in black; the "
+                f"{ZOOM_TARGET_COLOR} outline is the putative oocyte. "
+                "All three panels are the same window: clusters on the left, cell type "
+                "calls in the middle with grey for unassigned, and on the right every "
+                "transcript of the marker sets, with no segmentation drawn."
             ))
             oocyte_zoom(sdata, sample, record, resolution, px_per_um)
 
@@ -2150,9 +2154,24 @@ for path in ZARRS:
             "Genes": f"{adata.obs['n_genes_by_transcripts'].median():,.0f}",
             "Cell area": f"{adata.obs['cell_area'].median():,.0f}",
         })
-        labelled = adata.obs["cluster_v2"].astype(str).map(cluster_to_label)
-        counts = labelled.fillna(UNASSIGNED).value_counts()
-        composition_counts[sample] = counts.to_dict()
+        # Counted per cell TYPE, not per label. The slides label a cluster claimed by two
+        # types with both names joined, which is the honest reading of a follicle caught
+        # whole — but a joined label as a table column would give the cohort a column that
+        # exists on one sample and not another, and nothing to compare down it. So each
+        # claiming type counts the cluster's cells, and the columns are the vocabulary.
+        #
+        # A cluster claimed by two types is therefore counted in BOTH columns, and a
+        # sample's shares can total more than 100. That is the cost of one column per
+        # type; the alternative was a column per observed combination.
+        cluster_ids = adata.obs["cluster_v2"].astype(str)
+        sizes = cluster_ids.value_counts()
+        counts = {cell_type: int(sum(sizes.get(c, 0) for c in clusters))
+                  for cell_type, clusters in resolved_cell_types.items()}
+        claimed = {c for clusters in resolved_cell_types.values() for c in clusters}
+        counts[UNASSIGNED] = int(sizes[[c for c in sizes.index
+                                        if c not in claimed]].sum())
+        composition_counts[sample] = counts
+        composition_totals[sample] = int(adata.n_obs)
 
     except Exception:
         display(Markdown(f"```\n{traceback.format_exc()}\n```"))
@@ -2178,9 +2197,9 @@ summary = pd.DataFrame(summary_rows)
 if not summary.empty:
     display(Markdown("## Per-sample summary"))
     display(Markdown(
-        "One row per sample: cells surviving cluster_sdata's filter, the resolution this "
-        "deck splits on, the number of clusters at it, and the per-cell QC medians. "
-        "Medians rather than means: all three metrics are heavily right-skewed."
+        "One row per sample: cells surviving the filter, the resolution this deck splits "
+        "on, the number of clusters at it, and the per-cell QC medians. Medians rather "
+        "than means: all three metrics are heavily right-skewed."
     ))
     md_table(summary)
 ```
@@ -2191,26 +2210,27 @@ if not summary.empty:
 # reader comparing samples wants the shares and one checking a number wants the counts.
 if composition_counts:
     comp = pd.DataFrame(composition_counts).T.fillna(0).astype(int)
-    # Called types first in vocabulary order, unassigned last: it is the largest column
-    # on these samples and would otherwise sort into the middle and dominate the eye.
-    called_cols = [c for c in comp.columns if c != UNASSIGNED]
-    comp = comp[sorted(called_cols) + ([UNASSIGNED] if UNASSIGNED in comp.columns else [])]
+    # The vocabulary's own order, unassigned last: it is the largest column on these
+    # samples and would otherwise sort into the middle and dominate the eye. Reindexed
+    # rather than filtered, so a type absent from every sample still gets its column and
+    # reads as the zero it is.
+    comp = comp.reindex(columns=CELL_TYPE_VOCABULARY + [UNASSIGNED], fill_value=0)
 
     display(Markdown("## Cell type composition: share of cells"))
     display(Markdown(
         "Percent of each sample's cells falling in a cluster called as that cell type. A "
-        "cluster claimed by two cell types contributes its cells to the joined label, not "
-        "to each type separately, so the columns sum to 100 without double counting. "
-        "Unassigned is every cell in a cluster no cell type claims, which is most of the "
-        "section while only one cluster per cell type is named by default."
+        "cluster claimed by two cell types counts in both columns, so a row can total "
+        "more than 100. Unassigned is every cell in a cluster no cell type claims."
     ))
-    shares = comp.div(comp.sum(axis=1), axis=0).mul(100).round(1)
+    # Divided by the sample's cells, not by the row total, which double counts a cluster
+    # two types share.
+    shares = comp.div(pd.Series(composition_totals), axis=0).mul(100).round(1)
     shares_table = shares.reset_index().rename(columns={"index": "Sample"})
     md_table(shares_table)
 
     display(Markdown("## Cell type composition: cells"))
     display(Markdown(
-        "The same table as counts, with a cohort row."
+        "The same table as counts rather than shares, with a cohort row."
     ))
     counts_table = comp.reset_index().rename(columns={"index": "Sample"})
     for column in comp.columns:
@@ -2221,4 +2241,57 @@ if composition_counts:
 
     # The same numbers as a file, so composition can be read without opening the deck.
     comp.to_csv("cell_type_composition.csv")
+```
+
+```{python}
+# The chart lives in its own cell, WITHOUT `output: asis`: a matplotlib figure
+# emitted from an asis cell is dropped on the floor and the next heading arrives as
+# literal text in the caption above it. Headings still work here through
+# display(Markdown), the same way the per-sample loop emits its own.
+if composition_counts:
+    display(Markdown("## Cell type composition per sample"))
+    display(Markdown(
+        "The share of each sample's cells falling in each cell type. Bars are grouped by "
+        "cell type, one per sample."
+    ))
+    # Grouped, not stacked. sammy_r21's cohort chart stacks, which is right there because
+    # every cell falls in exactly one category; here a cluster claimed by two cell types
+    # counts in both, so stacked segments would overlap and a bar would run past 100%.
+    # Grouping shows the same numbers without implying they partition the sample.
+    chart_types = [t for t in CELL_TYPE_VOCABULARY + [UNASSIGNED] if shares[t].any()]
+    palette = dict(zip(CELL_TYPE_VOCABULARY,
+                       gradient_colors(len(CELL_TYPE_VOCABULARY))))
+    palette[UNASSIGNED] = "#d9d9d9"
+
+    samples = list(shares.index)
+    fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.78, FIGSIZE[1]),
+                           constrained_layout=True)
+    height = 0.8 / max(len(samples), 1)
+    base = np.arange(len(chart_types), dtype=float)
+    for i, sample_name in enumerate(samples):
+        # Samples run top to bottom within each group, which means offsetting downward
+        # from the group centre: the y axis is inverted below so the first type is on top.
+        offset = (i - (len(samples) - 1) / 2) * height
+        ax.barh(base + offset, [shares.loc[sample_name, t] for t in chart_types],
+                height=height * 0.9, label=sample_name,
+                color=[palette[t] for t in chart_types], edgecolor="white",
+                linewidth=0.5)
+        # One label per bar rather than a second legend for samples: with a colour already
+        # spent on cell type, the sample has to be named on the bar itself.
+        for y, cell_type in zip(base + offset, chart_types):
+            ax.text(0.4, y, sample_name, va="center", ha="left", fontsize=5,
+                    color="black")
+
+    ax.set_yticks(base)
+    ax.set_yticklabels(chart_types, fontsize=7)
+    ax.invert_yaxis()
+    ax.set_xlabel("share of the sample's cells (%)", fontsize=8)
+    ax.tick_params(axis="x", labelsize=7)
+    # Recessive frame: no box, nothing competing with the bars.
+    for side in ("top", "right", "left"):
+        ax.spines[side].set_visible(False)
+    ax.spines["bottom"].set_linewidth(0.6)
+    plt.show()
+    plt.close(fig)
+
 ```
