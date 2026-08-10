@@ -175,31 +175,17 @@ if not REFERENCE_CSV.exists():
     raise FileNotFoundError(f"{REFERENCE_CSV} not staged beside the notebook.")
 REFERENCE = pd.read_csv(REFERENCE_CSV, index_col=0)
 
-# How many genes per reference column define the gene set the correlation runs over.
+# The correlation runs over every gene the sample and the reference share, with no
+# selection beyond that intersection. Simplicity is the point: the gene set is then a
+# property of the panel and the reference rather than a choice this deck makes, and there
+# is no parameter to tune or asset to keep in step.
 #
-# Correlating across every shared gene does not work: most genes do not discriminate
-# between these four types, so every centroid correlates with every column at ~0.8 and
-# the argmax is decided by noise. Measured on one test ROI, the mean margin was 0.100
-# and a cluster of oocytes — a type absent from this reference — was confidently called
-# Stromal at r=0.689.
-#
-# Selecting our own highly variable genes does not help either (margin 0.099): they are
-# largely the same abundant genes. Selecting by variance ACROSS the reference columns is
-# worse than it looks — variance tracks the mean, so it reselects abundant genes and
-# inflates confidence, including for types the reference does not contain.
-#
-# A z-score across the columns picks genes raised in ONE type relative to the others,
-# which is what the argmax is actually asking. It lifted the mean margin to 0.133, and
-# dropped that oocyte cluster to r=0.345 — correctly reading as "no match" rather than a
-# confident wrong call.
-TYPE_SPECIFIC_TOP_N = 100
-
-# Genes specific to each reference type, computed once: the reference does not change
-# between samples, and this is a per-gene z-score over a 20k-row table.
-_z = REFERENCE.sub(REFERENCE.mean(axis=1), axis=0).div(
-    REFERENCE.std(axis=1).replace(0, np.nan), axis=0)
-REFERENCE_GENES = sorted({gene for cell_type in REFERENCE.columns
-                          for gene in _z[cell_type].nlargest(TYPE_SPECIFIC_TOP_N).index})
+# The cost is real and worth knowing. Most genes do not discriminate between these four
+# types, so centroids correlate with every column at ~0.8 and the margin between the best
+# match and the runner-up is thin: measured on the two test ROIs, 0.096 and 0.099 against
+# 0.23-0.25 for a set restricted to the paper's own type-specific genes, and Endothelial
+# and Pericyte fall on the same cluster where the restricted set separates all four. A
+# type the reference does not contain still gets a confident-looking winner.
 
 # The hand-curated oocyte list, staged flat beside the zarrs under this fixed name. One
 # row per putative oocyte with the stage a curator assigned it, how confident they were,
@@ -588,8 +574,8 @@ def centroid_correlation(sample, corr, order):
 
     # order[p] is a 0-based v1 rank position; +1 makes it the printed v1 id.
     panels = (
-        ([int(p) + 1 for p in order], "Cluster (v1)", "v1 ids"),
-        (list(range(1, len(order) + 1)), "Cluster (v2)", "v2 ids"),
+        ([int(p) + 1 for p in order], "Cluster", "numbered by size"),
+        (list(range(1, len(order) + 1)), "Cluster", "numbered by similarity"),
     )
 
     fig, axes = plt.subplots(1, 2, figsize=(12.5, 5.2), constrained_layout=True)
@@ -619,11 +605,11 @@ def centroid_correlation(sample, corr, order):
     plt.close(fig)
 
 
-def reference_correlation(sample, corr, resolved):
+def reference_correlation(sample, corr, resolved, n_genes):
     """One slide's figure: each cluster's centroid against the major cell types.
 
-    Spearman, over genes specific to a reference type rather than every shared gene —
-    see TYPE_SPECIFIC_TOP_N for why that choice is load-bearing rather than a detail.
+    Spearman, over every gene the sample shares with the reference. See the note where
+    REFERENCE is loaded for what that costs in margin.
 
     The call is NOT thresholded, and no cell type is written into obs here. What the
     slide reports is the best match, its correlation, and its MARGIN over the runner-up;
@@ -637,34 +623,11 @@ def reference_correlation(sample, corr, resolved):
     A low r with a small margin is the honest reading of "this cluster is not in the
     reference" — treat it that way rather than accepting the argmax.
     """
-    fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.62, FIGSIZE[1]))
-
-    image = ax.imshow(corr.to_numpy(), cmap="viridis", aspect="auto")
-    ax.set_xticks(range(corr.shape[1]))
-    ax.set_xticklabels(corr.columns, rotation=45, ha="right", fontsize=8)
-    ax.set_yticks(range(corr.shape[0]))
-
-    # Each row is labelled with its own call and margin, so the table and the heatmap
-    # are one object rather than a figure the reader has to join to a caption.
-    ordered = np.sort(corr.to_numpy(), axis=1)
-    margins = ordered[:, -1] - ordered[:, -2]
-    best = corr.idxmax(axis=1)
-    ax.set_yticklabels(
-        [f"{cluster}  {best.iloc[i]}  Δ{margins[i]:.2f}" for i, cluster in enumerate(corr.index)],
-        fontsize=7)
-
-    for row in range(corr.shape[0]):
-        for col in range(corr.shape[1]):
-            ax.text(col, row, f"{corr.iat[row, col]:.2f}", ha="center", va="center",
-                    fontsize=7, color="white")
-    outline_calls(ax, corr.index, corr.columns, resolved)
-    fig.colorbar(image, ax=ax, fraction=0.04)
-
-    ax.set_title(f"{sample} · cluster centroids vs major cell types\n"
-                 f"{len(REFERENCE_GENES)} type-specific genes", fontsize=10)
-    fig.tight_layout()
-    plt.show()
-    plt.close(fig)
+    evidence_heatmap(
+        sample, corr, resolved,
+        f"{sample} · cluster centroids vs major cell types · {n_genes:,} shared genes",
+        raw_label="Spearman r", column_label="within each cell type",
+        row_label="within each cluster")
 
 
 def marker_dotplot(adata, sample, name):
@@ -749,6 +712,74 @@ def marker_set_scores(centroids):
     return pd.DataFrame(scores)
 
 
+def evidence_heatmap(sample, values, resolved, suptitle, raw_label,
+                     column_label, row_label):
+    """One slide's figure: a clusters x cell-type matrix under three normalizations.
+
+    The same matrix three times, because the three answer different questions and no one
+    of them answers all three:
+
+      raw       absolute magnitude, in whatever units the matrix is in.
+      column    down a column, which cluster is highest for that cell type. The column's
+                own baseline drops out.
+      row       across a row, which cell type is highest in that cluster. This is the one
+                that points at an annotation.
+
+    Each panel PRINTS the values it colours by, so a number always matches its own shade.
+    Reading across panels is then reading three different quantities, which is the point.
+
+    Shared by both evidence families — the marker means and the reference correlations —
+    so the two slides are the same figure over a different matrix rather than two
+    implementations that agree today. Their units differ, which is what the label
+    arguments carry.
+    """
+    raw = values.to_numpy(dtype=float)
+
+    def normalize(matrix, axis):
+        lo = np.nanmin(matrix, axis=axis, keepdims=True)
+        span = np.nanmax(matrix, axis=axis, keepdims=True) - lo
+        return (matrix - lo) / np.where(span > 0, span, np.nan)
+
+    panels = [
+        (raw, "raw", raw_label),
+        (normalize(raw, 0), "column-normalized", column_label),
+        (normalize(raw, 1), "row-normalized", row_label),
+    ]
+
+    fig, axes = plt.subplots(1, 3, figsize=(FIGSIZE[0], FIGSIZE[1]), constrained_layout=True)
+    for ax, (matrix, title, bar_label) in zip(axes, panels):
+        finite = matrix[np.isfinite(matrix)]
+        vmin, vmax = (float(finite.min()), float(finite.max())) if finite.size else (0.0, 1.0)
+        image = ax.imshow(matrix, cmap="viridis", aspect="auto", vmin=vmin, vmax=vmax)
+        ax.set_xticks(range(values.shape[1]))
+        ax.set_xticklabels(values.columns, rotation=45, ha="right", fontsize=7)
+        ax.set_yticks(range(values.shape[0]))
+        ax.set_yticklabels(values.index, fontsize=7)
+        ax.set_title(title, fontsize=8)
+        for row in range(matrix.shape[0]):
+            for col in range(matrix.shape[1]):
+                value = matrix[row, col]
+                if not np.isfinite(value):
+                    continue
+                # Text colour off this panel's own scale, so it stays legible under
+                # whichever normalization is driving the shade.
+                shade = (value - vmin) / (vmax - vmin) if vmax > vmin else 0.0
+                ax.text(col, row, f"{value:.2f}", ha="center", va="center", fontsize=6,
+                        color="black" if shade > 0.55 else "white")
+        # The same boxes on all three panels. The call is one decision made on the raw
+        # values; drawing it only on the raw panel would suggest the normalizations each
+        # produce their own, when the normalized panels are the same numbers rescaled.
+        outline_calls(ax, values.index, values.columns, resolved)
+        bar = fig.colorbar(image, ax=ax, fraction=0.045)
+        bar.set_label(bar_label, fontsize=6)
+        bar.ax.tick_params(labelsize=5)
+
+    axes[0].set_ylabel("cluster", fontsize=8)
+    fig.suptitle(suptitle, fontsize=9, x=0.01, ha="left")
+    plt.show()
+    plt.close(fig)
+
+
 def marker_score_heatmap(sample, scores, resolved):
     """One slide's figure: the cluster x marker-set means under three normalizations.
 
@@ -782,52 +813,12 @@ def marker_score_heatmap(sample, scores, resolved):
     the sets are commensurate first — the same z-score dropped from the column question,
     where it changed no argmax, but which the row question actually needs.
     """
-    raw = scores.to_numpy(dtype=float)
-
-    def normalize(values, axis):
-        lo = np.nanmin(values, axis=axis, keepdims=True)
-        span = np.nanmax(values, axis=axis, keepdims=True) - lo
-        return (values - lo) / np.where(span > 0, span, np.nan)
-
-    panels = [
-        (raw, "raw", "log1p CP10K"),
-        (normalize(raw, 0), "column-normalized", "within each set"),
-        (normalize(raw, 1), "row-normalized", "within each cluster"),
-    ]
-
-    fig, axes = plt.subplots(1, 3, figsize=(FIGSIZE[0], FIGSIZE[1]), constrained_layout=True)
-    for ax, (values, title, bar_label) in zip(axes, panels):
-        finite = values[np.isfinite(values)]
-        vmin, vmax = (float(finite.min()), float(finite.max())) if finite.size else (0.0, 1.0)
-        image = ax.imshow(values, cmap="viridis", aspect="auto", vmin=vmin, vmax=vmax)
-        ax.set_xticks(range(scores.shape[1]))
-        ax.set_xticklabels(scores.columns, rotation=45, ha="right", fontsize=7)
-        ax.set_yticks(range(scores.shape[0]))
-        ax.set_yticklabels(scores.index, fontsize=7)
-        ax.set_title(title, fontsize=8)
-        for row in range(values.shape[0]):
-            for col in range(values.shape[1]):
-                value = values[row, col]
-                if not np.isfinite(value):
-                    continue
-                # Text colour off this panel's own scale, so it stays legible under
-                # whichever normalization is driving the shade.
-                shade = (value - vmin) / (vmax - vmin) if vmax > vmin else 0.0
-                ax.text(col, row, f"{value:.2f}", ha="center", va="center", fontsize=6,
-                        color="black" if shade > 0.55 else "white")
-        # The same boxes on all three panels. The call is one decision made on the raw
-        # values; drawing it only on the raw panel would suggest the normalizations each
-        # produce their own, when the normalized panels are the same numbers rescaled.
-        outline_calls(ax, scores.index, scores.columns, resolved)
-        bar = fig.colorbar(image, ax=ax, fraction=0.045)
-        bar.set_label(bar_label, fontsize=6)
-        bar.ax.tick_params(labelsize=5)
-
-    axes[0].set_ylabel("cluster (v2)", fontsize=8)
-    fig.suptitle(f"{sample} · mean marker expression per cluster "
-                 f"(quality score <= {MARKER_MAX_SCORE})", fontsize=9, x=0.01, ha="left")
-    plt.show()
-    plt.close(fig)
+    evidence_heatmap(
+        sample, scores, resolved,
+        f"{sample} · mean marker expression per cluster "
+        f"(quality score <= {MARKER_MAX_SCORE})",
+        raw_label="log1p CP10K", column_label="within each set",
+        row_label="within each cluster")
 
 
 
@@ -1026,8 +1017,8 @@ def resolve_cell_types(sample, evidence, valid_clusters):
                 # Warn rather than raise: a stale sheet should not take a cohort's render
                 # down, but a silently dropped call would be worse than a noisy one.
                 print(f"WARNING {sample}/{cell_type}: cluster(s) {unknown} not in this "
-                      f"sample (has {sorted(valid_clusters, key=int)}) — ignored. v2 ids "
-                      f"move when the clustering changes; re-derive the calls.")
+                      f"sample (has {sorted(valid_clusters, key=int)}) — ignored. The "
+                      f"numbering moves when the clustering changes; re-derive the calls.")
             resolved[cell_type] = [c for c in called if c in valid_clusters]
         else:
             column = evidence[cell_type]
@@ -1603,7 +1594,7 @@ def oocyte_zoom(sdata, sample, record, resolution, px_per_um):
         marker_tx, coordinates={"x": "x", "y": "y"}, feature_key="marker_set",
         transformations=get_transformation(tx, get_all=True))
 
-    panels = (("cluster_v2", f"clusters (v2) · resolution {resolution:g}"),
+    panels = (("cluster_v2", f"clusters · resolution {resolution:g}"),
               ("cell_type", "cell types"))
 
     has_image = ZOOM_BASE_IMAGE in crop.images
@@ -1916,7 +1907,7 @@ for path in ZARRS:
         # Intersecting with var_names rather than assuming: cluster_sdata marks genes
         # below min_cells ineligible for the embedding but keeps them, so the panel is
         # whole — though a zarr narrowed by --n_top_genes will be missing some.
-        reference_genes = [g for g in REFERENCE_GENES if g in centroids.columns]
+        reference_genes = [g for g in REFERENCE.index if g in centroids.columns]
         reference_corr = pd.DataFrame(index=centroids.index,
                                       columns=REFERENCE.columns, dtype=float)
         for cell_type in REFERENCE.columns:
@@ -1964,142 +1955,96 @@ for path in ZARRS:
 
         # The v1 UMAP comes first: it establishes what each cluster number and colour
         # refers to, which the correlation heatmap then reads against.
-        display(Markdown("## Clusters on the UMAP: v1 ids"))
+        display(Markdown("## Clusters on the UMAP: numbered by size"))
         display(Markdown(
-            "Cells in UMAP coordinates, coloured by cluster at this sample's Leiden "
-            "resolution. Clusters are renumbered 1-n by descending cell count, so cluster "
-            "1 is the largest. These ids are this deck's own and do not match the raw "
-            "Leiden labels cluster_report uses. Each number sits at its cluster's median "
-            "position, and the legend beside the panel keys them."
+            f"Cells in UMAP space, coloured by Leiden cluster at resolution "
+            f"{resolution:g}. Clusters are renumbered 1-n by descending cell count, so "
+            "cluster 1 is the largest."
         ))
         umap_clusters(adata, sample, "cluster_v1")
 
         display(Markdown("## Cluster centroid correlation"))
         display(Markdown(
             "Spearman correlation between every pair of cluster centroids within this "
-            "sample, across all genes. Centroids are CP10K pseudobulk, averaged linearly "
-            "over each cluster's cells and then log1p'd. Both panels are the same matrix, "
-            "cell for cell, and only the tick labels differ. Rows and columns are ordered by "
-            "hierarchical clustering, so similar clusters sit adjacent as blocks: the "
-            "v1 ids on the left therefore read out of numeric sequence, while "
-            "the v2 ids on the right read 1-n. Reading across the two shows which "
-            "v1 cluster each v2 id renames. High off-diagonal pairs are "
-            "clusters the chosen resolution split that are transcriptionally "
-            "near-identical."
+            "sample, across all genes. A centroid is the average of the cluster's cells, "
+            "each normalized to 10,000 counts, then log1p transformed. The left panel is "
+            "keyed by the size-based ids and "
+            "the right by the similarity ordering, so reading across the two shows which "
+            "cluster each new number renames."
         ))
         centroid_correlation(sample, corr, order)
 
         # The v2 UMAP follows the heatmaps, since they are what define
         # this numbering — reading it before the matrix that produced it would be
         # backwards.
-        display(Markdown("## Clusters on the UMAP: v2 ids"))
+        display(Markdown("## Clusters on the UMAP: numbered by similarity"))
         display(Markdown(
-            "The same cells and the same clusters as the first UMAP, carrying the "
-            "v2 ids from the heatmap above, so adjacent numbers are "
-            "transcriptionally adjacent. Colours follow the new numbering, so a given "
-            "cluster is not the same colour here as on the v1 UMAP: the number "
-            "identifies it, not the colour."
+            "New labels and colours, both taken from the similarity ordering on the "
+            "heatmap above, so adjacent numbers are transcriptionally adjacent."
         ))
         umap_clusters(adata, sample, "cluster_v2")
 
-        display(Markdown("## Clusters in tissue: v2 ids"))
+        display(Markdown("## Clusters in tissue: numbered by similarity"))
         display(Markdown(
-            "The same cells and clusters in tissue coordinates, carrying the v2 ids and "
-            "colours from the UMAP above. y is inverted and the aspect is equal, so the "
-            "section reads the way the scan does and its proportions are true. A cluster "
-            "that forms a discrete structure here is a different claim from one scattered "
-            "through the section, and the two are indistinguishable on a UMAP."
+            "Cells in tissue space, carrying the similarity labels and colours."
         ))
         spatial_clusters(adata, sample, "cluster_v2")
 
-        display(Markdown("## Per-cell QC by cluster: v2 ids"))
+        display(Markdown("## Per-cell QC by cluster"))
         display(Markdown(
-            "Per-cell QC distributions, one violin per cluster, at this sample's Leiden "
-            "resolution. Clusters carry the v2 ids and colours from the slides above, so "
-            "adjacent violins are transcriptionally adjacent and a cluster reads straight "
-            "down the slide across all three metrics. All are on log axes, being strictly "
-            "positive and heavily right-skewed. The box inside each violin is its "
-            "interquartile range and median. A cluster low on transcripts and genes "
-            "together, or with cells whose area sits well off the rest, is debris rather "
-            "than a cell type."
+            f"Per-cell QC distributions, one violin per cluster, at Leiden resolution "
+            f"{resolution:g}, on log axes. The box inside each violin is its interquartile "
+            "range and median."
         ))
         qc_violins(adata, sample, "cluster_v2", resolution)
 
         display(Markdown("## Marker genes by cluster"))
         display(Markdown(
-            "Granulosa, oocyte and theca markers from Sci Adv adm7506 Data S5, kept at "
-            f"quality score {MARKER_MAX_SCORE} or better on the paper's own 1-5 scale, so "
-            "these are its established markers rather than its whole published list. Dot "
-            "area is the fraction of a cluster's cells with any count for that gene, "
-            "colour is mean expression scaled to each gene's own range so a quiet marker "
-            "is visible beside an abundant one. Clusters carry the v2 ids."
+            "Dot size is the fraction of cells expressing that gene in a given cluster, "
+            "colour is mean expression scaled to each gene's own range. Clusters carry "
+            "the similarity numbering."
         ))
         marker_dotplot(adata, sample, "cluster_v2")
 
         display(Markdown("## Marker set expression on the UMAP"))
         display(Markdown(
-            "Mean expression of each marker set's genes per cell, in UMAP coordinates. "
-            "These are the same values the cluster heatmap aggregates, so the two agree by "
-            "construction. A set concentrated in one region is a cell type; one spread "
-            "thinly across the embedding is a set of broadly expressed genes, and both "
-            "give the same cluster mean. Most cells read zero: at ~200 transcripts "
-            "against a 5,101-gene panel a genuine oocyte often carries none of the seven "
-            "oocyte markers, so a mostly dark panel with a bright island is the expected "
-            "picture rather than a fault."
+            "Mean expression of each marker set's genes per cell, in UMAP space. These "
+            "are the same values the cluster heatmap aggregates. Most cells read zero: at "
+            "~200 transcripts against a 5,101-gene panel a genuine oocyte often carries "
+            "none of the seven oocyte markers."
         ))
         marker_umaps(adata, sample)
 
         display(Markdown("## Marker set scores by cluster"))
         display(Markdown(
-            "Mean expression of each marker set's genes in each cluster's centroid, in "
-            "log1p CP10K units, under three normalizations. Raw keeps the magnitudes: "
-            "granulosa markers sit near 0.75 in every cluster of this sample while "
-            "oocyte markers sit near 0.06. Column-normalized asks which cluster is "
-            "highest within a set; row-normalized asks which set is highest within a "
-            "cluster. Each panel prints the values it colours by. In the normalized "
-            "panels a set with no signal still has a brightest cell (theca's range here "
-            "is 0.11 to 0.53), so read those against the raw panel before believing "
-            "them. A red box marks the cluster assigned that set: the argmax down the "
-            "column, or the cluster named in cell_type_annotations.csv where a call has "
-            "been made by hand. Nothing here names a cell type on its own."
+            "Mean expression of each cell type's marker genes for each cluster centroid. "
+            "Left is raw, middle is column-normalized, "
+            "right is row-normalized. A red box marks the cluster assigned to that cell "
+            "type."
         ))
         marker_score_heatmap(sample, marker_set_score_table, resolved_cell_types)
 
         display(Markdown("## Cell types on the UMAP: follicle sets"))
         display(Markdown(
-            "The same cells in UMAP coordinates, coloured by the follicle calls. Says "
-            "whether a called cell type is coherent in expression space: a compact "
-            "island is a different claim from a scatter across half the embedding, "
-            "which the tissue plot on the next slide cannot show."
+            "Cells in UMAP space, coloured by the follicle calls."
         ))
         annotated_umap(adata, sample, "cluster_v2", marker_labels, "follicle sets")
 
         display(Markdown("## Cell types in tissue: follicle sets"))
         display(Markdown(
-            "The section coloured by the follicle calls alone, before the major-type "
-            "reference is brought in. Each cell type takes the cluster expressing its "
-            "markers most, unless cell_type_annotations.csv overrides it. Grey is "
-            "unassigned, which is nearly all of the section, because the follicle marker "
-            "sets "
-            "say nothing about stroma, endothelium or immune cells, and colouring them "
-            "would imply they had."
+            "Cells in tissue space, coloured by the follicle calls. Grey is unassigned."
         ))
         spatial_cell_types(adata, sample, "cluster_v2", marker_labels, "follicle sets")
 
         display(Markdown("## Cluster centroids vs major cell types"))
         display(Markdown(
             "Spearman correlation between each cluster's centroid and the four major "
-            "cell types of the Sci Adv adm7506 ovary reference, over the genes most "
-            "specific to one of those types. Each row is labelled with its best match "
-            "and the margin over the runner-up. The reference holds no follicle or "
-            "epithelial types, so a granulosa or oocyte cluster is assigned to whichever "
-            "of the four it least badly resembles; the marker slides are what name "
-            "those. A red box marks the cluster assigned that type: the argmax down the "
-            "column, or the cluster named in cell_type_annotations.csv where a call has "
-            "been made by hand. No threshold is applied and nothing is written to obs; "
-            "the numbers are reported and the judgement is the reader's."
+            "cell types of the reference, over every gene they share. Left is raw, "
+            "middle is column-normalized, right is row-normalized. A red box marks the "
+            "cluster assigned to that cell type."
         ))
-        reference_correlation(sample, reference_corr, resolved_cell_types)
+        reference_correlation(sample, reference_corr, resolved_cell_types,
+                              len(reference_genes))
 
         display(Markdown("## Cell types on the UMAP: with major types"))
         display(Markdown(
@@ -2110,17 +2055,15 @@ for path in ZARRS:
 
         display(Markdown("## Cell types in tissue: with major types"))
         display(Markdown(
-            "The same section with the reference's major types added, so what the "
-            "correlation contributes over the marker sets alone is the difference between "
-            "this slide and the previous one. Each cell type takes the cluster it scores "
-            "highest in, unless cell_type_annotations.csv overrides it. The emitted "
+            "The section with the reference's major types added. Each cell type takes "
+            "the cluster it scores highest in, unless cell_type_annotations.csv overrides "
+            "it. The emitted "
             "cluster_annotations.csv carries the defaults, both cluster numberings and the "
             "score behind each call, to be edited and fed back. A cluster claimed by two "
             "cell types carries both names: a follicle sectioned whole is granulosa cells "
-            "around an oocyte, and the two do not always separate. Grey is still "
-            "unassigned: one cluster per cell type is named by default, so a section "
-            "splitting into several stromal clusters has only one of them coloured until "
-            "the rest are written into the sheet."
+            "around an oocyte, and the two do not always separate. Grey is unassigned: "
+            "one cluster per cell type is named by default, so a section splitting into "
+            "several stromal clusters has only one of them coloured."
         ))
         spatial_cell_types(adata, sample, "cluster_v2", cluster_to_label, "with major types")
 
@@ -2185,7 +2128,8 @@ for path in ZARRS:
                 "other slide is drawn from. Every cell is outlined in black; the "
                 f"{ZOOM_TARGET_COLOR} outline is the curated target cell. All three panels are "
                 "the same window: clusters on the left with the "
-                "v2 ids and colours from the slides above, cell type calls in the middle "
+                "similarity numbering and colours from the slides above, cell type calls "
+                "in the middle "
                 "with the palette of the tissue plot, grey for unassigned. Where no cell "
                 "is drawn the H&E shows through unmodified, which is unsegmented space, "
                 "including the gaps inside a large oocyte. The right panel is every "
@@ -2236,10 +2180,7 @@ if not summary.empty:
     display(Markdown(
         "One row per sample: cells surviving cluster_sdata's filter, the resolution this "
         "deck splits on, the number of clusters at it, and the per-cell QC medians. "
-        "Resolution is here as well as on the slides because without it the cluster "
-        "counts look comparable across samples when they are not: a sample split at 0.6 "
-        "will have more clusters than one split at 0.4 whatever its biology. Medians "
-        "rather than means: all three metrics are heavily right-skewed."
+        "Medians rather than means: all three metrics are heavily right-skewed."
     ))
     md_table(summary)
 ```
@@ -2261,9 +2202,7 @@ if composition_counts:
         "cluster claimed by two cell types contributes its cells to the joined label, not "
         "to each type separately, so the columns sum to 100 without double counting. "
         "Unassigned is every cell in a cluster no cell type claims, which is most of the "
-        "section "
-        "while only one cluster per cell type is named by default, and the column to "
-        "watch as calls are written into the sheet."
+        "section while only one cluster per cell type is named by default."
     ))
     shares = comp.div(comp.sum(axis=1), axis=0).mul(100).round(1)
     shares_table = shares.reset_index().rename(columns={"index": "Sample"})
@@ -2271,9 +2210,7 @@ if composition_counts:
 
     display(Markdown("## Cell type composition: cells"))
     display(Markdown(
-        "The same table as counts, with a cohort row. Counts rather than shares are what "
-        "a rare population needs: 0.4% of two samples is a different claim at 21,000 "
-        "cells than at 700,000."
+        "The same table as counts, with a cohort row."
     ))
     counts_table = comp.reset_index().rename(columns={"index": "Sample"})
     for column in comp.columns:
