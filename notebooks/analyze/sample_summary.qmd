@@ -1021,12 +1021,16 @@ def resolve_cell_types(sample, evidence, valid_clusters):
     section splitting into several stromal clusters gets one of them coloured. That is
     what the sheet is for: add rows.
 
+    Where two types' argmax is the same cluster, the conflict is resolved rather than
+    shared — see the greedy pass below.
+
     A hand-made entry replaces the default for that (sample, cell_type) entirely. An
     entry present but empty means "not in this sample" and returns nothing, which is how
     a judgement overrides the default DOWNWARD — the argmax always exists, even for a
     cell type with no signal, so without this theca could never be dismissed.
     """
     resolved = {}
+    hand_called = set()
     for cell_type in evidence.columns:
         if (sample, cell_type) in CELL_TYPE_CALLS:
             called = CELL_TYPE_CALLS[(sample, cell_type)]
@@ -1038,21 +1042,51 @@ def resolve_cell_types(sample, evidence, valid_clusters):
                       f"sample (has {sorted(valid_clusters, key=int)}) — ignored. The "
                       f"numbering moves when the clustering changes; re-derive the calls.")
             resolved[cell_type] = [c for c in called if c in valid_clusters]
-        else:
-            column = evidence[cell_type]
-            resolved[cell_type] = [str(column.idxmax())] if column.notna().any() else []
-    return resolved
+            hand_called.update(resolved[cell_type])
+
+    # One cluster answers for at most one cell type, so the argmaxes have to be resolved
+    # against each other rather than taken independently. Two types whose argmax is the
+    # same cluster used to share it and be labelled with both names joined; a joined label
+    # cannot be a composition column, and counting the cluster under both types would
+    # double count its cells.
+    #
+    # Resolved greedily by STRENGTH OF CLAIM: each type's lead over its own runner-up,
+    # measured on the column's own 0-1 scale so a marker mean and a correlation are
+    # comparable. The strongest claim is settled first and takes its cluster; a type whose
+    # best cluster is already taken falls through to its next best. Every type therefore
+    # still gets a cluster, and the type that wanted one most gets the one it wanted.
+    #
+    # Hand calls are not part of this. They are placed first, above, and the clusters they
+    # name are removed from what the argmaxes can take — a judgement in the sheet outranks
+    # any lead computed here.
+    def claim_strength(cell_type):
+        column = evidence[cell_type].dropna()
+        if column.empty:
+            return -np.inf
+        span = column.max() - column.min()
+        if span <= 0:
+            return 0.0
+        scaled = ((column - column.min()) / span).sort_values(ascending=False)
+        return float(scaled.iloc[0] - scaled.iloc[1]) if len(scaled) > 1 else 1.0
+
+    taken = set(hand_called)
+    for cell_type in sorted((c for c in evidence.columns if c not in resolved),
+                            key=claim_strength, reverse=True):
+        column = evidence[cell_type].dropna().sort_values(ascending=False)
+        free = [str(cluster) for cluster in column.index if str(cluster) not in taken]
+        resolved[cell_type] = free[:1]
+        taken.update(resolved[cell_type])
+    return {cell_type: resolved[cell_type] for cell_type in evidence.columns}
 
 
 def cell_type_labels(resolved):
-    """v2 cluster id -> label, joining the cell types that share a cluster.
+    """v2 cluster id -> label, one cell type per cluster.
 
-    A cluster claimed by two cell types is labelled with both rather than one of them
-    being dropped: on ROI1_B granulosa and oocyte peak on the same cluster because the
-    section caught a whole follicle, and "granulosa + oocyte" is the accurate reading of
-    that, not a collision to break. Rendering it that way is also what makes the
-    difference between samples visible — ROI1_A resolves the two into separate clusters
-    and ROI1_B does not.
+    Clusters used to carry every type that claimed them, joined with " + ". They no
+    longer can: resolve_cell_types settles conflicts so a cluster answers for one type,
+    which is what lets the composition tables have a column per type and count each cell
+    once. The join is kept in the formatting below only so a hand-made sheet naming one
+    cluster under two types still renders rather than dropping one silently.
     """
     by_cluster = {}
     for cell_type, clusters in resolved.items():
@@ -2081,8 +2115,7 @@ for path in ZARRS:
         display(Markdown("## Cell types in tissue: with major types"))
         display(Markdown(
             f"Cells in tissue space, coloured by cell type: "
-            f"{', '.join(CELL_TYPE_VOCABULARY)}. A cluster claimed by two cell types "
-            f"carries both names. Grey is {UNASSIGNED}."
+            f"{', '.join(CELL_TYPE_VOCABULARY)}. Grey is {UNASSIGNED}."
         ))
         spatial_cell_types(adata, sample, "cluster_v2", cluster_to_label, "with major types")
 
@@ -2154,15 +2187,9 @@ for path in ZARRS:
             "Genes": f"{adata.obs['n_genes_by_transcripts'].median():,.0f}",
             "Cell area": f"{adata.obs['cell_area'].median():,.0f}",
         })
-        # Counted per cell TYPE, not per label. The slides label a cluster claimed by two
-        # types with both names joined, which is the honest reading of a follicle caught
-        # whole — but a joined label as a table column would give the cohort a column that
-        # exists on one sample and not another, and nothing to compare down it. So each
-        # claiming type counts the cluster's cells, and the columns are the vocabulary.
-        #
-        # A cluster claimed by two types is therefore counted in BOTH columns, and a
-        # sample's shares can total more than 100. That is the cost of one column per
-        # type; the alternative was a column per observed combination.
+        # Counted per cell TYPE, with the columns fixed to the vocabulary. Every cluster
+        # answers for at most one type (resolve_cell_types settles conflicts), so a cell is
+        # counted once and a sample's shares total 100 across the types plus unassigned.
         cluster_ids = adata.obs["cluster_v2"].astype(str)
         sizes = cluster_ids.value_counts()
         counts = {cell_type: int(sum(sizes.get(c, 0) for c in clusters))
@@ -2218,9 +2245,8 @@ if composition_counts:
 
     display(Markdown("## Cell type composition: share of cells"))
     display(Markdown(
-        "Percent of each sample's cells falling in a cluster called as that cell type. A "
-        "cluster claimed by two cell types counts in both columns, so a row can total "
-        "more than 100. Unassigned is every cell in a cluster no cell type claims."
+        "Percent of each sample's cells falling in a cluster called as that cell type. "
+        "Unassigned is every cell in a cluster no cell type claims."
     ))
     # Divided by the sample's cells, not by the row total, which double counts a cluster
     # two types share.
@@ -2251,46 +2277,42 @@ if composition_counts:
 if composition_counts:
     display(Markdown("## Cell type composition per sample"))
     display(Markdown(
-        "The share of each sample's cells falling in each cell type. Bars are grouped by "
-        "cell type, one per sample."
+        "The share of each sample's cells falling in each cell type, one bar per sample. "
+        "Every cell is counted, so each bar spans the full width."
     ))
-    # Grouped, not stacked. sammy_r21's cohort chart stacks, which is right there because
-    # every cell falls in exactly one category; here a cluster claimed by two cell types
-    # counts in both, so stacked segments would overlap and a bar would run past 100%.
-    # Grouping shows the same numbers without implying they partition the sample.
-    chart_types = [t for t in CELL_TYPE_VOCABULARY + [UNASSIGNED] if shares[t].any()]
+    # Stacked, which the numbers now support: every cell falls in exactly one category, so
+    # a bar spans the sample and segment lengths are shares of it. This is sammy_r21's
+    # cohort chart in the same form, for the same reason.
+    chart_types = [t for t in CELL_TYPE_VOCABULARY + [UNASSIGNED] if t in shares.columns]
     palette = dict(zip(CELL_TYPE_VOCABULARY,
                        gradient_colors(len(CELL_TYPE_VOCABULARY))))
     palette[UNASSIGNED] = "#d9d9d9"
 
     samples = list(shares.index)
-    fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.78, FIGSIZE[1]),
+    fig, ax = plt.subplots(figsize=(FIGSIZE[0] * 0.82, FIGSIZE[1] * 0.9),
                            constrained_layout=True)
-    height = 0.8 / max(len(samples), 1)
-    base = np.arange(len(chart_types), dtype=float)
-    for i, sample_name in enumerate(samples):
-        # Samples run top to bottom within each group, which means offsetting downward
-        # from the group centre: the y axis is inverted below so the first type is on top.
-        offset = (i - (len(samples) - 1) / 2) * height
-        ax.barh(base + offset, [shares.loc[sample_name, t] for t in chart_types],
-                height=height * 0.9, label=sample_name,
-                color=[palette[t] for t in chart_types], edgecolor="white",
-                linewidth=0.5)
-        # One label per bar rather than a second legend for samples: with a colour already
-        # spent on cell type, the sample has to be named on the bar itself.
-        for y, cell_type in zip(base + offset, chart_types):
-            ax.text(0.4, y, sample_name, va="center", ha="left", fontsize=5,
-                    color="black")
+    ypos = np.arange(len(samples), dtype=float)
+    left = np.zeros(len(samples))
+    for cell_type in chart_types:
+        values = shares[cell_type].to_numpy()
+        # A hairline surface-coloured edge between fills, so two adjacent segments stay
+        # separable where their hues are close in value.
+        ax.barh(ypos, values, left=left, height=0.62, label=cell_type,
+                color=palette[cell_type], edgecolor="white", linewidth=0.8)
+        left += values
 
-    ax.set_yticks(base)
-    ax.set_yticklabels(chart_types, fontsize=7)
+    ax.set_yticks(ypos)
+    ax.set_yticklabels(samples, fontsize=7)
     ax.invert_yaxis()
+    ax.set_xlim(0, 100)
     ax.set_xlabel("share of the sample's cells (%)", fontsize=8)
     ax.tick_params(axis="x", labelsize=7)
-    # Recessive frame: no box, nothing competing with the bars.
+    # Recessive frame: no box, nothing competing with the fills.
     for side in ("top", "right", "left"):
         ax.spines[side].set_visible(False)
     ax.spines["bottom"].set_linewidth(0.6)
+    # Legend outside the axes: inside, it would sit on the fills it names.
+    ax.legend(bbox_to_anchor=(1.01, 1.0), loc="upper left", fontsize=7, frameon=False)
     plt.show()
     plt.close(fig)
 
