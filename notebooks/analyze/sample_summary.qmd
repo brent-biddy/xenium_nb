@@ -2249,20 +2249,30 @@ if composition_counts:
 ```
 
 ```{python}
-# The chart lives in its own cell, WITHOUT `output: asis`: a matplotlib figure
-# emitted from an asis cell is dropped on the floor and the next heading arrives as
-# literal text in the caption above it. Headings still work here through
-# display(Markdown), the same way the per-sample loop emits its own.
-if composition_counts:
-    display(Markdown("## Cell type composition per sample"))
-    display(Markdown(
-        "The share of each sample's cells falling in each cell type, one bar per sample. "
-        "Every cell is counted, so each bar spans the full width."
-    ))
-    # Stacked, which the numbers now support: every cell falls in exactly one category, so
-    # a bar spans the sample and segment lengths are shares of it. This is sammy_r21's
-    # cohort chart in the same form, for the same reason.
-    chart_types = [t for t in CELL_TYPE_VOCABULARY + [UNASSIGNED] if t in shares.columns]
+# The chart lives in its own cell, WITHOUT `output: asis`: a matplotlib figure emitted
+# from an asis cell is dropped on the floor and the next heading arrives as literal text
+# in the caption above it. Headings still work here through display(Markdown), the same
+# way the per-sample loop emits its own.
+
+# Types the second chart leaves out. Stromal is 89-90% of both test crops, which is a fact
+# about the tissue rather than a fault, but it leaves every other type under 4% and
+# unreadable beside it. Named here rather than derived from a threshold: which type
+# dominates is a property of the tissue, and a threshold would silently drop a different
+# one on a different sample, changing what the slide means without saying so.
+CHART_EXCLUDE = ["Stromal"]
+
+
+def composition_chart(shares, cell_types):
+    """One slide's figure: each sample's cells as a stacked bar over `cell_types`.
+
+    Stacked rather than grouped because the categories partition the sample: every cell
+    falls in exactly one, so a bar is the sample and a segment is a share of it. This is
+    sammy_r21's cohort chart in the same form, for the same reason.
+
+    Shares are always of the WHOLE sample, so dropping a type shortens the bars rather
+    than rescaling them — the second chart's numbers are the first chart's numbers, and a
+    reader can carry a value between them.
+    """
     palette = dict(zip(CELL_TYPE_VOCABULARY,
                        gradient_colors(len(CELL_TYPE_VOCABULARY))))
     palette[UNASSIGNED] = "#d9d9d9"
@@ -2272,7 +2282,7 @@ if composition_counts:
                            constrained_layout=True)
     ypos = np.arange(len(samples), dtype=float)
     left = np.zeros(len(samples))
-    for cell_type in chart_types:
+    for cell_type in cell_types:
         values = shares[cell_type].to_numpy()
         # A hairline surface-coloured edge between fills, so two adjacent segments stay
         # separable where their hues are close in value.
@@ -2283,7 +2293,7 @@ if composition_counts:
     ax.set_yticks(ypos)
     ax.set_yticklabels(samples, fontsize=7)
     ax.invert_yaxis()
-    ax.set_xlim(0, 100)
+    ax.set_xlim(0, 100 if left.max() > 50 else float(np.ceil(left.max() / 5) * 5))
     ax.set_xlabel("share of the sample's cells (%)", fontsize=8)
     ax.tick_params(axis="x", labelsize=7)
     # Recessive frame: no box, nothing competing with the fills.
@@ -2295,6 +2305,26 @@ if composition_counts:
     plt.show()
     plt.close(fig)
 
+
+if composition_counts:
+    chart_types = [t for t in CELL_TYPE_VOCABULARY + [UNASSIGNED] if t in shares.columns]
+
+    display(Markdown("## Cell type composition per sample"))
+    display(Markdown(
+        "The share of each sample's cells falling in each cell type, one bar per sample. "
+        "Every cell is counted, so each bar spans the full width."
+    ))
+    composition_chart(shares, chart_types)
+
+    trimmed = [t for t in chart_types if t not in CHART_EXCLUDE]
+    display(Markdown(
+        f"## Cell type composition per sample: without {', '.join(CHART_EXCLUDE)}"))
+    display(Markdown(
+        f"The same shares with {', '.join(CHART_EXCLUDE)} left out. Shares are still of "
+        "the sample's cells, so the bars stop short of the full width rather than being "
+        "rescaled."
+    ))
+    composition_chart(shares, trimmed)
 ```
 
 ```{python}
