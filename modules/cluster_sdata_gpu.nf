@@ -8,8 +8,9 @@ def clusterSdataGpuPublishDir(sample) {
 process CLUSTER_SDATA_GPU {
     tag "${sample}"
 
-    // --nv passes through the host NVIDIA driver and CUDA libs into the container.
-    containerOptions '--nv'
+    // GPU driver passthrough is set per-profile in nextflow.config, not here: the
+    // oscer profile needs --nv while local needs a WSL2 bind, and a withName
+    // selector overrides a process directive anyway.
 
     // saveAs drops the per-sample row fragment from the published dir; it is only
     // needed on the channel for main.nf to collectFile into the aggregate sheet.

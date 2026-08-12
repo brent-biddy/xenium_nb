@@ -137,7 +137,7 @@ Defined in `nextflow.config`:
 |---------|----------|-----------|
 | (none)  | local, no container | requires activated conda env with Quarto + notebook deps |
 | `local` | local, Apptainer | `babiddy755/python_spatial:1.2.0`, 8 CPUs, 16 GB |
-| `oscer` | SLURM on OSCER HPC, Apptainer | same image, 16 CPUs, memory retries 48→96→144 GB (heavier for `CONCAT_SDATA`/`CLUSTER_SDATA`); GPU steps use the `sooner_gpu_test` partition with `--gres=gpu:1 --nv` |
+| `oscer` | SLURM on OSCER HPC, Apptainer | same image, 16 CPUs, memory retries 48→96→144 GB; GPU steps use the `sooner_gpu_test_h100` partition with `--gres=gpu:1 --nv` |
 
 **Run directories.** The `local` and `oscer` profiles set their own `workDir` and `outdir` so nothing lands in the repo (runs are typically launched from the repo root). Each run gets one self-contained directory, `<out_root>/<run_id>/{work,results}`, so a whole run is a single unit to size (`du -sh`) or prune (`rm -rf`). The shared Apptainer cache is a sibling of the run dirs (`<out_root>/apptainer_cache`), never nested under a `run_id`, so it survives across runs:
 
