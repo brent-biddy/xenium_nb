@@ -20,6 +20,7 @@ import argparse
 import rapids_singlecell as rsc
 import spatialdata
 
+from sdata_io import write_table_only
 from timer import timer, timing_summary
 
 DEFAULT_RESOLUTIONS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
@@ -193,8 +194,10 @@ def main():
         rsc.get.anndata_to_CPU(adata)
 
     with timer("Write zarr"):
+        # Only the table changed, so only the table is written; the images are
+        # hardlinked from the input store. See sdata_io.write_table_only.
         sdata.tables[table_key] = adata
-        sdata.write(output_path)
+        write_table_only(sdata, args.path, output_path, table_key)
 
     print(f"Written to {output_path}")
 

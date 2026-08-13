@@ -31,6 +31,7 @@ import spatialdata
 import zarr
 from rmm.allocators.cupy import rmm_cupy_allocator
 
+from sdata_io import write_table_only
 from timer import timer, timing_summary
 
 try:
@@ -295,8 +296,12 @@ def main():
         rsc.get.anndata_to_CPU(adata)
 
     with timer("Write zarr"):
+        # Only the table changed, so only the table is written; the images are
+        # hardlinked from the input store. See sdata_io.write_table_only. This step
+        # reads its sdata with an element selection that excludes the table, so the
+        # assignment below is what puts it there in the first place.
         sdata.tables[args.table_key] = adata
-        sdata.write(output_path)
+        write_table_only(sdata, args.path, output_path, args.table_key)
 
     print(f"Written to {output_path}")
 
