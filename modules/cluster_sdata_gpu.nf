@@ -50,6 +50,14 @@ process CLUSTER_SDATA_GPU {
     export TMPDIR="\$PWD/tmp"
     mkdir -p "\$XDG_CACHE_HOME" "\$TMPDIR"
 
+    # Which card, and how much of it is already spoken for. Cheap, and it makes the
+    # difference between "this table is too big" and "another job owns this GPU"
+    # readable off .command.log instead of inferable from a cupy stack trace. An
+    # unset CUDA_VISIBLE_DEVICES or more than one row here means the job is not
+    # pinned to its allocated card — see the envWhitelist note in nextflow.config.
+    echo "CUDA_VISIBLE_DEVICES=\${CUDA_VISIBLE_DEVICES:-<unset>}"
+    nvidia-smi --query-gpu=index,uuid,memory.used,memory.total --format=csv
+
     cluster_sdata_gpu.py ${clusterArgs.join(' ')}
 
     printf '%s' '${sample},${clusterSdataGpuPublishDir(sample)}/clustered.zarr' > ${sample}.samplesheet_row.csv

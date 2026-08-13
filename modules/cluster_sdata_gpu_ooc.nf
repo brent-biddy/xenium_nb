@@ -54,6 +54,12 @@ process CLUSTER_SDATA_GPU_OOC {
     export TMPDIR="\$PWD/tmp"
     mkdir -p "\$XDG_CACHE_HOME" "\$TMPDIR"
 
+    # Same probe as CLUSTER_SDATA_GPU, and it matters more here: this step exists for
+    # tables that do not fit, so "out of memory" is an expected answer and must be
+    # distinguishable from landing on a card another job already owns.
+    echo "CUDA_VISIBLE_DEVICES=\${CUDA_VISIBLE_DEVICES:-<unset>}"
+    nvidia-smi --query-gpu=index,uuid,memory.used,memory.total --format=csv
+
     cluster_sdata_gpu_ooc.py ${clusterArgs.join(' ')}
 
     printf '%s' '${sample},${clusterSdataGpuOocPublishDir(sample)}/clustered.zarr' > ${sample}.samplesheet_row.csv
