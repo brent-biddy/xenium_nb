@@ -83,12 +83,8 @@ HVG_N_TOP_GENES = 2000
 SCALE_MAX_VALUE = 10
 N_PCS = 30
 NEIGHBORS_METRIC = "cosine"
-# The vignette uses -1, scanpy's "run to convergence" sentinel, but rapids-singlecell
-# cannot: it forwards the value to cuGraph as a size_t and raises OverflowError on a
-# negative. 100 is rapids' own default, is far above the handful of passes Leiden
-# actually needs to converge here, and is accepted by both backends — which matters
-# more than matching the sentinel, since the CPU and GPU steps have to agree.
-LEIDEN_N_ITERATIONS = 100
+# n_iterations is deliberately NOT set here or in the GPU steps; see the Leiden call
+# below for why passing one number to both backends was wrong.
 
 
 def parse_args():
@@ -270,12 +266,30 @@ def main():
         with timer(f"Leiden res={res:g}"):
             # Use the igraph backend (orders of magnitude faster than the legacy
             # leidenalg default). flavor="igraph" requires an undirected graph.
+            #
+            # n_iterations is left at each library's default, and that is the whole
+            # point rather than an omission. scanpy defaults to -1 (run until a stable
+            # iteration) and rapids-singlecell to 100, which cuGraph treats as a cap it
+            # exits early from -- so both already mean "converge", by each library's own
+            # idiom. They cannot be made to agree by sharing a number, because the
+            # parameter counts different things: igraph iterations are refinement passes
+            # over a complete partition, while cuGraph's are hierarchical levels.
+            # Measured on a 21,694-cell ROI: n_iterations=2 gives igraph a slightly
+            # under-polished partition (ARI 0.86-0.90 against convergence) but gives
+            # cuGraph ~3,000 clusters instead of 4-11 (ARI 0.003).
+            #
+            # This step previously passed 100 to both. That is a no-op on GPU, where it
+            # is already the default, but on CPU it turned "converge" into a mandate of
+            # 100 refinement passes long after the partition stopped changing -- 6.4s
+            # per resolution instead of 0.4-1.6s on that ROI, and 82% of the whole CPU
+            # run on a 638k-cell sample. It came from writing the vignette's -1 into the
+            # GPU step, hitting an OverflowError (rapids forwards it to cuGraph as a
+            # size_t), and pinning 100 in both steps rather than dropping the argument.
             sc.tl.leiden(
                 adata,
                 resolution=res,
                 key_added=f"leiden_res_{res:.2f}",
                 flavor="igraph",
-                n_iterations=LEIDEN_N_ITERATIONS,
                 directed=False,
                 random_state=0,
             )

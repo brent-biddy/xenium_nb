@@ -38,9 +38,7 @@ HVG_N_TOP_GENES = 2000
 SCALE_MAX_VALUE = 10
 N_PCS = 30
 NEIGHBORS_METRIC = "cosine"
-# 100, not the vignette's -1: rapids forwards it to cuGraph as a size_t and overflows
-# on a negative. See cluster_sdata.py.
-LEIDEN_N_ITERATIONS = 100
+# n_iterations is deliberately not set; see cluster_sdata.py's Leiden call.
 
 
 def parse_args():
@@ -185,7 +183,6 @@ def main():
                 adata,
                 resolution=res,
                 key_added=f"leiden_res_{res:.2f}",
-                n_iterations=LEIDEN_N_ITERATIONS,
                 random_state=0,
             )
 
