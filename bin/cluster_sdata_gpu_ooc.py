@@ -56,7 +56,8 @@ HVG_N_TOP_GENES = 2000
 SCALE_MAX_VALUE = 10
 N_PCS = 30
 NEIGHBORS_METRIC = "cosine"
-LEIDEN_N_ITERATIONS = 100
+# n_iterations is deliberately not set; see cluster_sdata.py's Leiden call. This step
+# never passed it in the first place, so its clustering is unchanged by that fix.
 
 
 def parse_args():
