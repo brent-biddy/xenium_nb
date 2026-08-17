@@ -57,129 +57,43 @@ def parse_args():
     return parser.parse_args()
 
 
-def leiden_resolution(column):
-    """`leiden_res_0.60` -> `"0.60"`; None for any column that is not a sweep column.
-
-    A row's resolution is a property OF THE COLUMN, not of how that column was chosen.
-    Naming one explicitly (`--group_by leiden_res_0.60`) has to produce the same schema
-    the sweep produces for it, or a single-resolution store would carry the same numbers
-    as the sweep's rows and still be unreadable by a deck that selects on
-    obs["resolution"].
-
-    The float() check keeps an unrelated column that happens to start with the prefix
-    from being read as a resolution. The string is returned rather than the float: the
-    decks join it against assets/chosen_resolutions.csv, and "0.60" round-trips through
-    a CSV where 0.6 does not.
-    """
-    if not column.startswith(LEIDEN_PREFIX):
-        return None
-    res = column.removeprefix(LEIDEN_PREFIX)
-    try:
-        float(res)
-    except ValueError:
-        return None
-    return res
-
-
-def sweep_columns(adata):
-    """The sweep's cluster columns, as [(resolution_str, column_name), ...].
-
-    Sorted numerically rather than lexically: at ten resolutions "0.10" sorts before
-    "0.90" either way, but a sweep including "1.00" does not.
-    """
-    pairs = [
-        (res, col)
-        for col in adata.obs.columns
-        if (res := leiden_resolution(col)) is not None
-    ]
-    if not pairs:
-        raise ValueError(
-            f"no {LEIDEN_PREFIX}<r> columns in obs — was this zarr written by "
-            f"cluster_sdata, cluster_sdata_gpu or cluster_sdata_gpu_ooc? "
-            f"Found: {sorted(adata.obs.columns)}"
-        )
-    return sorted(pairs, key=lambda pair: float(pair[0]))
-
-
-def groupings(adata, group_by):
-    """What to sum over, as [(column_name, resolution_str_or_None), ...].
-
-    The one place the two modes differ; everything downstream of it just reduces by a
-    column. `resolution` rides beside the column because it is only recoverable by
-    parsing the leiden name — and it is parsed from the NAME in both modes, so
-    `--group_by leiden_res_0.60` yields exactly the sweep's row for that resolution. A
-    column with no resolution in its name gets None, which is what leaves
-    `resolution`/`cluster_v1` absent from the store rather than placeheld with something
-    that would sort and compare as if it meant anything.
-
-    A --group_by column is validated here and not later: a typo'd column name should
-    fail before the CP10K pass, which is the expensive part.
-    """
-    if group_by is None:
-        return [(col, res) for res, col in sweep_columns(adata)]
-    if group_by not in adata.obs:
-        raise ValueError(
-            f"--group_by {group_by!r} is not an obs column of this zarr. This step "
-            f"groups by a column some upstream step already wrote; it does not compute "
-            f"labels. Found: {sorted(adata.obs.columns)}"
-        )
-    return [(group_by, leiden_resolution(group_by))]
-
-
-def size_rank(counts):
-    """Group label -> size rank as a string, 1 being the largest group.
-
-    Leiden's own ids are assignment order, so cluster 3 in one sample has nothing to do
-    with cluster 3 in another, or with cluster 3 at the next resolution up. Ranking by
-    cell count at least makes the id mean the same KIND of thing everywhere.
-
-    value_counts already orders by descending count; the sort only settles ties, on the
-    original numeric label. Pandas sorts value_counts with a non-stable algorithm, so two
-    equal-sized clusters could otherwise swap ids between runs over the same data. int()
-    because the labels are strings, where "10" < "2".
-    """
-    ordered = sorted(counts.index, key=lambda level: (-counts[level], int(level)))
-    return {level: str(rank) for rank, level in enumerate(ordered, start=1)}
-
-
-def reduce_by(adata, column, resolution):
+def reduce_by(adata, column):
     """Sum both layers over one obs column, returning a groups x genes AnnData.
 
-    Two aggregate calls, not one: sc.get.aggregate takes a single `layer`, so each sum
-    is its own pass over the matrix. What guarantees the two are over identical row sets
-    is that both group on the SAME materialized `by_key` column — grouping twice on the
-    stored categorical could disagree if its unused categories differed between calls.
+    Two aggregate calls, not one: sc.get.aggregate takes a single `layer`, and its
+    `func` list gives several statistics over that one layer rather than one statistic
+    over several. Both group on the same column, so the rows line up.
     """
-    # sc.get.aggregate returns its results in .layers, keyed by the func name, and
-    # ignores .X entirely. `by` must NAME an obs column — passing the Series itself
-    # raises a KeyError on its values — so the string cast goes through a scratch
-    # column. Cast to str rather than grouped as the stored categorical so the row
-    # labels are plain strings on both sides of the join the decks make onto obs.
-    by_key = "_centroid_group"
-    adata.obs[by_key] = adata.obs[column].astype(str)
-    agg = sc.get.aggregate(adata, by=by_key, func="sum", layer="cp10k")
-    counts = sc.get.aggregate(adata, by=by_key, func="sum", layer="counts")
-    by = adata.obs.pop(by_key)
+    cp10k = sc.get.aggregate(adata, by=column, func="sum", layer="cp10k")
+    counts = sc.get.aggregate(adata, by=column, func="sum", layer="counts")
 
     out = ad.AnnData(
-        X=agg.layers["sum"],
-        obs=pd.DataFrame(index=agg.obs_names.astype(str)),
-        var=pd.DataFrame(index=agg.var_names),
+        X=cp10k.layers["sum"],
+        obs=pd.DataFrame(index=cp10k.obs_names),
+        var=pd.DataFrame(index=cp10k.var_names),
+        layers={"counts": counts.layers["sum"]},
     )
-    out.layers["counts"] = counts.layers["sum"]
 
-    # The schema every row carries, whatever the grouping.
-    group_counts = by.value_counts()
+    # The schema every row carries, whatever the grouping. n_cells comes from aggregate's
+    # own n_obs_aggregated rather than a second value_counts over the column.
+    n_cells = cp10k.obs["n_obs_aggregated"]
     out.obs["grouping"] = column
     out.obs["group"] = out.obs_names
-    out.obs["n_cells"] = group_counts.reindex(out.obs_names).to_numpy()
+    out.obs["n_cells"] = n_cells.to_numpy()
 
     # The two fields a leiden column earns and nothing else does. Absent rather than
-    # placeheld for a non-leiden grouping: a cell type has no resolution, and a NaN says
-    # so where a 0 or an empty string would sort and compare as if it meant something.
-    if resolution is not None:
-        out.obs["resolution"] = resolution
-        out.obs["cluster_v1"] = out.obs_names.map(size_rank(group_counts))
+    # placeheld for a non-leiden grouping: a cell type has no resolution.
+    #
+    # cluster_v1 is the size ranking, 1 being the largest cluster. Leiden's own ids are
+    # assignment order, so cluster 3 in one sample has nothing to do with cluster 3 in
+    # another. Ties are settled on the numeric label so two equal-sized clusters cannot
+    # swap ids between runs over the same data.
+    if column.startswith(LEIDEN_PREFIX):
+        out.obs["resolution"] = column.removeprefix(LEIDEN_PREFIX)
+        ranked = sorted(out.obs_names, key=lambda group: (-n_cells[group], int(group)))
+        out.obs["cluster_v1"] = out.obs_names.map(
+            {group: str(rank) for rank, group in enumerate(ranked, start=1)}
+        )
 
     return out
 
@@ -202,30 +116,16 @@ def main():
     with timer("Read zarr"):
         sdata = spatialdata.read_zarr(args.path)
 
-    table_key = "table"
     with timer("Extract table"):
-        adata = sdata.tables[table_key].copy()
+        adata = sdata.tables["table"]
 
-    print(f"Table:   {adata.n_obs:,} cells × {adata.n_vars:,} genes  (key: '{table_key}')")
+    print(f"Table:   {adata.n_obs:,} cells × {adata.n_vars:,} genes")
 
-    # Checked here, before the CP10K pass and before any grouping work, because the
-    # alternative is a bare KeyError from deep inside that pass on a zarr that has
-    # already been read.
-    #
-    # cluster_sdata and cluster_sdata_gpu both stash the raw matrix; cluster_sdata_gpu_ooc
-    # deliberately does NOT, since holding a second copy of a merged cohort's matrix is
-    # the thing that step exists to avoid. So its output cannot be reduced here, and the
-    # message says so rather than leaving the reader to find that out.
-    #
-    # There is no fallback to layers["lognorm"], and that is deliberate rather than
-    # unfinished. cluster_sdata* normalizes with no target_sum, so lognorm is on each
-    # sample's own median scale — the one thing these centroids exist NOT to be, since
-    # they are built to be compared across samples and against an external reference.
-    # CP10K is in fact recoverable from it (every cell sums to the same median M after
-    # normalize_total, so CP10K is expm1(lognorm) * 1e4 / M), but that round-trips a log
-    # transform over the whole matrix and adds a second normalization path that has to
-    # stay in step with the first. A clear error beats a subtle numerical difference
-    # between samples that nothing would report.
+    # Checked before the CP10K pass, so a zarr that cannot be reduced fails on its own
+    # terms rather than on a bare KeyError deep inside it. cluster_sdata_gpu_ooc omits
+    # this layer on purpose. There is deliberately no fallback to layers["lognorm"]:
+    # it is on each sample's own median scale, which is the one thing these centroids
+    # exist not to be.
     if "counts" not in adata.layers:
         raise KeyError(
             f"{args.sample}: the table has no layers['counts'], so centroids cannot be "
@@ -236,51 +136,56 @@ def main():
             f"cluster_sdata_gpu if it fits."
         )
 
-    to_reduce = groupings(adata, args.group_by)
-    print(f"Reducing over {len(to_reduce)} column(s): "
-          f"{', '.join(col for col, _ in to_reduce)}")
+    # What to sum over. The sweep is whatever the cluster run that produced this zarr
+    # chose, so it is read off the column names; sorted numerically because a sweep
+    # including "1.00" does not sort lexically.
+    if args.group_by is None:
+        columns = sorted(
+            (col for col in adata.obs if col.startswith(LEIDEN_PREFIX)),
+            key=lambda col: float(col.removeprefix(LEIDEN_PREFIX)),
+        )
+        if not columns:
+            raise ValueError(
+                f"no {LEIDEN_PREFIX}<r> columns in obs — was this zarr written by "
+                f"cluster_sdata or cluster_sdata_gpu? Found: {sorted(adata.obs.columns)}"
+            )
+    else:
+        # Validated before the CP10K pass, which is the expensive part.
+        if args.group_by not in adata.obs:
+            raise ValueError(
+                f"--group_by {args.group_by!r} is not an obs column of this zarr. This "
+                f"step groups by a column some upstream step already wrote; it does not "
+                f"compute labels. Found: {sorted(adata.obs.columns)}"
+            )
+        columns = [args.group_by]
+
+    print(f"Reducing over {len(columns)} column(s): {', '.join(columns)}")
 
     with timer("CP10K"):
-        # Normalized once, then reused for every grouping: the per-cell scaling does not
-        # depend on which column the cells are summed over, and on a whole-slide sample
-        # this is the pass worth not doing ten times.
-        #
-        # From layers["counts"], the raw matrix cluster_sdata stashes before normalizing.
-        # Not expm1(X): scaling has overwritten X, so it no longer holds expression at
-        # all, and not layers["lognorm"], which is on this sample's own median scale.
+        # Normalized once and reused for every grouping: the per-cell scaling does not
+        # depend on which column the cells are summed over. From layers["counts"], not
+        # expm1(X) — scaling has overwritten X, so it no longer holds expression.
         adata.layers["cp10k"] = adata.layers["counts"].copy()
         sc.pp.normalize_total(adata, layer="cp10k", target_sum=1e4)
 
     blocks = []
-    for column, resolution in to_reduce:
+    for column in columns:
         with timer(f"Reduce {column}"):
-            blocks.append(reduce_by(adata, column, resolution))
+            blocks.append(reduce_by(adata, column))
 
     with timer("Assemble"):
-        # index_unique=None keeps the group labels as they are; the rows are made unique
-        # by the (grouping, group) pair in obs, not by the index, and a suffixed index
-        # would break the decks' join back onto per-cell obs. anndata still requires the
-        # index to be unique, so the sweep's repeated labels are renumbered explicitly.
+        # index_unique=None keeps the group labels as they are; rows are made unique by
+        # the (grouping, group) pair in obs, not by the index, and a suffixed index would
+        # break the decks' join back onto per-cell obs. anndata still requires a unique
+        # index, so the sweep's repeated labels are renumbered explicitly.
         centroids = ad.concat(blocks, axis=0, join="outer", index_unique=None)
         centroids.obs_names = [str(i) for i in range(centroids.n_obs)]
-        # The sample id, so a cohort of these stores can be concatenated and the rows
-        # still say where they came from. Every deck reading a fan-in of centroid stores
-        # takes the sample from here rather than from the staged file name.
         centroids.obs["sample"] = args.sample
 
         # Pin the identity columns to categorical rather than letting the dtype fall out
-        # of the data. Both anndata's writer and ad.concat convert object string columns
-        # to categorical only when the cardinality is low enough to pay off, so `group`
-        # and `cluster_v1` come back categorical from a sweep store (77 rows, 7 unique at
-        # one resolution) and object from a single-resolution one (7 rows, 7 unique) —
-        # same values, different dtype, decided by how many resolutions were run.
-        #
-        # That breaks the promise above that `--group_by leiden_res_0.60` is readable by
-        # the code that reads the sweep: a categorical and an object column compare,
-        # merge and groupby differently, and a categorical is what round-trips a missing
-        # value as NA instead of the string "None" (the same trap create_sdata documents
-        # for var["codeword_category"]). Cast explicitly so the schema is this script's
-        # decision and not the cohort's shape.
+        # of the data: anndata's writer and ad.concat convert object string columns only
+        # when the cardinality makes it pay off, so the same column comes back categorical
+        # from a sweep store and object from a single-resolution one.
         for col in ("grouping", "group", "resolution", "cluster_v1", "sample"):
             if col in centroids.obs:
                 centroids.obs[col] = pd.Categorical(centroids.obs[col].astype(str))
