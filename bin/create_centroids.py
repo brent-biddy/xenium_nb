@@ -74,15 +74,10 @@ def reduce_by(adata, column):
         layers={"counts": counts.layers["sum"]},
     )
 
-    # The schema every row carries, whatever the grouping. n_cells comes from aggregate's
-    # own n_obs_aggregated rather than a second value_counts over the column.
     out.obs["grouping"] = column
     out.obs["group"] = out.obs_names
     out.obs["n_cells"] = cp10k.obs["n_obs_aggregated"].to_numpy()
 
-    # A sweep column earns one more field, since "0.60" is not recoverable from
-    # "leiden_res_0.60" without parsing. A cell type has no resolution, so for any other
-    # grouping it is absent rather than filled with a placeholder.
     if column.startswith(LEIDEN_PREFIX):
         out.obs["resolution"] = column.removeprefix(LEIDEN_PREFIX)
 
