@@ -107,6 +107,12 @@ MARKER_SETS = {name: sorted(g for g, s in genes.items()
                for name, genes in _scored.items()}
 REFERENCE = pd.read_csv("ovary_reference_major.csv.gz", index_col=0)
 
+# The immune subtype centroids (Data S7), read for one panel below. Kept separate from
+# REFERENCE rather than concatenated into it: these four are a decomposition of the
+# Immune column, not four more peers of it, so folding them in would let a subtype win
+# the argmax for a group and displace a major type.
+IMMUNE_REFERENCE = pd.read_csv("ovary_reference_immune.csv.gz", index_col=0)
+
 # The committed grouping. Rows are the authority; a header-only sheet means none exists
 # yet and the deck proposes one. Same convention as cell_type_annotations.csv.
 CONSENSUS_CSV = Path("consensus_clusters.csv")
@@ -409,6 +415,74 @@ if UNREPRESENTED:
         f"cannot name {len(EVIDENCE.columns)} types. Raise `CONSENSUS_K` if these are "
         f"expected to be present and distinct — the deck cannot separate two types that "
         f"share a group."
+    ))
+```
+
+## Consensus clusters vs immune subtypes
+
+```{python}
+# The one place this deck says anything about immune subtypes, and it is deliberately
+# NOT a subtyping section. Measured on the test ROIs, the immune compartment does not
+# split into subtypes at any cut: it is the same two clusters from k=5 through k=9, and
+# at k=10 it splits BY SAMPLE (the confound) rather than by subtype. So there is nothing
+# to subtype here, and a section claiming otherwise would be inventing structure.
+#
+# What aggregation does buy is depth. A consensus group's centroid is built from
+# thousands of cells, so this correlation is decisive where the per-cell version is not:
+# on the test ROIs the immune group's margin over its runner-up is 0.068, against a
+# median 0.011 per cell. That is the "aggregate before correlating" result, and it is
+# why this panel is at the consensus level and not in sample_summary.
+#
+# Every group is shown, not just the immune one, and that IS the diagnostic: the S7
+# signal should concentrate in the group the major reference called Immune. If it does
+# not, the reference is not discriminating and no call built on it means anything.
+immune_genes = [g for g in IMMUNE_REFERENCE.index if g in GROUP_CENTROIDS.columns]
+IMMUNE_EVIDENCE = pd.DataFrame({
+    subtype: GROUP_CENTROIDS[immune_genes].T.corrwith(
+        np.log1p(IMMUNE_REFERENCE.loc[immune_genes, subtype]), method="spearman")
+    for subtype in IMMUNE_REFERENCE.columns})
+
+immune_group = ASSIGNED.get("Immune")
+display(Markdown(
+    f"Spearman correlation between each consensus cluster's centroid and the four immune "
+    f"subtypes of Data S7, over {len(immune_genes):,} shared genes. "
+    + (f"The group called Immune is **{immune_group}**; a red box marks its strongest "
+       f"subtype. " if immune_group else "No group was assigned to Immune. ")
+    + "Unlike the heatmap above, all four columns are the same statistic and share one "
+      "colour scale. Read the ORDERING within a row, not the absolute values: the four "
+      "profiles are all immune cells and correlate highly with almost anything, and the "
+      "NK and T centroids correlate with each other at 0.924 over this panel, so those "
+      "two cannot be told apart at any depth by any metric."
+))
+
+fig, ax = plt.subplots(figsize=FIGSIZE)
+image = ax.imshow(IMMUNE_EVIDENCE.to_numpy(), cmap="viridis", aspect="auto")
+ax.set_xticks(range(len(IMMUNE_EVIDENCE.columns)))
+ax.set_xticklabels(IMMUNE_EVIDENCE.columns, rotation=45, ha="right", fontsize=6)
+ax.set_yticks(range(len(IMMUNE_EVIDENCE.index)))
+ax.set_yticklabels([f"{c} (n={GROUP_CELLS[i]:,})" for i, c in enumerate(IMMUNE_EVIDENCE.index)],
+                   fontsize=6)
+for row in range(len(IMMUNE_EVIDENCE.index)):
+    for column in range(len(IMMUNE_EVIDENCE.columns)):
+        ax.text(column, row, f"{IMMUNE_EVIDENCE.iloc[row, column]:.3f}", ha="center",
+                va="center", fontsize=5, color="white")
+if immune_group is not None:
+    row = list(IMMUNE_EVIDENCE.index).index(immune_group)
+    column = list(IMMUNE_EVIDENCE.columns).index(IMMUNE_EVIDENCE.loc[immune_group].idxmax())
+    ax.add_patch(Rectangle((column - 0.5, row - 0.5), 1, 1, fill=False,
+                           edgecolor="#d62728", linewidth=1.4))
+fig.colorbar(image, ax=ax, fraction=0.025, label="Spearman r")
+fig.tight_layout()
+plt.show()
+plt.close(fig)
+
+if immune_group is not None:
+    ranked = IMMUNE_EVIDENCE.loc[immune_group].sort_values(ascending=False)
+    display(Markdown(
+        f"**{immune_group}** ({GROUP_CELLS[list(IMMUNE_EVIDENCE.index).index(immune_group)]:,} "
+        f"cells) is most like **{ranked.index[0]}** at r={ranked.iloc[0]:.3f}, leading "
+        f"{ranked.index[1]} by {ranked.iloc[0] - ranked.iloc[1]:.3f}. Ranking: "
+        + ", ".join(f"{t} {v:.3f}" for t, v in ranked.items()) + "."
     ))
 ```
 

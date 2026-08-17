@@ -444,6 +444,7 @@ workflow consensus_report {
     if (!params.reference_major)    error "Please provide --reference_major"
     // Defaulted in nextflow.config to a header-only asset, so this only fires if it is
     // explicitly unset. Rows in it ARE the grouping; none means the deck proposes one.
+    if (!params.reference_immune)   error "Please provide --reference_immune"
     if (!params.consensus_clusters) error "Please provide --consensus_clusters"
 
     // Point --samplesheet at a CREATE_CENTROIDS handoff sheet. Only centroid_path is
@@ -471,6 +472,7 @@ workflow consensus_report {
         file(params.chosen_resolutions),
         file(params.follicle_markers),
         file(params.reference_major),
+        file(params.reference_immune),
         file(params.consensus_clusters),
     )
 }

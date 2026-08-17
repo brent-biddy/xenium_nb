@@ -40,6 +40,10 @@ process CONSENSUS_REPORT {
     // cluster, so both decks read one definition of each family.
     path markers, stageAs: 'ovary_follicle_markers.yaml'
     path reference, stageAs: 'ovary_reference_major.csv.gz'
+    // The immune subtype centroids, for the one panel that asks what the group called
+    // Immune is made of. Not a subtyping section — see the notebook for why the
+    // compartment does not split into subtypes at any cut.
+    path immune_reference, stageAs: 'ovary_reference_immune.csv.gz'
     // The committed consensus grouping, read by fixed name. OPTIONAL IN SUBSTANCE: it
     // does not exist as a real grouping until one has been promoted from
     // consensus_scaffold.csv and committed, and this deck is what you render to produce
