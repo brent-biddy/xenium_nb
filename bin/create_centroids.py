@@ -3,9 +3,14 @@
 create_centroids.py - Reduce a clustered SpatialData zarr to per-group centroids.
 
 Sums both expression layers over an obs column, writing one row per group of cells
-instead of one per cell: X is summed CP10K, layers["counts"] summed raw counts, and obs
-carries grouping, group, n_cells and sample, plus resolution and cluster_v1 for a leiden
-column. Requires layers["counts"], so not cluster_sdata_gpu_ooc output.
+instead of one per cell:
+
+    X                 each cell's CP10K profile, summed over the group
+    layers["counts"]  raw counts, summed over the group
+
+obs describes each row with `grouping`, `group`, `n_cells` and `sample`, plus
+`resolution` and `cluster_v1` when the column grouped on is one of the sweep's
+leiden_res_<r> columns. Requires layers["counts"], so not cluster_sdata_gpu_ooc output.
 
 Groups by every leiden_res_<r> column in the sweep by default, or by one named obs column
 with --group_by. Writes <sample>_centroids.h5ad into the current working directory (or
