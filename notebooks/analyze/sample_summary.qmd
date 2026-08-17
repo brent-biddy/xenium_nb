@@ -49,6 +49,7 @@ from spatialdata.models import PointsModel
 from spatialdata.transformations import get_transformation
 from scipy.cluster.hierarchy import leaves_list, linkage
 from scipy.sparse import issparse
+from scipy.stats import rankdata
 from scipy.spatial.distance import squareform
 
 # Chatter from the zoom slides, suppressed by message rather than wholesale: each of these
@@ -211,6 +212,46 @@ REFERENCE_CSV = Path("ovary_reference_major.csv.gz")
 if not REFERENCE_CSV.exists():
     raise FileNotFoundError(f"{REFERENCE_CSV} not staged beside the notebook.")
 REFERENCE = pd.read_csv(REFERENCE_CSV, index_col=0)
+
+# The immune subtype evidence, both halves of it. The major reference above resolves the
+# Immune compartment as one cell type; these describe what is inside it.
+#
+# THESE SLIDES SHOW EVIDENCE, THEY DO NOT MAKE A CALL, and that is a measured decision
+# rather than caution. Per-cell assignment against these four was built and tested first:
+# argmax over the S7 correlations has no skill against a majority-class baseline (it
+# calls most immune cells T where markers say macrophage, at a median margin of 0.011),
+# and marker-set argmax is not reproducible for the rare subtypes (split the marker sets
+# in half and the two halves agree on 0% and 7% of the non-macrophage calls, against 82%
+# overall — which is just both halves saying macrophage). Two structural reasons, both
+# fixed properties of this panel rather than of the method: NK and T correlate at 0.924
+# in the S7 centroids, so they cannot be separated at any depth; and a cell carries ~174
+# of 5,101 genes, so a per-cell profile is ~95% zeros. Macrophage is the one subtype with
+# reproducible signal. Adding an argmax here would put four confident labels on top of
+# evidence that supports one.
+IMMUNE_MARKERS_YAML = Path("ovary_immune_markers.yaml")
+if not IMMUNE_MARKERS_YAML.exists():
+    raise FileNotFoundError(f"{IMMUNE_MARKERS_YAML} not staged beside the notebook.")
+# Read verbatim, with no score filter and no curation — unlike MARKER_SETS above, which
+# the paper tiers 1-5 and this deck cuts at 1. The asset is the paper's own text markers
+# and carries no tiering to cut on; genes absent from the panel are dropped at use, and
+# the slide reports the coverage rather than hiding it.
+IMMUNE_SETS = yaml.safe_load(IMMUNE_MARKERS_YAML.read_text())
+
+IMMUNE_REFERENCE_CSV = Path("ovary_reference_immune.csv.gz")
+if not IMMUNE_REFERENCE_CSV.exists():
+    raise FileNotFoundError(f"{IMMUNE_REFERENCE_CSV} not staged beside the notebook.")
+IMMUNE_REFERENCE = pd.read_csv(IMMUNE_REFERENCE_CSV, index_col=0)
+
+# Subtype order for the immune slides, so the marker row and the correlation row below it
+# line up column for column. Taken from the yaml rather than the reference because the
+# reference's own column order is NK, T, Macrophage, Mast and reading T beside T matters
+# more than matching the asset.
+IMMUNE_ORDER = [t for t in IMMUNE_SETS if t in IMMUNE_REFERENCE.columns]
+if len(IMMUNE_ORDER) != len(IMMUNE_SETS):
+    raise ValueError(
+        f"immune marker sets {sorted(IMMUNE_SETS)} and reference columns "
+        f"{sorted(IMMUNE_REFERENCE.columns)} name different subtypes — the two assets "
+        f"come from the same paper and must agree.")
 
 # The correlation runs over every gene the sample and the reference share, with no
 # selection beyond that intersection. Simplicity is the point: the gene set is then a
@@ -958,6 +999,132 @@ def marker_umaps(adata, sample):
     plt.show()
     plt.close(fig)
 
+
+def immune_evidence(adata, sample, immune_clusters):
+    """One slide's figure: per-cell immune subtype evidence, two independent ways.
+
+    Top row is the mean of each subtype's marker set, from layers["lognorm"] — the same
+    layer and the same plain mean marker_umaps takes, so the two slides cannot tell
+    different stories. Bottom row is each cell's Spearman correlation against the Data S7
+    subtype centroids over every gene they share.
+
+    BOTH ROWS ARE READ WITHIN A COLUMN, NEVER ACROSS. The marker scores carry the
+    expression level of whichever genes the panel happens to cover — a 3-gene macrophage
+    set that is fully covered outscores a 1-gene T set whatever the cell is — so an
+    argmax across them would report panel coverage rather than cell identity. Each panel
+    is therefore on its own colour range, and no call is made anywhere on this slide.
+
+    The correlations are MEAN-CENTRED per cell, and without that the row is worthless:
+    all four S7 profiles are immune cells and share most of their signal, so the raw
+    correlations are four copies of one generic-expression gradient across the whole
+    embedding — verified by rendering it. Centring leaves each cell's relative preference
+    among the four, which is the only part that differs between them. The cost is that a
+    cell must rank something first, so a stromal cell showing red for T means only that
+    it resembles T more than the other three immune profiles, not that it is a T cell.
+
+    Spearman is computed from lognorm rather than the CP10K the cluster centroids use.
+    That is not an approximation: ranking is per cell and lognorm is a monotonic per-cell
+    transform of counts, so the ranks — and therefore the correlation — are identical.
+    Verified on a real ROI at max absolute difference 0.0. It matters because it keeps
+    this slide off layers["counts"], which the deck stopped reading when the centroids
+    moved to create_centroids.
+
+    Drawn over ALL cells, not just the immune cluster. Whether a subtype's signal is
+    confined to the compartment the major reference called Immune is the check on whether
+    it means anything, and masking to that cluster would assume the answer.
+    """
+    shared = adata.var_names.intersection(IMMUNE_REFERENCE.index)
+    coords = adata.obsm["X_umap"]
+    in_immune = adata.obs["cluster_v2"].astype(str).isin(
+        {str(c) for c in immune_clusters}).to_numpy()
+
+    # Per-cell marker means, one column per subtype. Genes off the panel are dropped
+    # here and the count is put on the panel title, so a set scored on one of three
+    # genes says so rather than looking like a set of three.
+    present = {t: [g for g in IMMUNE_SETS[t] if g in adata.var_names] for t in IMMUNE_ORDER}
+    scores = {}
+    for subtype, genes in present.items():
+        block = adata[:, genes].layers["lognorm"] if genes else None
+        scores[subtype] = (np.asarray(block.mean(axis=1)).ravel() if genes
+                           else np.full(adata.n_obs, np.nan))
+
+    # Per-cell Spearman: rank genes within each cell, rank each reference column, then
+    # correlate. Done as one matrix product rather than per cell — 20k cells against
+    # 4,372 genes is seconds this way and minutes in a loop.
+    shared_block = adata[:, shared].layers["lognorm"]
+    cell_ranks = rankdata(
+        np.asarray(shared_block.todense() if issparse(shared_block) else shared_block),
+        axis=1)
+    reference_ranks = rankdata(np.log1p(IMMUNE_REFERENCE.loc[shared, IMMUNE_ORDER].to_numpy()),
+                               axis=0)
+    centred_cells = cell_ranks - cell_ranks.mean(axis=1, keepdims=True)
+    centred_reference = reference_ranks - reference_ranks.mean(axis=0, keepdims=True)
+    correlation = np.nan_to_num(
+        (centred_cells @ centred_reference)
+        / (np.linalg.norm(centred_cells, axis=1)[:, None]
+           * np.linalg.norm(centred_reference, axis=0)[None, :]))
+    relative = correlation - correlation.mean(axis=1, keepdims=True)
+
+    # umap_figure_height is shaped for ONE row: it adds the chrome allowance and caps at
+    # the slide height, so doubling its result double-counts the chrome and leaves a band
+    # of empty slide between the rows — which is exactly what the first render showed.
+    # Take the panel-only height for one row (chrome 0), double THAT, and add the chrome
+    # once, capping the total against the same slide budget the helper uses.
+    panel_width = FIGSIZE[0] / (len(IMMUNE_ORDER) + 1)
+    row_height = umap_figure_height(coords, panel_width, 0.0)
+    height = min(FIGSIZE[1] * 0.95, 2 * row_height + 0.9)
+    fig, axes = plt.subplots(2, len(IMMUNE_ORDER) + 1,
+                             figsize=(FIGSIZE[0], height), squeeze=False)
+
+    # Leftmost column orients the reader: where the compartment the major reference
+    # called Immune actually sits, repeated on both rows so neither has to look up.
+    for row in (0, 1):
+        axis = axes[row, 0]
+        axis.scatter(coords[:, 0], coords[:, 1], s=0.6, c="#dcdcdc", linewidths=0)
+        axis.scatter(coords[in_immune, 0], coords[in_immune, 1], s=1.4, c="#d62728",
+                     linewidths=0)
+        axis.set_title(f"Immune cluster{'s' if len(immune_clusters) != 1 else ''} "
+                       f"{', '.join(str(c) for c in immune_clusters) or '—'}\n"
+                       f"n={int(in_immune.sum()):,}", fontsize=6)
+
+    for column, subtype in enumerate(IMMUNE_ORDER, start=1):
+        marker_values = scores[subtype]
+        finite = marker_values[np.isfinite(marker_values)]
+        top = np.percentile(finite[finite > 0], 99) if (finite > 0).any() else 1.0
+        # Expressing cells drawn last: they are a small minority at this sparsity and
+        # would otherwise be buried under the zeros they sit among.
+        order = np.argsort(np.nan_to_num(marker_values), kind="stable")
+        marker_art = axes[0, column].scatter(
+            coords[order, 0], coords[order, 1], s=0.8, c=marker_values[order],
+            cmap="magma", vmin=0, vmax=top, linewidths=0)
+        axes[0, column].set_title(
+            f"{subtype} markers\n{len(present[subtype])}/{len(IMMUNE_SETS[subtype])} on "
+            f"panel · {100 * np.mean(np.nan_to_num(marker_values) > 0):.1f}% of cells >0",
+            fontsize=6)
+        fig.colorbar(marker_art, ax=axes[0, column], fraction=0.046)
+
+        relative_values = relative[:, column - 1]
+        limit = np.percentile(np.abs(relative_values), 99)
+        order = np.argsort(relative_values, kind="stable")
+        correlation_art = axes[1, column].scatter(
+            coords[order, 0], coords[order, 1], s=0.8, c=relative_values[order],
+            cmap="coolwarm", vmin=-limit, vmax=limit, linewidths=0)
+        axes[1, column].set_title(f"{subtype} · relative correlation", fontsize=6)
+        fig.colorbar(correlation_art, ax=axes[1, column], fraction=0.046)
+
+    for axis in axes.ravel():
+        match_umap_axes(axis, coords)
+        axis.set_xticks([])
+        axis.set_yticks([])
+        for spine in axis.spines.values():
+            spine.set_visible(False)
+
+    fig.suptitle(f"{sample} · immune subtype evidence per cell · "
+                 f"markers (top) and Data S7 centroid correlation (bottom, mean-centred) · "
+                 f"{len(shared):,} shared genes", fontsize=8, x=0.01, ha="left")
+    fig.tight_layout()
+    plt.show()
+    plt.close(fig)
 
 
 def umap_clusters(adata, sample, name):
@@ -2151,6 +2318,23 @@ for path in ZARRS:
             f"{', '.join(CELL_TYPE_VOCABULARY)}. Grey is {UNASSIGNED}."
         ))
         spatial_cell_types(adata, sample, "cluster_v2", cluster_to_label, "with major types")
+
+        # Immune subtypes sit one level below the call the slide above just made: the
+        # major reference resolves Immune as a single cell type, and this asks what is
+        # inside it. Placed here rather than beside the marker slides because it is only
+        # readable against that call — the leftmost panel marks the cluster it named.
+        display(Markdown("## Immune subtype evidence"))
+        display(Markdown(
+            f"Per-cell evidence for the four immune subtypes of Sci Adv adm7506, over "
+            f"all {adata.n_obs:,} cells. Top row is the mean of each subtype's marker "
+            f"set from the paper's text, with the number of those genes carried by the "
+            f"panel and the share of cells expressing any of them. Bottom row is each "
+            f"cell's Spearman correlation against the Data S7 subtype centroids, "
+            f"mean-centred across the four so each panel shows relative preference. "
+            f"Every panel is on its own colour range; values are not comparable between "
+            f"subtypes. Leftmost marks the cluster called Immune."
+        ))
+        immune_evidence(adata, sample, resolved_cell_types.get("Immune", []))
 
         # The oocyte zooms close the section. Everything above is at section scale, where a
         # 30 µm oocyte is one dot; these are the only slides at a magnification where the

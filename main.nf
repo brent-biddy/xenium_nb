@@ -377,6 +377,10 @@ workflow sample_summary {
     // anything derived — a different tissue needs a different marker file.
     if (!params.follicle_markers)   error "Please provide --follicle_markers"
     if (!params.reference_major)    error "Please provide --reference_major"
+    // The immune subtype assets, both defaulted in nextflow.config to the same
+    // converter's output. Tissue-specific in the same way the two above are.
+    if (!params.immune_markers)     error "Please provide --immune_markers"
+    if (!params.reference_immune)   error "Please provide --reference_immune"
     // Defaulted to a header-only asset, so this only fires if explicitly unset. Its rows
     // override the argmax per cell type; a sample with no rows takes the defaults.
     if (!params.cell_type_annotations) error "Please provide --cell_type_annotations"
@@ -421,6 +425,8 @@ workflow sample_summary {
         file(params.chosen_resolutions),
         file(params.follicle_markers),
         file(params.reference_major),
+        file(params.immune_markers),
+        file(params.reference_immune),
         file(params.cell_type_annotations),
         file(params.curated_oocytes),
     )

@@ -52,6 +52,13 @@ process SAMPLE_SUMMARY {
     // The major cell-type reference the cluster centroids are correlated against,
     // likewise under the fixed name the notebook reads.
     path reference, stageAs: 'ovary_reference_major.csv.gz'
+    // The immune subtype markers and centroids, both from the same paper as the two
+    // assets above and both staged under the fixed names the notebook reads. They drive
+    // one slide per sample, showing what is inside the compartment the major reference
+    // resolves as a single Immune cell type. Required rather than optional for the same
+    // reason the follicle markers are: absent, the slide would vanish in silence.
+    path immune_markers, stageAs: 'ovary_immune_markers.yaml'
+    path immune_reference, stageAs: 'ovary_reference_immune.csv.gz'
     // The hand-made cell type calls. Optional in substance — the notebook falls back to
     // the argmax per cell type when the file has no row for a (sample, cell type) — but
     // staged unconditionally, since Nextflow has no optional path input and the shipped

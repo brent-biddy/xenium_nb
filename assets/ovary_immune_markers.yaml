@@ -1,0 +1,60 @@
+# Immune subtype markers, from Sci Adv adm7506 — the paper's own, verbatim.
+#
+# These are the marker genes the paper names in the Results text ("scRNA-seq of three
+# ovaries from reproductive-age women") when it introduces the four immune subtypes it
+# resolves by focused clustering of 863 immune cells.
+#
+# WHY THE TEXT AND NOT A SUPPLEMENTARY TABLE. The supplement carries no immune-subtype
+# marker LIST. Data S5 is the only true marker list in it (granulosa/oocyte/theca, with
+# the paper's 1-5 tiering) and has no immune sets. Data S6 and S7 are centroids —
+# genes x cell type mean expression and detection rate — and Data S2 is GeoMx cluster
+# centroids. Data S8 is a 331-gene type-specific table, but it is dominated by the major
+# types (119 Endothelial, 110 Stromal, 87 Pericyte by argmax across its columns) against
+# 9 Macrophage, 3 Mast, 3 NK and 0 T, of which the 5K panel carries exactly CD74 and
+# SOX4. So these three-per-subtype sets are the whole published inventory.
+#
+# NOTHING IS ADDED, REMOVED OR REORDERED. Where the panel does not carry a gene it is
+# still listed, and the scoring code drops it at read time and reports the coverage —
+# the asset records what the paper said, not what this panel can measure. Coverage is
+# uneven and materially so:
+#
+#     T           CD3D absent · CD3G PANEL · IL7R absent          -> 1 of 3
+#     NK          KLRD1 PANEL · TRDC PANEL · GNLY absent          -> 2 of 3
+#     Macrophage  CD68 PANEL · CD14 PANEL · FOLR2 PANEL           -> 3 of 3
+#     Mast        KIT PANEL · TPSB2 absent · TPSAB1 absent        -> 1 of 3
+#
+# So a T score here rests on CD3G alone and a mast score on KIT alone. KIT is worth
+# knowing about specifically: in ovary it is an OOCYTE marker, so a mast score built on
+# it will light up the cell type this pipeline exists to find.
+#
+# ONE SYMBOL RESOLVED, NOT CURATED. The paper writes the NK set as "KLRD1, TRCD, and
+# GNLY". TRCD is not a gene symbol; it is a transposition of TRDC (T cell receptor delta
+# constant), which IS on the panel while TRCD matches nothing anywhere. The literal
+# string is preserved in the comment beside it so the substitution is auditable.
+#
+# READ SCORES WITHIN A SET, NEVER ACROSS SETS. A set's score is the mean log1p CP10K of
+# its members, so it carries the expression level of those particular genes: a 3-gene
+# macrophage set that is fully covered outscores a 1-gene T set structurally, whatever
+# the cell is. Comparing columns compares gene panels, not cell identities — which is
+# why an argmax across these four is not a cell type call. sample_summary's marker
+# heatmap colours each column on its own range for the same reason.
+
+T:
+  - CD3D
+  - CD3G
+  - IL7R
+
+NK:
+  - KLRD1
+  - TRDC      # paper writes "TRCD", a transposition of TRDC — see note above
+  - GNLY
+
+Macrophage:
+  - CD68
+  - CD14
+  - FOLR2
+
+Mast:
+  - KIT
+  - TPSB2
+  - TPSAB1

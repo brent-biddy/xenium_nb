@@ -10,6 +10,11 @@ forms sample_summary consumes, and writes them into assets/.
       averaged over the three donor sheets. This is the form cluster centroids are
       Spearman-correlated against.
 
+  Data S7 -> assets/ovary_reference_immune.csv.gz
+      Genes x immune subtype (NK, T, Macrophage, Mast), mean expression, from the one
+      sheet Data S7 carries. Cluster and per-cell profiles are correlated against its
+      columns the same way they are against the major reference.
+
   Data S5 -> assets/ovary_follicle_markers.yaml
       Granulosa / Oocyte / Theca markers as {gene: quality score}. These sheets carry
       per-sample values rather than per-cell-type means, so they cannot be made into
@@ -27,6 +32,7 @@ Usage:
 """
 
 import argparse
+import datetime
 from pathlib import Path
 
 import numpy as np
@@ -38,6 +44,14 @@ import yaml
 # 4 detection-rate columns) under a two-row header.
 S6_DONOR_SHEETS = ["Donor 3", "Donor 4", "Donor 5"]
 N_MAJOR_TYPES = 4
+
+# Data S7's single sheet: the same two-row header as an S6 donor sheet, four immune
+# subtypes (NK, T, Macrophage, Mast) under "Mean Expression" then "Detection Rate".
+S7_SHEET = "immu4_mean_detect"
+N_IMMUNE_TYPES = 4
+
+# Excel reads MARCH*/SEPT*/DEC* gene symbols as dates. Month -> the symbol prefix it ate.
+EXCEL_DATE_GENES = {3: "MARCH", 9: "SEPT", 12: "DEC"}
 
 # Data S5's follicle sheets. Each lists its gene set in column A, terminated by a blank
 # row and followed by a footnote describing the paper's 1-5 marker-quality scoring.
@@ -60,6 +74,61 @@ def parse_args():
     return parser.parse_args()
 
 
+def gene_symbol(value):
+    """A cell from a gene column, as a symbol — undoing Excel's date autoformatting.
+
+    MARCH1, SEPT1 and DEC1 are read by Excel as dates and stored as datetimes, so they
+    arrive here as `2023-03-01 00:00:00` rather than `MARCH1`. Ten such entries are in
+    Data S6 and twelve in Data S7, all of them MARCH family. Left alone they become
+    literal date strings in the asset that match no gene anywhere and silently drop out
+    of every intersection.
+
+    It costs nothing today — none of the MARCH family is on the 5K panel under either
+    the old name or the current MARCHF one, so the corrupted rows never entered a
+    correlation. It is fixed because a panel that did carry them would lose them without
+    any error, and because the immune reference this now also writes is one where the
+    family is relevant (MARCHF1 regulates MHC-II in antigen-presenting cells).
+
+    Note the recovered symbol is the OLD one — MARCH1, not MARCHF1 — because that is
+    what the paper's table said before Excel ate it. Renaming to current HGNC would be a
+    second, separate decision.
+    """
+    if isinstance(value, datetime.datetime):
+        return f"{EXCEL_DATE_GENES.get(value.month, value.month)}{value.day}"
+    return None if value is None else str(value).strip()
+
+
+def read_immune_reference(path):
+    """Genes x immune subtype mean expression, from the single Data S7 sheet.
+
+    The same shape as one of Data S6's donor sheets — a two-row header spanning
+    "Mean Expression" then "Detection Rate", four subtypes under each — but there is one
+    sheet rather than three, so nothing is averaged. Only the mean-expression block is
+    taken, for the same reason as the major reference: detection rate is a different
+    quantity and is not comparable to a cluster centroid.
+
+    Worth knowing before this is used to name anything: the four subtype profiles are
+    NOT four separable things on a 5K panel. Measured over the panel intersection, the
+    NK and T centroids correlate at 0.924 — they cannot be told apart at any depth by any
+    metric — while Macrophage sits ~0.69-0.71 from the others and Mast ~0.60.
+    """
+    workbook = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    rows = list(workbook[S7_SHEET].iter_rows(values_only=True))
+    workbook.close()
+    types = list(rows[1][1:1 + N_IMMUNE_TYPES])
+    data = {}
+    for row in rows[2:]:
+        gene, values = gene_symbol(row[0]), row[1:1 + N_IMMUNE_TYPES]
+        if not gene or any(v is None for v in values):
+            continue
+        data[gene] = [float(v) for v in values]
+    reference = pd.DataFrame.from_dict(data, orient="index", columns=types)
+    reference.index.name = "gene"
+    print(f"  {S7_SHEET}: {reference.shape[0]:,} genes x {reference.shape[1]} subtypes "
+          f"({', '.join(types)})")
+    return reference
+
+
 def read_major_reference(path):
     """Genes x major cell type mean expression, averaged over the donor sheets.
 
@@ -74,10 +143,10 @@ def read_major_reference(path):
         types = list(rows[1][1:1 + N_MAJOR_TYPES])
         data = {}
         for row in rows[2:]:
-            gene, values = row[0], row[1:1 + N_MAJOR_TYPES]
-            if gene is None or not str(gene).strip() or any(v is None for v in values):
+            gene, values = gene_symbol(row[0]), row[1:1 + N_MAJOR_TYPES]
+            if not gene or any(v is None for v in values):
                 continue
-            data[str(gene).strip()] = [float(v) for v in values]
+            data[gene] = [float(v) for v in values]
         frames[sheet] = pd.DataFrame.from_dict(data, orient="index", columns=types)
         print(f"  {sheet}: {frames[sheet].shape[0]:,} genes x {len(types)} types")
     workbook.close()
@@ -147,6 +216,12 @@ def main():
     reference.to_csv(reference_path)
     print(f"  wrote {reference_path}")
 
+    print("\nData S7 - immune subtype mean expression:")
+    immune = read_immune_reference(supdir / "adm7506_Data_S7.xlsx")
+    immune_path = outdir / "ovary_reference_immune.csv.gz"
+    immune.to_csv(immune_path)
+    print(f"  wrote {immune_path}")
+
     print("\nData S5 - follicle marker sets:")
     sets = read_follicle_markers(supdir / "adm7506_Data_S5.xlsx")
     markers_path = outdir / "ovary_follicle_markers.yaml"
@@ -157,9 +232,10 @@ def main():
         import anndata as ad
         panel = set(ad.read_zarr(f"{args.panel.rstrip('/')}/tables/table").var_names)
         print(f"\nOverlap with a {len(panel):,}-gene panel:")
-        shared = panel & set(reference.index)
-        print(f"  reference: {len(shared):,} shared "
-              f"({len(shared) / len(panel) * 100:.1f}% of the panel)")
+        for label, table in (("major reference ", reference), ("immune reference", immune)):
+            shared = panel & set(table.index)
+            print(f"  {label}: {len(shared):,} shared "
+                  f"({len(shared) / len(panel) * 100:.1f}% of the panel)")
         for name, genes in sets.items():
             on_panel = panel & set(genes)
             established = {g for g, score in genes.items() if score == 1} & panel
