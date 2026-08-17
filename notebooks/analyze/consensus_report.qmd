@@ -1,0 +1,490 @@
+---
+title: "xenium_nb: consensus clusters"
+subtitle: "One cohort-wide grouping of every sample's clusters, and what it is made of"
+# Pin the kernel by name, as the other decks do. Apptainer bind-mounts $HOME, so
+# kernelspecs from ~/.local/share/jupyter/kernels shadow the container's own — quarto's
+# default "python3" then resolves to a host env missing the pipeline's packages, and
+# every cell fails at import under `error: true` while the render still exits 0.
+jupyter: python_spatial
+format:
+  pptx:
+    reference-doc: ouhsc_ppt_template.pptx
+    slide-level: 2
+execute:
+  echo: false
+  warning: false
+  # Keep rendering when a cell raises. Read the slides, not just the exit status.
+  error: true
+---
+
+```{python}
+# A SIBLING of sample_summary, not a step downstream of it: both read create_centroids'
+# stores directly, so neither blocks the other and neither can invalidate the other's
+# output. The split exists because consensus grouping is the part that gets iterated on
+# — inside sample_summary, changing the linkage or the cut meant re-rendering every
+# sample's fourteen per-sample slides to look at one heatmap.
+#
+# This deck reads CENTROIDS ONLY. No clustered zarr, no counts matrix, no per-cell
+# anything: sample and cluster ride in each store's obs, so the cohort is recoverable
+# without opening a zarr at all. That is what makes it cheap enough to re-render on
+# every change to the grouping.
+#
+# THE DECK READS THE GROUPING, IT DOES NOT DEFINE IT — with one deliberate exception,
+# stated here because the rule matters more than the exception. A consensus cluster id
+# is an analytical artifact: it is a label you annotate against, do DE within, and cite,
+# so it must not move when someone edits a caption. The authority is
+# assets/consensus_clusters.csv, committed. What this deck does when that file has no
+# rows is PROPOSE one — it emits consensus_scaffold.csv from the cut below, which you
+# read against these slides, edit, and promote by committing. Once the asset has rows it
+# wins outright and the cut is not consulted. So the exception is bounded: the deck
+# defines a grouping only while no committed one exists, and it always publishes what it
+# used.
+import warnings
+from pathlib import Path
+
+import anndata as ad
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import yaml
+from IPython.display import display, Markdown
+from matplotlib.patches import Rectangle
+from scipy.cluster.hierarchy import dendrogram, fcluster, leaves_list, linkage
+from scipy.spatial.distance import squareform
+
+warnings.filterwarnings("ignore")
+
+plt.rcParams.update({"figure.dpi": 200, "savefig.dpi": 200})
+
+# One slide's figure, in inches, matching the other decks.
+FIGSIZE = (9.0, 4.3)
+
+# How many consensus clusters the proposed cut takes. A knob with a default rather than
+# something derived: no internal criterion (silhouette, gap) knows what a cell type is,
+# and on the two test ROIs the choice between 5 and 6 is exactly the choice between
+# "follicle" as one group and "oocyte" and "granulosa" as two — a biological judgment
+# made by reading the marker evidence on the slides below, not a number to optimise.
+#
+# It only ever affects the SCAFFOLD. Once assets/consensus_clusters.csv has rows, this is
+# not consulted at all.
+CONSENSUS_K = 5
+
+# Average linkage on 1 - Spearman between cluster centroids. Average rather than Ward
+# because Ward's criterion is defined on Euclidean distances and is not meaningful on a
+# correlation distance; average is what sample_summary already uses for its within-sample
+# dendrogram, so the two decks order clusters by the same rule.
+LINKAGE_METHOD = "average"
+
+# Every sample's centroid store, staged flat into this notebook's working directory by
+# the Nextflow process. Globbing is the whole input contract, as it is for the other
+# decks. Keyed on obs["sample"] rather than the file name.
+STORES = sorted(Path(".").glob("*_centroids.h5ad"))
+if not STORES:
+    raise FileNotFoundError(
+        "No *_centroids.h5ad staged next to the notebook. This deck reads "
+        "create_centroids' stores — point --samplesheet at its handoff sheet.")
+
+# The per-sample resolution table, staged under the fixed name. The cohort matrix is
+# built at the resolution chosen for each sample, so this decides which rows of each
+# store are read — it is a required input, not a param with a default.
+RESOLUTIONS_CSV = Path("chosen_resolutions.csv")
+if not RESOLUTIONS_CSV.exists():
+    raise FileNotFoundError(f"{RESOLUTIONS_CSV} not staged beside the notebook.")
+_resolutions = pd.read_csv(RESOLUTIONS_CSV)
+DEFAULT_RESOLUTION = 0.5
+OVERRIDES = (dict(zip(_resolutions["sample"].astype(str),
+                      _resolutions["resolution"].astype(float)))
+             if len(_resolutions) else {})
+
+# The two evidence families, the same assets and the same forms sample_summary uses, so
+# a consensus cluster is named by the rule that names a per-sample cluster. Nothing here
+# is a second definition: the marker cut, the reference and the assignment rule are all
+# that deck's, applied to groups instead of clusters.
+MARKER_MAX_SCORE = 1
+_scored = yaml.safe_load(Path("ovary_follicle_markers.yaml").read_text())
+MARKER_SETS = {name: sorted(g for g, s in genes.items()
+                            if s is not None and s <= MARKER_MAX_SCORE)
+               for name, genes in _scored.items()}
+REFERENCE = pd.read_csv("ovary_reference_major.csv.gz", index_col=0)
+
+# The committed grouping. Rows are the authority; a header-only sheet means none exists
+# yet and the deck proposes one. Same convention as cell_type_annotations.csv.
+CONSENSUS_CSV = Path("consensus_clusters.csv")
+CURATED = pd.read_csv(CONSENSUS_CSV) if CONSENSUS_CSV.exists() else pd.DataFrame()
+
+UNASSIGNED = "unassigned"
+
+
+def md_table(df, index_label=None):
+    """Render a DataFrame as a markdown table.
+
+    The same hand-built table sample_summary uses, and for the same reason: df.style is
+    HTML-only and renders as nothing in pptx, while df.to_markdown needs tabulate, which
+    is NOT in the pipeline container — it fails as an ImportError inside a cell that
+    `error: true` turns into a traceback slide while the render still exits 0.
+
+    Wrapped in blank lines so the pipes start their own block. Without them Pandoc reads
+    them as a lazy continuation of the caption paragraph above and prints them verbatim
+    instead of building a table.
+    """
+    frame = df.reset_index() if index_label else df
+    if index_label:
+        frame = frame.rename(columns={frame.columns[0]: index_label})
+    header = "| " + " | ".join(str(c) for c in frame.columns) + " |"
+    rule = "| " + " | ".join("---" for _ in frame.columns) + " |"
+    rows = ["| " + " | ".join(str(v) for v in row) + " |"
+            for row in frame.itertuples(index=False)]
+    display(Markdown("\n".join(["", ""] + [header, rule] + rows + ["", ""])))
+```
+
+```{python}
+# ── The cohort matrix ─────────────────────────────────────────────────────────
+# One row per (sample, cluster) at that sample's chosen resolution. Both the summed
+# CP10K and the summed cell count are carried, because a GROUP's centroid is the
+# row-wise sum of its members' sums over the summed n_cells — the additive property
+# create_centroids stores sums for. Averaging the members' centroids instead would
+# weight a 200-cell cluster like a 20,000-cell one.
+sums, cells, rows = [], [], []
+genes = None
+for path in STORES:
+    store = ad.read_h5ad(path)
+    sample = str(store.obs["sample"].iloc[0])
+    resolution = OVERRIDES.get(sample, DEFAULT_RESOLUTION)
+    block = store[store.obs["resolution"].astype(str) == f"{resolution:.2f}"]
+    if block.n_obs == 0:
+        raise ValueError(
+            f"{sample}: centroid store holds no rows at resolution {resolution:.2f} — "
+            f"it carries {sorted(store.obs['resolution'].astype(str).unique())}.")
+    if genes is None:
+        genes = list(block.var_names)
+    elif list(block.var_names) != genes:
+        raise ValueError(
+            f"{sample}: centroid store has a different gene set than the samples before "
+            f"it. The cohort matrix is one frame over one panel; a store narrowed by "
+            f"--n_top_genes cannot be compared against a whole-panel one.")
+    matrix = np.asarray(block.X.todense() if hasattr(block.X, "todense") else block.X)
+    for i, cluster in enumerate(block.obs["cluster_v1"].astype(str)):
+        sums.append(matrix[i])
+        cells.append(int(block.obs["n_cells"].iloc[i]))
+        rows.append({"sample": sample, "cluster_v1": cluster,
+                     "resolution": f"{resolution:.2f}", "label": f"{sample}:{cluster}"})
+
+META = pd.DataFrame(rows)
+SUMS = np.vstack(sums)
+NCELLS = np.array(cells)
+LABELS = list(META["label"])
+
+# Cluster centroids, in the atlas pseudobulk form: summed CP10K over summed cells, then
+# log1p. Identical to what sample_summary draws its own slides from.
+CENTROIDS = pd.DataFrame(np.log1p(SUMS / NCELLS[:, None]), index=LABELS, columns=genes)
+
+# Spearman rather than Pearson, for the reason sample_summary gives: a targeted panel's
+# centroids are dominated by a few very high-expressing genes, which set a Pearson r
+# almost on their own, while ranks weight the whole panel.
+CORR = CENTROIDS.T.corr(method="spearman")
+DISTANCE = 1 - CORR.to_numpy()
+np.fill_diagonal(DISTANCE, 0.0)
+Z = linkage(squareform(DISTANCE, checks=False), method=LINKAGE_METHOD)
+ORDER = leaves_list(Z)
+
+display(Markdown(
+    f"# Cohort\n\n{META['sample'].nunique()} samples · {len(LABELS)} clusters · "
+    f"{len(genes):,} genes · {int(NCELLS.sum()):,} cells"
+))
+```
+
+## Cohort cluster centroid correlation
+
+```{python}
+display(Markdown(
+    f"Spearman correlation between every pair of cluster centroids across the cohort, "
+    f"over all {len(genes):,} genes. Rows and columns are ordered by average linkage on "
+    f"1 − r, symmetrically. The strip along the top marks which sample each cluster "
+    f"comes from."
+))
+
+fig, (strip_ax, ax) = plt.subplots(
+    2, 1, figsize=FIGSIZE, height_ratios=[1, 22], gridspec_kw={"hspace": 0.02})
+
+ordered = [LABELS[i] for i in ORDER]
+samples = sorted(META["sample"].unique())
+palette = plt.get_cmap("tab10")(np.linspace(0, 1, 10))[:len(samples)]
+sample_of = dict(zip(META["label"], META["sample"]))
+strip = np.array([[samples.index(sample_of[lab]) for lab in ordered]])
+strip_ax.imshow(strip, aspect="auto", cmap=plt.matplotlib.colors.ListedColormap(palette),
+                vmin=0, vmax=max(len(samples) - 1, 1))
+strip_ax.set_xticks([]); strip_ax.set_yticks([])
+for spine in strip_ax.spines.values():
+    spine.set_visible(False)
+
+image = ax.imshow(CORR.loc[ordered, ordered].to_numpy(), cmap="viridis", aspect="auto")
+ax.set_xticks(range(len(ordered)))
+ax.set_xticklabels(ordered, rotation=90, fontsize=3)
+ax.set_yticks(range(len(ordered)))
+ax.set_yticklabels(ordered, fontsize=3)
+fig.colorbar(image, ax=[strip_ax, ax], fraction=0.025, label="Spearman r")
+handles = [Rectangle((0, 0), 1, 1, color=palette[i]) for i in range(len(samples))]
+strip_ax.legend(handles, samples, loc="lower left", bbox_to_anchor=(0, 1.05),
+                ncol=min(len(samples), 6), fontsize=4, frameon=False)
+plt.show()
+plt.close(fig)
+```
+
+## The proposed grouping
+
+```{python}
+# The cut, and whether the curated sheet overrides it. Computed here rather than in a
+# slide function because the composition and annotation sections below both read it.
+proposed = fcluster(Z, CONSENSUS_K, criterion="maxclust")
+PROPOSED = {label: f"C{group}" for label, group in zip(LABELS, proposed)}
+
+if len(CURATED):
+    missing = {"sample", "cluster_v1", "consensus_id"} - set(CURATED.columns)
+    if missing:
+        raise ValueError(f"{CONSENSUS_CSV} missing column(s): {sorted(missing)}")
+    curated_map = {f"{r.sample}:{r.cluster_v1}": str(r.consensus_id)
+                   for r in CURATED.itertuples()}
+    # A cluster the sheet does not name is unassigned rather than silently taking the
+    # proposed group: a partially-curated sheet must not read as a whole grouping.
+    ASSIGNMENT = {label: curated_map.get(label, UNASSIGNED) for label in LABELS}
+    SOURCE = "curated"
+else:
+    ASSIGNMENT = dict(PROPOSED)
+    SOURCE = "proposed"
+
+META["consensus_id"] = META["label"].map(ASSIGNMENT)
+CONSENSUS_IDS = sorted(set(META["consensus_id"]) - {UNASSIGNED},
+                       key=lambda c: (len(c), c))
+
+display(Markdown(
+    f"Average-linkage dendrogram over the same 1 − r distances, cut at "
+    f"**{CONSENSUS_K}** groups. "
+    + (f"`consensus_clusters.csv` carries {len(CURATED)} rows, so **that grouping is "
+       f"used** and this cut is shown only as the alternative it replaced."
+       if SOURCE == "curated" else
+       "`consensus_clusters.csv` has no rows, so **this cut is used** and is published "
+       "as `consensus_scaffold.csv` to be edited and committed.")
+))
+
+fig, ax = plt.subplots(figsize=FIGSIZE)
+dendrogram(Z, labels=LABELS, ax=ax, leaf_font_size=3.5,
+           color_threshold=Z[-(CONSENSUS_K - 1), 2] if CONSENSUS_K > 1 else 0)
+ax.set_ylabel("1 − Spearman r", fontsize=6)
+ax.tick_params(axis="y", labelsize=5)
+plt.setp(ax.get_xticklabels(), rotation=90)
+for spine in ("top", "right"):
+    ax.spines[spine].set_visible(False)
+fig.tight_layout()
+plt.show()
+plt.close(fig)
+```
+
+## Consensus cluster membership
+
+```{python}
+display(Markdown(
+    f"Each consensus cluster's members, its cell count, and how many samples it draws "
+    f"from. A group spanning one sample where others span several is the signal to "
+    f"look at: with donor and slide confounded in this cohort it may be a real "
+    f"sample-specific population or it may be batch, and this table cannot tell them "
+    f"apart."
+))
+
+membership = []
+for consensus_id in CONSENSUS_IDS:
+    members = META[META["consensus_id"] == consensus_id]
+    membership.append({
+        "consensus_id": consensus_id,
+        "clusters": len(members),
+        "samples": members["sample"].nunique(),
+        "cells": int(NCELLS[[LABELS.index(l) for l in members["label"]]].sum()),
+        "members": ", ".join(members["label"]),
+    })
+MEMBERSHIP = pd.DataFrame(membership)
+md_table(MEMBERSHIP)
+```
+
+```{python}
+# ── Consensus centroids and their evidence ────────────────────────────────────
+# The row-wise sum, which is the whole reason create_centroids stores sums: a consensus
+# cluster's profile is its members' summed CP10K over their summed cells. No re-reading
+# of any zarr, and identical to what clustering those cells together would have given.
+group_sums, group_cells = [], []
+for consensus_id in CONSENSUS_IDS:
+    idx = [LABELS.index(l) for l in META["label"][META["consensus_id"] == consensus_id]]
+    group_sums.append(SUMS[idx].sum(axis=0))
+    group_cells.append(NCELLS[idx].sum())
+GROUP_CELLS = np.array(group_cells)
+GROUP_CENTROIDS = pd.DataFrame(
+    np.log1p(np.vstack(group_sums) / GROUP_CELLS[:, None]),
+    index=CONSENSUS_IDS, columns=genes)
+
+# Both evidence families in one frame, exactly as sample_summary builds it: marker means
+# for the follicle types the reference does not contain, reference correlations for the
+# major types the markers say nothing about. The two are on different scales, which does
+# not matter — the assignment reads each column separately.
+reference_genes = [g for g in REFERENCE.index if g in GROUP_CENTROIDS.columns]
+evidence = pd.DataFrame({
+    cell_type: GROUP_CENTROIDS[reference_genes].T.corrwith(
+        REFERENCE.loc[reference_genes, cell_type], method="spearman")
+    for cell_type in REFERENCE.columns})
+for set_name, set_genes in MARKER_SETS.items():
+    present = [g for g in set_genes if g in GROUP_CENTROIDS.columns]
+    evidence[set_name] = (GROUP_CENTROIDS[present].mean(axis=1) if present
+                          else np.nan)
+EVIDENCE = evidence
+```
+
+## Consensus clusters vs cell type evidence
+
+```{python}
+display(Markdown(
+    f"Each consensus cluster against both evidence families, over {len(reference_genes):,} "
+    f"genes shared with the reference. The four major types are Spearman correlations of "
+    f"the group centroid; the three follicle sets are the mean of that set's markers at "
+    f"quality score {MARKER_MAX_SCORE}. Each column is normalised on its own range — the "
+    f"two families are not on one scale, and a correlation and a marker mean are not "
+    f"comparable. A red box marks the group assigned to that cell type."
+))
+
+# Assignment is the argmax DOWN each column, then a greedy pass, which is
+# sample_summary's rule applied to groups. Down the column asks "which group is most
+# Endothelial"; across the row asks "which of the seven is this group most like" and
+# answers Stromal nearly everywhere in stroma-dominated tissue. Where two types claim
+# the same group, the stronger claim — the type's lead over its own runner-up, on that
+# column's own 0-1 scale so a marker mean and a correlation compare — takes it, and the
+# loser falls through to its next best.
+scaled = EVIDENCE.apply(
+    lambda col: (col - col.min()) / (col.max() - col.min())
+    if col.max() > col.min() else col * 0)
+claims = []
+for cell_type in EVIDENCE.columns:
+    ranked = scaled[cell_type].sort_values(ascending=False)
+    lead = float(ranked.iloc[0] - ranked.iloc[1]) if len(ranked) > 1 else 1.0
+    claims.append((lead, cell_type, list(ranked.index)))
+# A cell type whose every candidate is already taken gets None, not a missing key. That
+# is not an edge case here, it is the normal state whenever the cut produces fewer groups
+# than the vocabulary has types: at k=5 against 7 types, two types cannot be represented
+# at all. Recording it as None and naming those types on the slide is the honest report —
+# silently dropping them would show a heatmap where two columns have no box and nothing
+# says why, and indexing them would raise inside a cell that `error: true` turns into a
+# traceback slide while the render still exits 0.
+ASSIGNED, taken = {}, set()
+for _lead, cell_type, ranked in sorted(claims, reverse=True):
+    ASSIGNED[cell_type] = next((c for c in ranked if c not in taken), None)
+    if ASSIGNED[cell_type] is not None:
+        taken.add(ASSIGNED[cell_type])
+UNREPRESENTED = [t for t, c in ASSIGNED.items() if c is None]
+
+fig, ax = plt.subplots(figsize=FIGSIZE)
+image = ax.imshow(scaled.to_numpy(), cmap="magma", aspect="auto", vmin=0, vmax=1)
+ax.set_xticks(range(len(EVIDENCE.columns)))
+ax.set_xticklabels(EVIDENCE.columns, rotation=45, ha="right", fontsize=6)
+ax.set_yticks(range(len(EVIDENCE.index)))
+ax.set_yticklabels([f"{c} (n={GROUP_CELLS[i]:,})" for i, c in enumerate(EVIDENCE.index)],
+                   fontsize=6)
+for column, cell_type in enumerate(EVIDENCE.columns):
+    consensus_id = ASSIGNED.get(cell_type)
+    # No box for a type the cut left unrepresented; the caption names it instead.
+    if consensus_id is None:
+        continue
+    row = list(EVIDENCE.index).index(consensus_id)
+    ax.add_patch(Rectangle((column - 0.5, row - 0.5), 1, 1, fill=False,
+                           edgecolor="#d62728", linewidth=1.2))
+for row in range(len(EVIDENCE.index)):
+    for column in range(len(EVIDENCE.columns)):
+        ax.text(column, row, f"{EVIDENCE.iloc[row, column]:.2f}", ha="center",
+                va="center", fontsize=4.5,
+                color="white" if scaled.iloc[row, column] < 0.6 else "black")
+fig.colorbar(image, ax=ax, fraction=0.025, label="column-normalised")
+fig.tight_layout()
+plt.show()
+plt.close(fig)
+
+if UNREPRESENTED:
+    display(Markdown(
+        f"**{len(UNREPRESENTED)} of {len(EVIDENCE.columns)} cell types are "
+        f"unrepresented at this cut: {', '.join(sorted(UNREPRESENTED))}.** A group "
+        f"answers for at most one cell type, so a cut into {len(EVIDENCE.index)} groups "
+        f"cannot name {len(EVIDENCE.columns)} types. Raise `CONSENSUS_K` if these are "
+        f"expected to be present and distinct — the deck cannot separate two types that "
+        f"share a group."
+    ))
+```
+
+## Consensus composition by sample
+
+```{python}
+display(Markdown(
+    "Cells per consensus cluster in each sample, as a share of that sample. Read down a "
+    "column to compare one group across samples. A group thin in one sample may reflect "
+    "a harsher per-sample filtering cut rather than biology — cluster_sdata resolves "
+    "min_counts per sample."
+))
+
+names = {consensus_id: cell_type for cell_type, consensus_id in ASSIGNED.items()
+         if consensus_id is not None}
+composition = pd.DataFrame(
+    0, index=sorted(META["sample"].unique()),
+    columns=[f"{c} · {names.get(c, UNASSIGNED)}" for c in CONSENSUS_IDS], dtype=int)
+for consensus_id in CONSENSUS_IDS:
+    column = f"{consensus_id} · {names.get(consensus_id, UNASSIGNED)}"
+    for sample in composition.index:
+        selected = META[(META["consensus_id"] == consensus_id)
+                        & (META["sample"] == sample)]
+        composition.loc[sample, column] = int(
+            NCELLS[[LABELS.index(l) for l in selected["label"]]].sum())
+
+shares = composition.div(composition.sum(axis=1), axis=0) * 100
+fig, ax = plt.subplots(figsize=FIGSIZE)
+bottom = np.zeros(len(shares))
+colours = plt.get_cmap("tab20")(np.linspace(0, 1, 20))
+for i, column in enumerate(shares.columns):
+    ax.bar(shares.index, shares[column], bottom=bottom, label=column,
+           color=colours[i % 20])
+    bottom += shares[column].to_numpy()
+ax.set_ylabel("% of sample", fontsize=7)
+ax.tick_params(labelsize=6)
+ax.legend(fontsize=5, bbox_to_anchor=(1.01, 1), loc="upper left", frameon=False)
+for spine in ("top", "right"):
+    ax.spines[spine].set_visible(False)
+fig.tight_layout()
+plt.show()
+plt.close(fig)
+
+display(Markdown("### Cells per consensus cluster"))
+md_table(composition, index_label="sample")
+```
+
+```{python}
+# ── The two sheets ────────────────────────────────────────────────────────────
+# Always written, whether or not a curated grouping exists, so the declared outputs are
+# there either way and a run can be inspected without opening the pptx.
+scaffold = pd.DataFrame({
+    "sample": META["sample"],
+    "cluster_v1": META["cluster_v1"],
+    "resolution": META["resolution"],
+    "n_cells": [NCELLS[LABELS.index(l)] for l in META["label"]],
+    # The PROPOSED cut, not the assignment in use: this sheet exists to be promoted into
+    # assets/consensus_clusters.csv, and writing back the curated grouping would make it
+    # a copy of its own input rather than a proposal.
+    "consensus_id": META["label"].map(PROPOSED),
+})
+scaffold.to_csv("consensus_scaffold.csv", index=False)
+
+annotations = EVIDENCE.copy()
+annotations.insert(0, "n_cells", GROUP_CELLS)
+annotations.insert(0, "cell_type", [names.get(c, "") for c in EVIDENCE.index])
+annotations.insert(0, "consensus_id", EVIDENCE.index)
+annotations.to_csv("consensus_annotations.csv", index=False)
+
+display(Markdown(
+    f"# Outputs\n\n"
+    f"`consensus_scaffold.csv` — {len(scaffold)} rows, one per (sample, cluster), "
+    f"carrying the proposed grouping at k={CONSENSUS_K}. Edit it against these slides "
+    f"and commit it as `assets/consensus_clusters.csv` to make a grouping authoritative.\n\n"
+    f"`consensus_annotations.csv` — {len(annotations)} rows, one per consensus cluster, "
+    f"with its cell type call and the evidence behind it.\n\n"
+    f"Grouping in use: **{SOURCE}**."
+))
+```

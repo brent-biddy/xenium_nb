@@ -15,6 +15,7 @@
 //   cluster_report            samplesheet: sample, path  (clustered zarrs; one deck for the cohort)
 //   qc_report                 samplesheet: sample, path  (raw create_sdata zarrs; one deck for the cohort)
 //   sample_summary            samplesheet: sample, path, centroid_path  (create_centroids sheet; + --chosen_resolutions)
+//   consensus_report          samplesheet: sample, path, centroid_path  (create_centroids sheet)
 //   concat_sdata              samplesheet: path
 //   downsample_sdata          samplesheet: sample, path  (+ --fraction or --n_cells)
 //   plot_follicle             samplesheet: sample, cell, path
@@ -30,6 +31,7 @@ include { CREATE_CENTROIDS }         from './modules/create_centroids'
 include { CLUSTER_REPORT }           from './modules/cluster_report'
 include { QC_REPORT }                from './modules/qc_report'
 include { SAMPLE_SUMMARY }           from './modules/sample_summary'
+include { CONSENSUS_REPORT }         from './modules/consensus_report'
 include { CONCAT_SDATA }             from './modules/concat_sdata'
 include { DOWNSAMPLE_SDATA }         from './modules/downsample_sdata'
 include { PLOT_FOLLICLE }            from './modules/plot_follicle'
@@ -53,7 +55,7 @@ def resolveThreshold(rowValue, paramValue) {
 // ── Entry workflow ────────────────────────────────────────────────────────────
 
 workflow {
-    if (!params.step) error "Please provide --step <name>. Valid steps: downsample_xenium_region, create_sdata, create_adata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, create_centroids, cluster_report, qc_report, sample_summary, concat_sdata, downsample_sdata, plot_follicle"
+    if (!params.step) error "Please provide --step <name>. Valid steps: downsample_xenium_region, create_sdata, create_adata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, create_centroids, cluster_report, qc_report, sample_summary, consensus_report, concat_sdata, downsample_sdata, plot_follicle"
 
     if      (params.step == 'downsample_xenium_region')  downsample_xenium_region()
     else if (params.step == 'create_sdata')              create_sdata()
@@ -66,10 +68,11 @@ workflow {
     else if (params.step == 'cluster_report')            cluster_report()
     else if (params.step == 'qc_report')                 qc_report()
     else if (params.step == 'sample_summary')            sample_summary()
+    else if (params.step == 'consensus_report')          consensus_report()
     else if (params.step == 'concat_sdata')              concat_sdata()
     else if (params.step == 'downsample_sdata')          downsample_sdata()
     else if (params.step == 'plot_follicle')             plot_follicle()
-    else error "Unknown --step '${params.step}'. Valid steps: downsample_xenium_region, create_sdata, create_adata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, create_centroids, cluster_report, qc_report, sample_summary, concat_sdata, downsample_sdata, plot_follicle"
+    else error "Unknown --step '${params.step}'. Valid steps: downsample_xenium_region, create_sdata, create_adata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, create_centroids, cluster_report, qc_report, sample_summary, consensus_report, concat_sdata, downsample_sdata, plot_follicle"
 }
 
 // ── downsample_xenium_region ──────────────────────────────────────────────────
@@ -429,6 +432,46 @@ workflow sample_summary {
         file(params.reference_immune),
         file(params.cell_type_annotations),
         file(params.curated_oocytes),
+    )
+}
+
+// ── consensus_report ──────────────────────────────────────────────────────────
+
+workflow consensus_report {
+    if (!params.samplesheet)        error "Please provide --samplesheet"
+    if (!params.chosen_resolutions) error "Please provide --chosen_resolutions"
+    if (!params.follicle_markers)   error "Please provide --follicle_markers"
+    if (!params.reference_major)    error "Please provide --reference_major"
+    // Defaulted in nextflow.config to a header-only asset, so this only fires if it is
+    // explicitly unset. Rows in it ARE the grouping; none means the deck proposes one.
+    if (!params.consensus_clusters) error "Please provide --consensus_clusters"
+
+    // Point --samplesheet at a CREATE_CENTROIDS handoff sheet. Only centroid_path is
+    // read — this deck never opens a zarr, which is what makes it cheap enough to
+    // re-render on every change to the grouping.
+    channel
+        .fromPath(params.samplesheet)
+        .splitCsv(header: true)          // Map(sample, path, centroid_path)
+        .map { row ->
+            if (!row.centroid_path) error(
+                "Samplesheet row missing 'centroid_path': ${row}. consensus_report reads " +
+                "create_centroids' stores — point --samplesheet at " +
+                "<outdir>/create_centroids_samplesheet.csv.")
+            file(row.centroid_path)
+        }                                // path(centroid_h5ad)
+        // sort so the staged order — and therefore the cohort order — is reproducible
+        // regardless of the order tasks happen to finish upstream.
+        .toSortedList()                  // one list: fans in to a single task
+        .set { consensusCentroids }      // val(list of centroid h5ad paths)
+
+    CONSENSUS_REPORT(
+        consensusCentroids,
+        file("${projectDir}/notebooks/analyze/consensus_report.qmd"),
+        file("${projectDir}/resources/ouhsc_ppt_template.pptx"),
+        file(params.chosen_resolutions),
+        file(params.follicle_markers),
+        file(params.reference_major),
+        file(params.consensus_clusters),
     )
 }
 

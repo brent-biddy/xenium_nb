@@ -61,6 +61,9 @@ jobs:
       - name: Stub sample_summary
         run: nextflow run main.nf --step sample_summary -stub --samplesheet assets/ci_analyze_samplesheet.csv
 
+      - name: Stub consensus_report
+        run: nextflow run main.nf --step consensus_report -stub --samplesheet assets/ci_analyze_samplesheet.csv
+
       - name: Stub concat_sdata
         run: nextflow run main.nf --step concat_sdata -stub --samplesheet assets/ci_analyze_samplesheet.csv
 
