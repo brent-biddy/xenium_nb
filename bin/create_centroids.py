@@ -2,9 +2,13 @@
 """
 create_centroids.py - Reduce one clustered SpatialData zarr to per-group centroids.
 
-Consumes a cluster_sdata* zarr and writes a small centroid store: one row per group of
-cells instead of one row per cell. This is the artifact the report decks read, so they
-never open a counts matrix. Today sample_summary is the only thing that touches
+Consumes a clustered zarr from cluster_sdata or cluster_sdata_gpu and writes a small
+centroid store: one row per group of cells instead of one row per cell. This is the
+artifact the report decks read, so they never open a counts matrix.
+
+NOT cluster_sdata_gpu_ooc, whose output has no layers["counts"] — that step omits it on
+purpose, since holding a second copy of a merged cohort's matrix is what it exists to
+avoid. The check for that layer is up front in main(), with the reasoning there. Today sample_summary is the only thing that touches
 layers["counts"] at all, and it does so to compute exactly these numbers — once per
 render, over every sample, for a table that is three orders of magnitude smaller than
 the matrix it came from.
@@ -121,7 +125,9 @@ def parse_args():
     )
     parser.add_argument("--sample", required=True, help="Sample identifier")
     parser.add_argument(
-        "--path", required=True, help="Clustered SpatialData zarr from cluster_sdata*"
+        "--path", required=True,
+        help="Clustered SpatialData zarr from cluster_sdata or cluster_sdata_gpu. "
+             "NOT cluster_sdata_gpu_ooc, which omits layers['counts']."
     )
     parser.add_argument(
         "--group_by",
@@ -220,9 +226,10 @@ def size_rank(counts):
 def reduce_by(adata, column, resolution):
     """Sum both layers over one obs column, returning a groups x genes AnnData.
 
-    Both layers come from the SAME sc.get.aggregate call, so the two sums are guaranteed
-    to be over identical row sets — a second call could disagree if the column's
-    categories differed between them.
+    Two aggregate calls, not one: sc.get.aggregate takes a single `layer`, so each sum
+    is its own pass over the matrix. What guarantees the two are over identical row sets
+    is that both group on the SAME materialized `by_key` column — grouping twice on the
+    stored categorical could disagree if its unused categories differed between calls.
     """
     # sc.get.aggregate returns its results in .layers, keyed by the func name, and
     # ignores .X entirely. `by` must NAME an obs column — passing the Series itself
@@ -281,6 +288,34 @@ def main():
         adata = sdata.tables[table_key].copy()
 
     print(f"Table:   {adata.n_obs:,} cells × {adata.n_vars:,} genes  (key: '{table_key}')")
+
+    # Checked here, before the CP10K pass and before any grouping work, because the
+    # alternative is a bare KeyError from deep inside that pass on a zarr that has
+    # already been read.
+    #
+    # cluster_sdata and cluster_sdata_gpu both stash the raw matrix; cluster_sdata_gpu_ooc
+    # deliberately does NOT, since holding a second copy of a merged cohort's matrix is
+    # the thing that step exists to avoid. So its output cannot be reduced here, and the
+    # message says so rather than leaving the reader to find that out.
+    #
+    # There is no fallback to layers["lognorm"], and that is deliberate rather than
+    # unfinished. cluster_sdata* normalizes with no target_sum, so lognorm is on each
+    # sample's own median scale — the one thing these centroids exist NOT to be, since
+    # they are built to be compared across samples and against an external reference.
+    # CP10K is in fact recoverable from it (every cell sums to the same median M after
+    # normalize_total, so CP10K is expm1(lognorm) * 1e4 / M), but that round-trips a log
+    # transform over the whole matrix and adds a second normalization path that has to
+    # stay in step with the first. A clear error beats a subtle numerical difference
+    # between samples that nothing would report.
+    if "counts" not in adata.layers:
+        raise KeyError(
+            f"{args.sample}: the table has no layers['counts'], so centroids cannot be "
+            f"built. Centroids are summed CP10K and need the raw matrix; the layers "
+            f"present are {sorted(adata.layers)}. cluster_sdata and cluster_sdata_gpu "
+            f"write this layer, but cluster_sdata_gpu_ooc omits it on purpose — if this "
+            f"zarr came from that step, re-cluster the sample with cluster_sdata or "
+            f"cluster_sdata_gpu if it fits."
+        )
 
     to_reduce = groupings(adata, args.group_by)
     print(f"Reducing over {len(to_reduce)} column(s): "

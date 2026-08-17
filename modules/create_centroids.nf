@@ -4,6 +4,11 @@
 // Per-sample fan-out, the same shape as CLUSTER_SDATA — one zarr in, one h5ad out,
 // publishing its own handoff row.
 //
+// Takes CLUSTER_SDATA or CLUSTER_SDATA_GPU output. NOT CLUSTER_SDATA_GPU_OOC, which
+// omits layers['counts'] on purpose — holding a second copy of a merged cohort's matrix
+// is what that step exists to avoid — and so cannot be reduced here. The script checks
+// for the layer up front and fails naming the cause.
+//
 // Deliberately its own step rather than folded into CLUSTER_SDATA, which already holds
 // the matrix in memory: Nextflow hashes the task script, so folding it in would make any
 // change to the centroid recipe re-run PCA, UMAP and the whole Leiden sweep for the
