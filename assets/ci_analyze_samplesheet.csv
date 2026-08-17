@@ -1,2 +1,2 @@
-sample,cell,path
-ROI1,aaaaimck-1,/path/to/ROI1/create_follicle_sdata/aaaaimck-1.zarr
+sample,cell,path,centroid_path
+ROI1,aaaaimck-1,/path/to/ROI1/create_follicle_sdata/aaaaimck-1.zarr,/path/to/ROI1/create_centroids/ROI1_centroids.h5ad

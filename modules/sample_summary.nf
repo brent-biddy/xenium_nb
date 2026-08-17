@@ -23,6 +23,16 @@ process SAMPLE_SUMMARY {
     // staged name carries no meaning as a result — the notebook takes each sample's id
     // from obs["sample"], not from the path.
     path zarrs, stageAs: 'sample*.zarr'
+    // Every sample's centroid store from create_centroids, staged flat beside the zarrs.
+    // This is where the deck's expression evidence comes from — it no longer opens a
+    // counts matrix at all, so the zarrs above are read only for obs, obsm and the
+    // spatial elements the tissue and zoom slides draw.
+    //
+    // No indexed stageAs here, unlike the zarrs: create_centroids names its output
+    // <sample>_centroids.h5ad, so two samples cannot collide the way two `clustered.zarr`
+    // do. The notebook still keys them on obs["sample"] rather than the file name, so a
+    // renamed file changes nothing.
+    path centroids
     path notebook
     // Quarto resolves reference-doc relative to the qmd's own directory, so the
     // template has to land beside the staged notebook, not at its repo path.

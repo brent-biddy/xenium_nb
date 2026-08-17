@@ -14,7 +14,7 @@
 //   create_centroids          samplesheet: sample, path  (clustered zarrs; + --group_by)
 //   cluster_report            samplesheet: sample, path  (clustered zarrs; one deck for the cohort)
 //   qc_report                 samplesheet: sample, path  (raw create_sdata zarrs; one deck for the cohort)
-//   sample_summary            samplesheet: sample, path  (clustered zarrs; + --chosen_resolutions)
+//   sample_summary            samplesheet: sample, path, centroid_path  (create_centroids sheet; + --chosen_resolutions)
 //   concat_sdata              samplesheet: path
 //   downsample_sdata          samplesheet: sample, path  (+ --fraction or --n_cells)
 //   plot_follicle             samplesheet: sample, cell, path
@@ -385,22 +385,37 @@ workflow sample_summary {
     // no curated cells in it simply gets none.
     if (!params.curated_oocytes)    error "Please provide --curated_oocytes"
 
-    // Point --samplesheet at a cluster_sdata* handoff sheet — this report reads the
-    // clustered zarrs (obs, var, and the leiden_res_* columns), not create_sdata's raw ones.
-    channel
+    // Point --samplesheet at a CREATE_CENTROIDS handoff sheet, which carries both
+    // locations per sample: `path` is the clustered zarr (read for obs, obsm and the
+    // spatial elements) and `centroid_path` the centroid store (read for all expression
+    // evidence). A cluster_sdata* sheet no longer suffices — it has no centroid column,
+    // and this deck stopped deriving centroids from the counts matrix.
+    def sampleSummaryRows = channel
         .fromPath(params.samplesheet)
-        .splitCsv(header: true)          // Map(sample, path)
+        .splitCsv(header: true)          // Map(sample, path, centroid_path)
         .map { row ->
             if (!row.path) error "Samplesheet row missing 'path': ${row}"
-            file(row.path)
-        }                                // path(zarr)
-        // sort so the staged order — and therefore the report — is reproducible
-        // regardless of the order tasks happen to finish upstream.
-        .toSortedList()                  // one list of every zarr: fans in to a single task
+            if (!row.centroid_path) error(
+                "Samplesheet row missing 'centroid_path': ${row}. sample_summary reads " +
+                "create_centroids' stores — point --samplesheet at " +
+                "<outdir>/create_centroids_samplesheet.csv, not cluster_sdata's sheet.")
+            tuple(file(row.path), file(row.centroid_path))
+        }                                // tuple(zarr, centroid_h5ad)
+
+    // Split into two fan-in lists rather than one list of pairs: the process takes them
+    // as separate `path` inputs so each gets its own stageAs rule. Both are sorted, so
+    // the staged order — and therefore the report — is reproducible regardless of the
+    // order tasks happen to finish upstream.
+    sampleSummaryRows.map { zarr, _centroid -> zarr }
+        .toSortedList()
         .set { sampleSummaryZarrs }      // val(list of zarr paths)
+    sampleSummaryRows.map { _zarr, centroid -> centroid }
+        .toSortedList()
+        .set { sampleSummaryCentroids }  // val(list of centroid h5ad paths)
 
     SAMPLE_SUMMARY(
         sampleSummaryZarrs,
+        sampleSummaryCentroids,
         file("${projectDir}/notebooks/analyze/sample_summary.qmd"),
         file("${projectDir}/resources/ouhsc_ppt_template.pptx"),
         file(params.chosen_resolutions),

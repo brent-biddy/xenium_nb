@@ -31,6 +31,7 @@ import traceback
 import warnings
 from pathlib import Path
 
+import anndata as ad
 import matplotlib.patheffects as patheffects
 import matplotlib.pyplot as plt
 import numpy as np
@@ -47,6 +48,7 @@ from matplotlib_scalebar.scalebar import ScaleBar
 from spatialdata.models import PointsModel
 from spatialdata.transformations import get_transformation
 from scipy.cluster.hierarchy import leaves_list, linkage
+from scipy.sparse import issparse
 from scipy.spatial.distance import squareform
 
 # Chatter from the zoom slides, suppressed by message rather than wholesale: each of these
@@ -107,6 +109,24 @@ plt.rcParams.update({
 ZARRS = sorted(Path(".").glob("*.zarr"))
 if not ZARRS:
     raise FileNotFoundError("No .zarr directories staged next to the notebook.")
+
+# create_centroids' per-sample stores, staged flat beside the zarrs. This deck reads its
+# expression evidence from these and never opens a counts matrix: the clustered zarrs are
+# ~1.1 GB each against ~6.5 MB of centroids, and every render was re-reading all of it to
+# recompute numbers that do not change between renders.
+#
+# Keyed on obs["sample"] rather than the file name. These need no indexed stageAs — the
+# stores are named per sample and cannot collide the way `clustered.zarr` does — but the
+# id still comes from inside the artifact, as it does for the zarrs, so the two agree
+# even if a file is renamed. Read whole: a store is one row per (resolution, cluster).
+CENTROIDS = {}
+for path in sorted(Path(".").glob("*_centroids.h5ad")):
+    store = ad.read_h5ad(path)
+    CENTROIDS[str(store.obs["sample"].iloc[0])] = store
+if not CENTROIDS:
+    raise FileNotFoundError(
+        "No *_centroids.h5ad staged next to the notebook. This deck reads centroids from "
+        "create_centroids — point --samplesheet at its handoff sheet, not cluster_sdata's.")
 
 # The resolution each sample's clusters are taken at unless its row in
 # chosen_resolutions.csv says otherwise. A cohort-wide starting point, not a claim that
@@ -1888,48 +1908,49 @@ for path in ZARRS:
         # cluster_report labels its panels with the raw leiden ids — the two disagree on
         # cluster names by design, which each slide's caption says.
         #
-        # value_counts already orders by descending count; the sort only settles ties, on
-        # the original numeric label. Pandas sorts value_counts with a non-stable
-        # algorithm, so two equal-sized clusters could otherwise swap ids between renders
-        # of the same data. int() because the labels are strings, where "10" < "2".
-        counts = adata.obs[key].value_counts()
-        levels = sorted(counts.index, key=lambda level: (-counts[level], int(level)))
+        # BOTH the size ranking and the centroids are READ from create_centroids' store,
+        # not derived here. This deck used to do both, off layers["counts"] — by far the
+        # most expensive thing it touched, ~1.1 GB per sample re-read on every render to
+        # recompute numbers that do not change between renders.
+        #
+        # cluster_v1 is JOINED, never recomputed. The store ranks clusters by cell count
+        # at every resolution in the sweep; re-deriving the same ranking here would be a
+        # second definition of the id the centroids are keyed on, free to drift from the
+        # first. `levels` is therefore the store's own group labels put in v1 order, and
+        # add_cluster_ids writes the same numbering into obs that the centroid rows carry.
+        store = CENTROIDS.get(sample)
+        if store is None:
+            raise FileNotFoundError(
+                f"no centroid store staged for {sample!r}. Point --samplesheet at a "
+                f"create_centroids handoff sheet; staged stores: {sorted(CENTROIDS)}")
+        block = store[store.obs["resolution"].astype(str) == f"{resolution:.2f}"]
+        if block.n_obs == 0:
+            raise ValueError(
+                f"{sample}: centroid store holds no rows at resolution "
+                f"{resolution:.2f} — it carries "
+                f"{sorted(store.obs['resolution'].astype(str).unique())}. Re-run "
+                f"create_centroids over a sweep that includes it.")
+        group_to_v1 = dict(zip(block.obs["group"].astype(str),
+                               block.obs["cluster_v1"].astype(str)))
+        levels = sorted(group_to_v1, key=lambda level: int(group_to_v1[level]))
         add_cluster_ids(adata, key, levels, "cluster_v1")
 
-        # Centroids, their correlation, and the dendrogram order, computed once here rather
-        # than inside a slide function: both the heatmap and the v2
-        # numbering need the ordering, and the counts layer is by far the most expensive
-        # thing this deck touches.
+        # The centroid recipe itself lives in bin/create_centroids.py; see its docstring
+        # for why the store holds SUMS rather than means (they are additive, so any union
+        # of clusters is a row-wise add). Recovering the centroid is the one division the
+        # store is shaped to make cheap: X is summed CP10K, so X / n_cells is the mean
+        # CP10K over the cluster's cells, and log1p of that is the atlas pseudobulk form
+        # (Seurat AverageExpression + ln(avg + 1)) — mean-then-log, not log-then-mean.
         #
-        # Centroids follow the sammy_r21 / PNAS atlas pseudobulk (Seurat AverageExpression
-        # + ln(avg + 1)): normalize each cell to CP10K, average the *linear* CP10K over a
-        # cluster's cells, then log1p that average — mean-then-log, not log-then-mean.
-        # Built from layers["counts"] (ground truth, stashed by cluster_sdata before
-        # normalizing) rather than expm1(X), which would round-trip the log transform.
-        #
-        # The log1p does not affect this slide: Spearman ranks genes within a centroid and
-        # log1p is monotonic, so the correlation is identical with or without it. It is
-        # kept because these centroids are the form to reuse elsewhere. Nor does the CP10K
-        # target — a uniform per-cell scale leaves within-centroid ranks untouched. CP10K
-        # matters for comparability only: cluster_sdata's normalize_total takes no
-        # target_sum, and its default is the median pre-normalization total (226 for one of
-        # these samples, 198 for the other), which is a per-sample scale that could not be
-        # compared across samples or against an external atlas.
-        #
-        # Not sc.tl.dendrogram / sc.pl.correlation_matrix: those average a *representation*
-        # (X_pca by default) and correlate with Pearson — log-then-mean in a reduced space,
-        # a different quantity. The scanpy calls used here do the recipe's own steps.
-        adata.layers["cp10k"] = adata.layers["counts"].copy()
-        sc.pp.normalize_total(adata, layer="cp10k", target_sum=1e4)
-        # sc.get.aggregate returns its result in .layers["mean"], not .X.
-        agg = sc.get.aggregate(adata, by="cluster_v1", func="mean", layer="cp10k")
-        centroids = pd.DataFrame(np.log1p(agg.layers["mean"]),
-                                 index=list(agg.obs_names), columns=agg.var_names)
-
-
-        # Drop the second copy of the matrix now: the figures below do not need it.
-        del adata.layers["cp10k"]
-        gc.collect()
+        # Sorted into v1 order because everything below indexes positionally: `order[j]`
+        # from the dendrogram names the 0-based v1 rank that becomes v2 id j + 1, so row i
+        # of this frame must be v1 id i + 1. int() on the labels, where "10" < "2".
+        block = block[np.argsort([int(v) for v in block.obs["cluster_v1"]])]
+        counts_per_cluster = block.obs["n_cells"].to_numpy()[:, None]
+        centroids = pd.DataFrame(
+            np.log1p(np.asarray(block.X.todense() if issparse(block.X) else block.X)
+                     / counts_per_cluster),
+            index=list(block.obs["cluster_v1"].astype(str)), columns=block.var_names)
 
         # Spearman rather than Pearson on the values: a targeted panel's centroids are
         # dominated by a few very high-expressing genes, which set a Pearson r almost on
