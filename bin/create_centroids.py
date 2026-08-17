@@ -34,10 +34,7 @@ import spatialdata
 
 from timer import timer, timing_summary
 
-# The prefix cluster_sdata* writes its sweep under, `leiden_res_<r>` formatted to two
-# decimals. Matched on the prefix rather than taken from a --resolutions flag: the sweep
-# is whatever the cluster run that produced this zarr chose, and the zarr is the only
-# thing that knows.
+# The prefix cluster_sdata* writes its sweep under.
 LEIDEN_PREFIX = "leiden_res_"
 
 
