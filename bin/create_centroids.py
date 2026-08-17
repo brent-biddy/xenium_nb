@@ -9,8 +9,8 @@ instead of one per cell:
     layers["counts"]  raw counts, summed over the group
 
 obs describes each row with `grouping`, `group`, `n_cells` and `sample`, plus
-`resolution` and `cluster_v1` when the column grouped on is one of the sweep's
-leiden_res_<r> columns. Requires layers["counts"], so not cluster_sdata_gpu_ooc output.
+`resolution` when the column grouped on is one of the sweep's leiden_res_<r> columns.
+Requires layers["counts"], so not cluster_sdata_gpu_ooc output.
 
 Groups by every leiden_res_<r> column in the sweep by default, or by one named obs column
 with --group_by. Writes <sample>_centroids.h5ad into the current working directory (or
@@ -76,24 +76,15 @@ def reduce_by(adata, column):
 
     # The schema every row carries, whatever the grouping. n_cells comes from aggregate's
     # own n_obs_aggregated rather than a second value_counts over the column.
-    n_cells = cp10k.obs["n_obs_aggregated"]
     out.obs["grouping"] = column
     out.obs["group"] = out.obs_names
-    out.obs["n_cells"] = n_cells.to_numpy()
+    out.obs["n_cells"] = cp10k.obs["n_obs_aggregated"].to_numpy()
 
-    # The two fields a leiden column earns and nothing else does. Absent rather than
-    # placeheld for a non-leiden grouping: a cell type has no resolution.
-    #
-    # cluster_v1 is the size ranking, 1 being the largest cluster. Leiden's own ids are
-    # assignment order, so cluster 3 in one sample has nothing to do with cluster 3 in
-    # another. Ties are settled on the numeric label so two equal-sized clusters cannot
-    # swap ids between runs over the same data.
+    # A sweep column earns one more field, since "0.60" is not recoverable from
+    # "leiden_res_0.60" without parsing. A cell type has no resolution, so for any other
+    # grouping it is absent rather than filled with a placeholder.
     if column.startswith(LEIDEN_PREFIX):
         out.obs["resolution"] = column.removeprefix(LEIDEN_PREFIX)
-        ranked = sorted(out.obs_names, key=lambda group: (-n_cells[group], int(group)))
-        out.obs["cluster_v1"] = out.obs_names.map(
-            {group: str(rank) for rank, group in enumerate(ranked, start=1)}
-        )
 
     return out
 
@@ -186,7 +177,7 @@ def main():
         # of the data: anndata's writer and ad.concat convert object string columns only
         # when the cardinality makes it pay off, so the same column comes back categorical
         # from a sweep store and object from a single-resolution one.
-        for col in ("grouping", "group", "resolution", "cluster_v1", "sample"):
+        for col in ("grouping", "group", "resolution", "sample"):
             if col in centroids.obs:
                 centroids.obs[col] = pd.Categorical(centroids.obs[col].astype(str))
 
