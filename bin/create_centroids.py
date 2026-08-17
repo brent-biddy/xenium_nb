@@ -2,100 +2,34 @@
 """
 create_centroids.py - Reduce one clustered SpatialData zarr to per-group centroids.
 
-Consumes a clustered zarr from cluster_sdata or cluster_sdata_gpu and writes a small
-centroid store: one row per group of cells instead of one row per cell. This is the
-artifact the report decks read, so they never open a counts matrix.
+Consumes a clustered zarr from cluster_sdata or cluster_sdata_gpu and writes one row per
+group of cells instead of one per cell: <sample>_centroids.h5ad, or
+<sample>_centroids_<column>.h5ad for a --group_by run, so the two never collide. This is
+the artifact the report decks read, so they never open a counts matrix.
 
-NOT cluster_sdata_gpu_ooc, whose output has no layers["counts"] — that step omits it on
-purpose, since holding a second copy of a merged cohort's matrix is what it exists to
-avoid. The check for that layer is up front in main(), with the reasoning there. Today sample_summary is the only thing that touches
-layers["counts"] at all, and it does so to compute exactly these numbers — once per
-render, over every sample, for a table that is three orders of magnitude smaller than
-the matrix it came from.
+Requires layers["counts"]. cluster_sdata_gpu_ooc omits it on purpose, so its output
+cannot be reduced here; main() checks up front and the error says so.
 
-WHAT DEFINES A GROUP IS AN OBS COLUMN, and which one is the only thing --group_by
-changes. The reducer below is indifferent to what the column means:
+WHAT DEFINES A GROUP IS AN OBS COLUMN, and which one is all --group_by changes:
 
     (default)              every leiden_res_<r> in the sweep, one block per resolution
     --group_by <column>    that one obs column
 
-The default is the cluster sweep because that is what the decks read. --group_by exists
-for groupings some upstream step writes into obs — per-cell cell type being the case it
-would be used for — and it makes this step reusable without a second script, since
-summing by one categorical is summing by any other.
+EVERYTHING IS STORED AS SUMS over a group's cells, never means, because sums are
+additive: any union of groups is the row-wise sum of its members and n_cells sums with
+it. Two layers, neither recoverable from the other — X is cp10k_sum (per-cell CP10K,
+THEN summed) and layers["counts"] is counts_sum. The centroid a deck correlates against a
+reference is log1p(cp10k_sum / n_cells).
 
-Note what --group_by is NOT for: a grouping that is a COARSENING of the sweep's clusters
-needs no run at all. Sums are additive (below), so a cell type defined per cluster, a
-consensus cluster, or any other union of clusters is the row-wise sum of its members'
-rows in the default store — the deck adds them. --group_by earns its cost only when the
-grouping SPLITS a cluster, which is the per-cell case: it needs the cells, so it needs
-this pass over the zarr.
+obs describes every row the same way whatever the grouping: `grouping` (the column summed
+over), `group`, `n_cells`, `sample`. A leiden column earns two more, `resolution` and
+`cluster_v1` (the size ranking, 1 being the largest cluster) — decided by the COLUMN
+NAME, not by which mode produced it, so `--group_by leiden_res_0.60` yields exactly the
+sweep's rows for that resolution.
 
-Centroids are computed at EVERY resolution in the sweep, not just the one recorded in
-assets/chosen_resolutions.csv. That file is a curated judgment made by reading
-cluster_report, and it stays a report-level knob: revising a sample's chosen resolution
-re-renders a deck, it does not re-run this step. Restricting to the chosen resolution
-here would also make this the first bin/ script to read a curated file, which the
-compute/report split in this repo avoids — and the same rule is why --group_by names a
-column already in obs rather than reading a label file.
-
-Deliberately its own step rather than folded into cluster_sdata, which already holds the
-matrix in memory: Nextflow hashes the task script, so folding it in would make any change
-to the centroid recipe re-run PCA, UMAP and the whole Leiden sweep for the cohort.
-
-WHY SUMS, NOT MEANS
-Everything is stored as SUMS over the cells of a group, never as means, because sums are
-additive: the profile of any union of groups — across resolutions, across samples, a
-consensus cluster — is the plain row-wise sum of its members, and `n_cells` sums with it.
-A mean would have to be un-averaged (weight by n) before it could be combined, which is
-the same number by a longer route. Two layers, because neither is recoverable from the
-other:
-
-    X                 cp10k_sum    per-cell CP10K normalization, THEN summed
-    layers["counts"]  counts_sum   raw counts summed
-
-The centroid the decks correlate against a reference is `log1p(cp10k_sum / n_cells)` —
-mean-of-normalized, matching Seurat's AverageExpression and therefore the published
-centroid tables in assets/. Summing raw counts instead lets deep cells dominate in
-proportion to depth; on ovary that is not a marginal difference, since oocytes carry
-~5,000 transcripts against a ~200-transcript median. The counts layer is kept for DE
-input, where edgeR/DESeq2 estimate size factors themselves, and it is not derivable from
-the CP10K route — that one needs each cell's library size, which summing raw counts
-discards.
-
-CP10K rather than the pipeline's own normalization is deliberate. cluster_sdata's
-normalize_total takes no target_sum, so layers["lognorm"] is on each sample's own median
-scale (226 and 198 on the two test ROIs) and is comparable neither across samples nor
-against an external atlas. These centroids exist to be compared, so they are built from
-layers["counts"] and normalized here. Building them from expm1(X) would round-trip a log
-transform through a matrix that scaling has already overwritten.
-
-THE OBS SCHEMA
-obs describes every row the same way whatever the grouping: `grouping` is the obs column
-the cells were grouped by, `group` its value, `n_cells` the count. Rows grouped by a
-`leiden_res_<r>` column carry two more, `resolution` and `cluster_v1`, because a
-resolution is a number the decks select on and "0.60" is not recoverable from
-"leiden_res_0.60" without parsing. That is decided by the COLUMN NAME and not by which
-mode produced it, so `--group_by leiden_res_0.60` yields exactly the sweep's rows for
-that resolution — same numbers, same schema, readable by the same deck code.
-
-`cluster_v1` is the size ranking: 1 is the sample's largest cluster at that resolution.
-It is computed HERE rather than at render time, and that is a change from where it used
-to live. Leiden's own labels are assignment order and mean nothing across samples or
-across resolutions; sample_summary was deriving the size rank itself, inside the same
-cell that built the centroids. Splitting the centroids out without the ranking would
-leave the deck re-deriving a key it then has to join the centroids on, which is two
-definitions of one id. The deck should JOIN on this column, not recompute it.
-
-The decks label their slides with a second numbering, v2, that renumbers a sample's
-clusters 1..k down their own centroid-correlation dendrogram so adjacent numbers are
-transcriptionally adjacent. That one stays at render time: its recipe is unsettled —
-which genes it correlates over, which linkage — and stored here, every trial of it costs
-a cohort-wide re-run of this step and renumbers every heatmap in every deck.
-
-Writes <sample>_centroids.h5ad into the current working directory, alongside timing and
-session info files. A --group_by run writes <sample>_centroids_<column>.h5ad instead, so
-one sample's groupings sit side by side and a new one never clobbers the sweep store.
+See the create_centroids entry in CLAUDE.md for why sums rather than means, why CP10K
+rather than the pipeline's own scale, why cluster_v1 is computed here and v2 is not, and
+when --group_by is the wrong tool.
 
 Usage:
     create_centroids.py --sample ROI1_A --path clustered.zarr
