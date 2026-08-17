@@ -1,35 +1,18 @@
 #!/usr/bin/env python3
 """
-create_centroids.py - Reduce one clustered SpatialData zarr to per-group centroids.
+create_centroids.py - Reduce a clustered SpatialData zarr to per-group centroids.
 
-Consumes a clustered zarr from cluster_sdata or cluster_sdata_gpu and writes one row per
-group of cells instead of one per cell: <sample>_centroids.h5ad, or
-<sample>_centroids_<column>.h5ad for a --group_by run, so the two never collide. This is
-the artifact the report decks read, so they never open a counts matrix.
+Sums both expression layers over an obs column, writing one row per group of cells
+instead of one per cell: X is summed CP10K, layers["counts"] summed raw counts, and obs
+carries grouping, group, n_cells and sample, plus resolution and cluster_v1 for a leiden
+column. Requires layers["counts"], so not cluster_sdata_gpu_ooc output.
 
-Requires layers["counts"]. cluster_sdata_gpu_ooc omits it on purpose, so its output
-cannot be reduced here; main() checks up front and the error says so.
+Groups by every leiden_res_<r> column in the sweep by default, or by one named obs column
+with --group_by. Writes <sample>_centroids.h5ad into the current working directory (or
+<sample>_centroids_<column>.h5ad for a --group_by run), alongside timing and session info
+files.
 
-WHAT DEFINES A GROUP IS AN OBS COLUMN, and which one is all --group_by changes:
-
-    (default)              every leiden_res_<r> in the sweep, one block per resolution
-    --group_by <column>    that one obs column
-
-EVERYTHING IS STORED AS SUMS over a group's cells, never means, because sums are
-additive: any union of groups is the row-wise sum of its members and n_cells sums with
-it. Two layers, neither recoverable from the other — X is cp10k_sum (per-cell CP10K,
-THEN summed) and layers["counts"] is counts_sum. The centroid a deck correlates against a
-reference is log1p(cp10k_sum / n_cells).
-
-obs describes every row the same way whatever the grouping: `grouping` (the column summed
-over), `group`, `n_cells`, `sample`. A leiden column earns two more, `resolution` and
-`cluster_v1` (the size ranking, 1 being the largest cluster) — decided by the COLUMN
-NAME, not by which mode produced it, so `--group_by leiden_res_0.60` yields exactly the
-sweep's rows for that resolution.
-
-See the create_centroids entry in CLAUDE.md for why sums rather than means, why CP10K
-rather than the pipeline's own scale, why cluster_v1 is computed here and v2 is not, and
-when --group_by is the wrong tool.
+See the create_centroids entry in CLAUDE.md for the design rationale.
 
 Usage:
     create_centroids.py --sample ROI1_A --path clustered.zarr
