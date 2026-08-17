@@ -11,6 +11,7 @@
 //   cluster_sdata             samplesheet: sample, path[, min_counts, min_cells, max_counts_quantile]  (+ --resolutions)
 //   cluster_sdata_gpu         samplesheet: sample, path[, min_counts, min_cells, max_counts_quantile]  (+ --resolutions)
 //   cluster_sdata_gpu_ooc     samplesheet: sample, path[, min_counts, min_cells, max_counts_quantile]  (+ --chunk_size, --n_top_genes, --resolutions)
+//   create_centroids          samplesheet: sample, path  (clustered zarrs; + --group_by)
 //   cluster_report            samplesheet: sample, path  (clustered zarrs; one deck for the cohort)
 //   qc_report                 samplesheet: sample, path  (raw create_sdata zarrs; one deck for the cohort)
 //   sample_summary            samplesheet: sample, path  (clustered zarrs; + --chosen_resolutions)
@@ -25,6 +26,7 @@ include { CREATE_FOLLICLE_SDATA }    from './modules/create_follicle_sdata'
 include { CLUSTER_SDATA }            from './modules/cluster_sdata'
 include { CLUSTER_SDATA_GPU }        from './modules/cluster_sdata_gpu'
 include { CLUSTER_SDATA_GPU_OOC }    from './modules/cluster_sdata_gpu_ooc'
+include { CREATE_CENTROIDS }         from './modules/create_centroids'
 include { CLUSTER_REPORT }           from './modules/cluster_report'
 include { QC_REPORT }                from './modules/qc_report'
 include { SAMPLE_SUMMARY }           from './modules/sample_summary'
@@ -51,7 +53,7 @@ def resolveThreshold(rowValue, paramValue) {
 // ── Entry workflow ────────────────────────────────────────────────────────────
 
 workflow {
-    if (!params.step) error "Please provide --step <name>. Valid steps: downsample_xenium_region, create_sdata, create_adata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, cluster_report, qc_report, sample_summary, concat_sdata, downsample_sdata, plot_follicle"
+    if (!params.step) error "Please provide --step <name>. Valid steps: downsample_xenium_region, create_sdata, create_adata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, create_centroids, cluster_report, qc_report, sample_summary, concat_sdata, downsample_sdata, plot_follicle"
 
     if      (params.step == 'downsample_xenium_region')  downsample_xenium_region()
     else if (params.step == 'create_sdata')              create_sdata()
@@ -60,13 +62,14 @@ workflow {
     else if (params.step == 'cluster_sdata')             cluster_sdata()
     else if (params.step == 'cluster_sdata_gpu')         cluster_sdata_gpu()
     else if (params.step == 'cluster_sdata_gpu_ooc')     cluster_sdata_gpu_ooc()
+    else if (params.step == 'create_centroids')          create_centroids()
     else if (params.step == 'cluster_report')            cluster_report()
     else if (params.step == 'qc_report')                 qc_report()
     else if (params.step == 'sample_summary')            sample_summary()
     else if (params.step == 'concat_sdata')              concat_sdata()
     else if (params.step == 'downsample_sdata')          downsample_sdata()
     else if (params.step == 'plot_follicle')             plot_follicle()
-    else error "Unknown --step '${params.step}'. Valid steps: downsample_xenium_region, create_sdata, create_adata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, cluster_report, qc_report, sample_summary, concat_sdata, downsample_sdata, plot_follicle"
+    else error "Unknown --step '${params.step}'. Valid steps: downsample_xenium_region, create_sdata, create_adata, create_follicle_sdata, cluster_sdata, cluster_sdata_gpu, cluster_sdata_gpu_ooc, create_centroids, cluster_report, qc_report, sample_summary, concat_sdata, downsample_sdata, plot_follicle"
 }
 
 // ── downsample_xenium_region ──────────────────────────────────────────────────
@@ -273,6 +276,38 @@ workflow cluster_sdata_gpu_ooc {
         .map { it.text }             // read row content so collectFile's sort is deterministic
         .collectFile(name: 'cluster_sdata_gpu_ooc_samplesheet.csv', storeDir: params.outdir,
                      seed: 'sample,path', newLine: true, sort: true)
+}
+
+// ── create_centroids ──────────────────────────────────────────────────────────
+
+workflow create_centroids {
+    if (!params.samplesheet) error "Please provide --samplesheet"
+
+    // Point --samplesheet at a cluster_sdata* handoff sheet — this step reads the
+    // clustered zarrs (layers["counts"] and the leiden_res_* columns), not
+    // create_sdata's raw ones, which carry no clusters to group by.
+    channel
+        .fromPath(params.samplesheet)
+        .splitCsv(header: true)      // Map(sample, path)
+        .map { row ->
+            if (!row.sample) error "Samplesheet row missing 'sample': ${row}"
+            if (!row.path)   error "Samplesheet row missing 'path': ${row}"
+            // row.path rides along as a val as well as a staged path: inside the task the
+            // staged name means nothing outside that work dir, and the handoff row has to
+            // forward a location sample_summary can still resolve. That deck needs both
+            // artifacts — the centroids for expression, the clustered zarr for obs, obsm
+            // and the spatial elements — so the row it collects carries both.
+            tuple(row.sample, file(row.path), row.path)
+        }                            // tuple(sample, path, cluster_path)
+        | CREATE_CENTROIDS
+
+    // Handoff samplesheet of the clustered zarrs AND their centroid stores (see
+    // create_sdata for rationale). Three columns rather than two, because the decks
+    // downstream of this step read both artifacts.
+    CREATE_CENTROIDS.out.samplesheet_row
+        .map { it.text }             // read row content so collectFile's sort is deterministic
+        .collectFile(name: 'create_centroids_samplesheet.csv', storeDir: params.outdir,
+                     seed: 'sample,path,centroid_path', newLine: true, sort: true)
 }
 
 // ── cluster_report ────────────────────────────────────────────────────────────
